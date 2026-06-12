@@ -1,0 +1,2002 @@
+     1→<!DOCTYPE html>
+     2→<html lang="zh-CN">
+     3→<head>
+     4→  <meta charset="UTF-8">
+     5→  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+     6→  <title>Luna - 经期追踪原型</title>
+     7→  <script src="https://cdn.tailwindcss.com"></script>
+     8→  <link rel="preconnect" href="https://fonts.googleapis.com">
+     9→  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    10→  <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@300;400;500;600&family=Noto+Sans+SC:wght@300;400;500;600&display=swap" rel="stylesheet">
+    11→  <style>
+    12→    :root {
+    13→      --bg-primary: #0f1419;
+    14→      --bg-secondary: #1a2027;
+    15→      --bg-card: #232b35;
+    16→      --fg-primary: #f0ece4;
+    17→      --fg-secondary: #a8a29e;
+    18→      --fg-muted: #6b7280;
+    19→      --accent-warm: #e07a5f;
+    20→      --accent-soft: #d4a574;
+    21→      --accent-sage: #81b29a;
+    22→      --accent-coral: #f2cc8f;
+    23→      --border: rgba(255,255,255,0.08);
+    24→    }
+    25→
+    26→    * {
+    27→      -webkit-tap-highlight-color: transparent;
+    28→      box-sizing: border-box;
+    29→    }
+    30→
+    31→    body {
+    32→      font-family: 'Noto Sans SC', sans-serif;
+    33→      background: var(--bg-primary);
+    34→      color: var(--fg-primary);
+    35→      overflow-x: hidden;
+    36→    }
+    37→
+    38→    .font-display {
+    39→      font-family: 'Cormorant Garamond', serif;
+    40→    }
+    41→
+    42→    .phone-frame {
+    43→      width: 375px;
+    44→      height: 812px;
+    45→      background: var(--bg-primary);
+    46→      border-radius: 40px;
+    47→      overflow: hidden;
+    48→      position: relative;
+    49→      box-shadow: 
+    50→        0 0 0 12px #1a1a1a,
+    51→        0 0 0 14px #333,
+    52→        0 25px 50px -12px rgba(0,0,0,0.5);
+    53→    }
+    54→
+    55→    .notch {
+    56→      position: absolute;
+    57→      top: 0;
+    58→      left: 50%;
+    59→      transform: translateX(-50%);
+    60→      width: 150px;
+    61→      height: 30px;
+    62→      background: #000;
+    63→      border-radius: 0 0 20px 20px;
+    64→      z-index: 100;
+    65→    }
+    66→
+    67→    .animated-bg {
+    68→      position: absolute;
+    69→      inset: 0;
+    70→      overflow: hidden;
+    71→      z-index: 0;
+    72→    }
+    73→
+    74→    .blob {
+    75→      position: absolute;
+    76→      border-radius: 50%;
+    77→      filter: blur(60px);
+    78→      opacity: 0.4;
+    79→      animation: float 20s ease-in-out infinite;
+    80→    }
+    81→
+    82→    .blob-1 {
+    83→      width: 300px;
+    84→      height: 300px;
+    85→      background: linear-gradient(135deg, var(--accent-warm), transparent);
+    86→      top: -100px;
+    87→      right: -100px;
+    88→      animation-delay: 0s;
+    89→    }
+    90→
+    91→    .blob-2 {
+    92→      width: 250px;
+    93→      height: 250px;
+    94→      background: linear-gradient(135deg, var(--accent-sage), transparent);
+    95→      bottom: 200px;
+    96→      left: -100px;
+    97→      animation-delay: -7s;
+    98→    }
+    99→
+   100→    .blob-3 {
+   101→      width: 200px;
+   102→      height: 200px;
+   103→      background: linear-gradient(135deg, var(--accent-soft), transparent);
+   104→      bottom: -50px;
+   105→      right: -50px;
+   106→      animation-delay: -14s;
+   107→    }
+   108→
+   109→    @keyframes float {
+   110→      0%, 100% { transform: translate(0, 0) scale(1); }
+   111→      33% { transform: translate(30px, -30px) scale(1.1); }
+   112→      66% { transform: translate(-20px, 20px) scale(0.9); }
+   113→    }
+   114→
+   115→    .cycle-ring {
+   116→      position: relative;
+   117→      width: 260px;
+   118→      height: 260px;
+   119→    }
+   120→
+   121→    .cycle-ring svg {
+   122→      transform: rotate(-90deg);
+   123→    }
+   124→
+   125→    .ring-track {
+   126→      fill: none;
+   127→      stroke: var(--border);
+   128→      stroke-width: 8;
+   129→    }
+   130→
+   131→    .ring-progress {
+   132→      fill: none;
+   133→      stroke: url(#ringGradient);
+   134→      stroke-width: 8;
+   135→      stroke-linecap: round;
+   136→      stroke-dasharray: 754;
+   137→      stroke-dashoffset: 754;
+   138→      transition: stroke-dashoffset 1.5s ease-out;
+   139→    }
+   140→
+   141→    .ring-glow {
+   142→      fill: none;
+   143→      stroke: url(#ringGradient);
+   144→      stroke-width: 16;
+   145→      stroke-linecap: round;
+   146→      stroke-dasharray: 754;
+   147→      stroke-dashoffset: 754;
+   148→      filter: blur(8px);
+   149→      opacity: 0.5;
+   150→      transition: stroke-dashoffset 1.5s ease-out;
+   151→    }
+   152→
+   153→    .cycle-center {
+   154→      position: absolute;
+   155→      inset: 30px;
+   156→      border-radius: 50%;
+   157→      display: flex;
+   158→      flex-direction: column;
+   159→      align-items: center;
+   160→      justify-content: center;
+   161→      cursor: pointer;
+   162→      transition: all 0.3s ease;
+   163→      user-select: none;
+   164→    }
+   165→
+   166→    .cycle-center::before {
+   167→      content: '';
+   168→      position: absolute;
+   169→      inset: 0;
+   170→      border-radius: 50%;
+   171→      background: radial-gradient(circle, rgba(224, 122, 95, 0.1) 0%, transparent 70%);
+   172→      opacity: 0;
+   173→      transition: opacity 0.3s ease;
+   174→    }
+   175→
+   176→    .cycle-center:hover::before {
+   177→      opacity: 1;
+   178→    }
+   179→
+   180→    .cycle-center:active {
+   181→      transform: scale(0.95);
+   182→    }
+   183→
+   184→    .long-press-hint {
+   185→      position: absolute;
+   186→      bottom: -30px;
+   187→      left: 50%;
+   188→      transform: translateX(-50%);
+   189→      font-size: 11px;
+   190→      color: var(--fg-muted);
+   191→      opacity: 0;
+   192→      transition: opacity 0.3s ease;
+   193→      white-space: nowrap;
+   194→    }
+   195→
+   196→    .cycle-center:hover .long-press-hint {
+   197→      opacity: 1;
+   198→    }
+   199→
+   200→    .page {
+   201→      position: absolute;
+   202→      inset: 0;
+   203→      padding-top: 50px;
+   204→      padding-bottom: 90px;
+   205→      opacity: 0;
+   206→      visibility: hidden;
+   207→      transition: opacity 0.4s ease, transform 0.4s ease;
+   208→      transform: translateX(20px);
+   209→      z-index: 1;
+   210→      overflow-y: auto;
+   211→      overflow-x: hidden;
+   212→      -webkit-overflow-scrolling: touch;
+   213→    }
+   214→
+   215→    .page::-webkit-scrollbar {
+   216→      width: 0;
+   217→      display: none;
+   218→    }
+   219→
+   220→    .page.active {
+   221→      opacity: 1;
+   222→      visibility: visible;
+   223→      transform: translateX(0);
+   224→      z-index: 2;
+   225→    }
+   226→
+   227→    .bottom-nav {
+   228→      position: absolute;
+   229→      bottom: 0;
+   230→      left: 0;
+   231→      right: 0;
+   232→      height: 85px;
+   233→      background: linear-gradient(to top, var(--bg-primary) 70%, transparent);
+   234→      display: flex;
+   235→      justify-content: space-around;
+   236→      align-items: center;
+   237→      padding-bottom: 20px;
+   238→      z-index: 50;
+   239→    }
+   240→
+   241→    .nav-item {
+   242→      display: flex;
+   243→      flex-direction: column;
+   244→      align-items: center;
+   245→      gap: 4px;
+   246→      padding: 8px 16px;
+   247→      border-radius: 16px;
+   248→      transition: all 0.3s ease;
+   249→      cursor: pointer;
+   250→    }
+   251→
+   252→    .nav-item svg {
+   253→      width: 24px;
+   254→      height: 24px;
+   255→      stroke: var(--fg-muted);
+   256→      transition: all 0.3s ease;
+   257→    }
+   258→
+   259→    .nav-item span {
+   260→      font-size: 11px;
+   261→      color: var(--fg-muted);
+   262→      transition: all 0.3s ease;
+   263→    }
+   264→
+   265→    .nav-item.active svg {
+   266→      stroke: var(--accent-warm);
+   267→    }
+   268→
+   269→    .nav-item.active span {
+   270→      color: var(--accent-warm);
+   271→    }
+   272→
+   273→    .nav-item:hover {
+   274→      background: rgba(255,255,255,0.05);
+   275→    }
+   276→
+   277→    .fab {
+   278→      width: 56px;
+   279→      height: 56px;
+   280→      border-radius: 50%;
+   281→      background: linear-gradient(135deg, var(--accent-warm), var(--accent-soft));
+   282→      display: flex;
+   283→      align-items: center;
+   284→      justify-content: center;
+   285→      box-shadow: 0 8px 24px rgba(224, 122, 95, 0.4);
+   286→      cursor: pointer;
+   287→      transition: all 0.3s ease;
+   288→      margin-top: -20px;
+   289→    }
+   290→
+   291→    .fab:hover {
+   292→      transform: scale(1.1);
+   293→      box-shadow: 0 12px 32px rgba(224, 122, 95, 0.5);
+   294→    }
+   295→
+   296→    .fab:active {
+   297→      transform: scale(0.95);
+   298→    }
+   299→
+   300→    .fab svg {
+   301→      width: 28px;
+   302→      height: 28px;
+   303→      stroke: var(--bg-primary);
+   304→      stroke-width: 2.5;
+   305→    }
+   306→
+   307→    .card {
+   308→      background: var(--bg-card);
+   309→      border-radius: 20px;
+   310→      border: 1px solid var(--border);
+   311→      padding: 20px;
+   312→      transition: all 0.3s ease;
+   313→    }
+   314→
+   315→    .card:hover {
+   316→      border-color: rgba(255,255,255,0.15);
+   317→      transform: translateY(-2px);
+   318→    }
+   319→
+   320→    .calendar-day {
+   321→      width: 40px;
+   322→      height: 40px;
+   323→      display: flex;
+   324→      align-items: center;
+   325→      justify-content: center;
+   326→      border-radius: 12px;
+   327→      font-size: 14px;
+   328→      cursor: pointer;
+   329→      transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+   330→      position: relative;
+   331→      background: transparent;
+   332→      color: var(--fg-primary);
+   333→      user-select: none;
+   334→      -webkit-user-select: none;
+   335→    }
+   336→
+   337→    .calendar-day:hover {
+   338→      background: rgba(255,255,255,0.08);
+   339→    }
+   340→
+   341→    .calendar-day:active {
+   342→      transform: scale(0.92);
+   343→    }
+   344→
+   345→    .calendar-day.today {
+   346→      background: linear-gradient(135deg, var(--accent-soft), var(--accent-coral)) !important;
+   347→      color: var(--bg-primary) !important;
+   348→      font-weight: 700 !important;
+   349→      transform: scale(1.08);
+   350→      z-index: 10;
+   351→    }
+   352→
+   353→    .calendar-day.period {
+   354→      background: var(--accent-warm);
+   355→      color: var(--bg-primary);
+   356→      font-weight: 500;
+   357→    }
+   358→
+   359→    .calendar-day.today.period {
+   360→      background: var(--accent-warm) !important;
+   361→      color: var(--bg-primary) !important;
+   362→      box-shadow: 0 0 0 3px var(--accent-soft) !important;
+   363→      transform: scale(1.08);
+   364→      z-index: 10;
+   365→    }
+   366→
+   367→    .calendar-day.period-start {
+   368→      border-top-left-radius: 20px;
+   369→      border-bottom-left-radius: 20px;
+   370→      border-top-right-radius: 4px;
+   371→      border-bottom-right-radius: 4px;
+   372→    }
+   373→
+   374→    .calendar-day.period-end {
+   375→      border-top-right-radius: 20px;
+   376→      border-bottom-right-radius: 20px;
+   377→      border-top-left-radius: 4px;
+   378→      border-bottom-left-radius: 4px;
+   379→    }
+   380→
+   381→    .calendar-day.period-middle {
+   382→      border-radius: 4px;
+   383→    }
+   384→
+   385→    .calendar-day.period-single {
+   386→      border-radius: 20px;
+   387→    }
+   388→
+   389→    .calendar-day.period-active {
+   390→      animation: period-pulse 2s ease-in-out infinite;
+   391→    }
+   392→
+   393→    @keyframes period-pulse {
+   394→      0%, 100% { box-shadow: 0 0 0 0 rgba(224, 122, 95, 0.4); }
+   395→      50% { box-shadow: 0 0 0 6px rgba(224, 122, 95, 0.2); }
+   396→    }
+   397→
+   398→    .calendar-day.today.period-active {
+   399→      animation: none; 
+   400→    }
+   401→
+   402→    .calendar-day.predicted {
+   403→      background: rgba(129, 178, 154, 0.2);
+   404→      color: var(--accent-sage);
+   405→    }
+   406→
+   407→    .calendar-day.fertile {
+   408→      background: rgba(212, 165, 116, 0.2);
+   409→      color: var(--accent-soft);
+   410→    }
+   411→
+   412→    .calendar-day.other-month {
+   413→      color: var(--fg-muted);
+   414→      opacity: 0.4;
+   415→    }
+   416→
+   417→    .action-sheet {
+   418→      position: absolute;
+   419→      inset: 0;
+   420→      background: rgba(0,0,0,0.6);
+   421→      backdrop-filter: blur(8px);
+   422→      z-index: 200;
+   423→      opacity: 0;
+   424→      visibility: hidden;
+   425→      transition: all 0.3s ease;
+   426→    }
+   427→
+   428→    .action-sheet.active {
+   429→      opacity: 1;
+   430→      visibility: visible;
+   431→    }
+   432→
+   433→    .action-sheet-content {
+   434→      position: absolute;
+   435→      bottom: 0;
+   436→      left: 0;
+   437→      right: 0;
+   438→      background: var(--bg-secondary);
+   439→      border-radius: 24px 24px 0 0;
+   440→      padding: 12px 20px 34px;
+   441→      transform: translateY(100%);
+   442→      transition: transform 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+   443→      max-height: 80vh;
+   444→      overflow-y: auto;
+   445→    }
+   446→
+   447→    .action-sheet.active .action-sheet-content {
+   448→      transform: translateY(0);
+   449→    }
+   450→
+   451→    .action-sheet-handle {
+   452→      width: 36px;
+   453→      height: 4px;
+   454→      background: var(--fg-muted);
+   455→      border-radius: 2px;
+   456→      margin: 0 auto 16px;
+   457→      opacity: 0.5;
+   458→    }
+   459→
+   460→    .action-sheet-title {
+   461→      text-align: center;
+   462→      margin-bottom: 16px;
+   463→    }
+   464→
+   465→    .action-sheet-title span {
+   466→      font-size: 13px;
+   467→      color: var(--fg-muted);
+   468→    }
+   469→
+   470→    .action-sheet-title strong {
+   471→      color: var(--fg-primary);
+   472→      font-weight: 500;
+   473→    }
+   474→
+   475→    .action-option {
+   476→      display: flex;
+   477→      align-items: center;
+   478→      gap: 14px;
+   479→      padding: 16px;
+   480→      border-radius: 14px;
+   481→      cursor: pointer;
+   482→      transition: all 0.2s ease;
+   483→      margin-bottom: 8px;
+   484→    }
+   485→
+   486→    .action-option:hover {
+   487→      background: rgba(255,255,255,0.05);
+   488→    }
+   489→
+   490→    .action-option:active {
+   491→      transform: scale(0.98);
+   492→    }
+   493→
+   494→    .action-option.primary {
+   495→      background: rgba(224, 122, 95, 0.15);
+   496→      border: 1px solid rgba(224, 122, 95, 0.3);
+   497→    }
+   498→
+   499→    .action-option.primary:hover {
+   500→      background: rgba(224, 122, 95, 0.25);
+   501→    }
+   502→
+   503→    .action-option.sage {
+   504→      background: rgba(129, 178, 154, 0.15);
+   505→      border: 1px solid rgba(129, 178, 154, 0.3);
+   506→    }
+   507→
+   508→    .action-option.sage:hover {
+   509→      background: rgba(129, 178, 154, 0.25);
+   510→    }
+   511→
+   512→    .action-option.danger {
+   513→      background: rgba(239, 68, 68, 0.1);
+   514→      border: 1px solid rgba(239, 68, 68, 0.2);
+   515→    }
+   516→
+   517→    .action-option.danger:hover {
+   518→      background: rgba(239, 68, 68, 0.2);
+   519→    }
+   520→
+   521→    .action-option-icon {
+   522→      width: 44px;
+   523→      height: 44px;
+   524→      border-radius: 12px;
+   525→      display: flex;
+   526→      align-items: center;
+   527→      justify-content: center;
+   528→      flex-shrink: 0;
+   529→    }
+   530→
+   531→    .action-option.primary .action-option-icon {
+   532→      background: linear-gradient(135deg, var(--accent-warm), var(--accent-soft));
+   533→    }
+   534→
+   535→    .action-option.sage .action-option-icon {
+   536→      background: linear-gradient(135deg, var(--accent-sage), #6b9e85);
+   537→    }
+   538→
+   539→    .action-option.danger .action-option-icon {
+   540→      background: linear-gradient(135deg, #ef4444, #dc2626);
+   541→    }
+   542→
+   543→    .action-option-icon svg {
+   544→      width: 22px;
+   545→      height: 22px;
+   546→      stroke: var(--bg-primary);
+   547→      stroke-width: 2;
+   548→    }
+   549→
+   550→    .action-option-text h4 {
+   551→      font-size: 15px;
+   552→      font-weight: 500;
+   553→      color: var(--fg-primary);
+   554→      margin: 0 0 2px;
+   555→    }
+   556→
+   557→    .action-option-text p {
+   558→      font-size: 12px;
+   559→      color: var(--fg-muted);
+   560→      margin: 0;
+   561→    }
+   562→
+   563→    .action-cancel {
+   564→      text-align: center;
+   565→      padding: 16px;
+   566→      color: var(--fg-muted);
+   567→      font-size: 14px;
+   568→      cursor: pointer;
+   569→      transition: color 0.2s;
+   570→      margin-top: 8px;
+   571→    }
+   572→
+   573→    .action-cancel:hover {
+   574→      color: var(--fg-secondary);
+   575→    }
+   576→
+   577→    .stagger-in > * {
+   578→      opacity: 0;
+   579→      transform: translateY(20px);
+   580→      animation: staggerFadeIn 0.6s ease forwards;
+   581→    }
+   582→
+   583→    @keyframes staggerFadeIn {
+   584→      to {
+   585→        opacity: 1;
+   586→        transform: translateY(0);
+   587→      }
+   588→    }
+   589→
+   590→    .toast {
+   591→      position: fixed;
+   592→      top: 60px;
+   593→      left: 50%;
+   594→      transform: translateX(-50%) translateY(-20px);
+   595→      background: var(--bg-card);
+   596→      border: 1px solid var(--accent-sage);
+   597→      padding: 12px 24px;
+   598→      border-radius: 12px;
+   599→      font-size: 14px;
+   600→      color: var(--accent-sage);
+   601→      opacity: 0;
+   602→      visibility: hidden;
+   603→      transition: all 0.3s ease;
+   604→      z-index: 300;
+   605→      box-shadow: 0 8px 24px rgba(0,0,0,0.3);
+   606→    }
+   607→
+   608→    .toast.show {
+   609→      opacity: 1;
+   610→      visibility: visible;
+   611→      transform: translateX(-50%) translateY(0);
+   612→    }
+   613→
+   614→    .legend-item {
+   615→      display: flex;
+   616→      align-items: center;
+   617→      gap: 12px;
+   618→      padding: 12px;
+   619→      border-radius: 12px;
+   620→      background: var(--bg-secondary);
+   621→      transition: all 0.2s ease;
+   622→    }
+   623→
+   624→    .legend-item:hover {
+   625→      background: rgba(255,255,255,0.05);
+   626→    }
+   627→
+   628→    .legend-dot {
+   629→      width: 32px;
+   630→      height: 32px;
+   631→      border-radius: 10px;
+   632→      display: flex;
+   633→      align-items: center;
+   634→      justify-content: center;
+   635→      flex-shrink: 0;
+   636→    }
+   637→
+   638→    .legend-dot.period {
+   639→      background: rgba(224, 122, 95, 0.25);
+   640→      border: 2px solid var(--accent-warm);
+   641→    }
+   642→
+   643→    .legend-dot.predicted {
+   644→      background: transparent;
+   645→      border: 2px dashed var(--accent-sage);
+   646→    }
+   647→
+   648→    .legend-dot.fertile {
+   649→      background: rgba(212, 165, 116, 0.25);
+   650→      border: 2px solid var(--accent-soft);
+   651→    }
+   652→
+   653→    /* 记录页增强样式 */
+   654→    .record-section {
+   655→      margin-bottom: 24px;
+   656→    }
+   657→
+   658→    .record-section-title {
+   659→      font-size: 14px;
+   660→      font-weight: 500;
+   661→      color: var(--fg-primary);
+   662→      margin-bottom: 12px;
+   663→    }
+   664→
+   665→    .flow-selector {
+   666→      display: flex;
+   667→      gap: 12px;
+   668→      justify-content: space-between;
+   669→    }
+   670→
+   671→    .flow-option {
+   672→      display: flex;
+   673→      flex-direction: column;
+   674→      align-items: center;
+   675→      gap: 8px;
+   676→      padding: 12px;
+   677→      border-radius: 16px;
+   678→      background: var(--bg-secondary);
+   679→      border: 1px solid var(--border);
+   680→      cursor: pointer;
+   681→      transition: all 0.2s ease;
+   682→      flex: 1;
+   683→    }
+   684→
+   685→    .flow-option:hover {
+   686→      background: rgba(255,255,255,0.05);
+   687→    }
+   688→
+   689→    .flow-option.selected {
+   690→      background: rgba(224, 122, 95, 0.15);
+   691→      border-color: var(--accent-warm);
+   692→    }
+   693→
+   694→    .flow-dot {
+   695→      width: 24px;
+   696→      height: 24px;
+   697→      border-radius: 50%;
+   698→      background: var(--fg-muted);
+   699→      transition: all 0.2s ease;
+   700→    }
+   701→
+   702→    .flow-option.selected .flow-dot {
+   703→      background: var(--accent-warm);
+   704→      box-shadow: 0 0 12px var(--accent-warm);
+   705→    }
+   706→
+   707→    .flow-option:nth-child(2) .flow-dot { width: 28px; height: 28px; }
+   708→    .flow-option:nth-child(3) .flow-dot { width: 32px; height: 32px; }
+   709→    .flow-option:nth-child(4) .flow-dot { width: 36px; height: 36px; }
+   710→
+   711→    .symptom-tag {
+   712→      display: inline-flex;
+   713→      align-items: center;
+   714→      gap: 6px;
+   715→      padding: 10px 16px;
+   716→      border-radius: 12px;
+   717→      background: var(--bg-secondary);
+   718→      border: 1px solid var(--border);
+   719→      font-size: 14px;
+   720→      cursor: pointer;
+   721→      transition: all 0.2s ease;
+   722→      user-select: none;
+   723→    }
+   724→
+   725→    .symptom-tag.selected {
+   726→      background: rgba(224, 122, 95, 0.15);
+   727→      border-color: var(--accent-warm);
+   728→      color: var(--accent-warm);
+   729→    }
+   730→
+   731→    .symptom-tag:hover {
+   732→      background: rgba(255,255,255,0.08);
+   733→    }
+   734→
+   735→    .symptom-add {
+   736→      background: transparent;
+   737→      border: 1px dashed var(--border);
+   738→      color: var(--fg-muted);
+   739→    }
+   740→
+   741→    .symptom-add:hover {
+   742→      border-color: var(--accent-soft);
+   743→      color: var(--accent-soft);
+   744→    }
+   745→
+   746→    .custom-input {
+   747→      width: 100%;
+   748→      background: var(--bg-secondary);
+   749→      border: 1px solid var(--border);
+   750→      border-radius: 12px;
+   751→      padding: 12px 16px;
+   752→      color: var(--fg-primary);
+   753→      font-size: 14px;
+   754→      outline: none;
+   755→      transition: all 0.2s ease;
+   756→    }
+   757→
+   758→    .custom-input:focus {
+   759→      border-color: var(--accent-soft);
+   760→    }
+   761→
+   762→    .custom-input::placeholder {
+   763→      color: var(--fg-muted);
+   764→    }
+   765→
+   766→    .history-item {
+   767→      background: var(--bg-card);
+   768→      border-radius: 16px;
+   769→      padding: 16px;
+   770→      margin-bottom: 12px;
+   771→      border: 1px solid var(--border);
+   772→    }
+   773→
+   774→    .history-item-header {
+   775→      display: flex;
+   776→      justify-content: space-between;
+   777→      align-items: center;
+   778→      margin-bottom: 8px;
+   779→    }
+   780→
+   781→    .history-item-date {
+   782→      font-weight: 500;
+   783→      color: var(--fg-primary);
+   784→    }
+   785→
+   786→    .history-item-tags {
+   787→      display: flex;
+   788→      flex-wrap: wrap;
+   789→      gap: 6px;
+   790→    }
+   791→
+   792→    .history-tag {
+   793→      font-size: 12px;
+   794→      padding: 4px 10px;
+   795→      border-radius: 8px;
+   796→      background: rgba(224, 122, 95, 0.1);
+   797→      color: var(--accent-warm);
+   798→    }
+   799→
+   800→    .tab-container {
+   801→      display: flex;
+   802→      background: var(--bg-secondary);
+   803→      border-radius: 14px;
+   804→      padding: 4px;
+   805→      margin-bottom: 20px;
+   806→    }
+   807→
+   808→    .tab-btn {
+   809→      flex: 1;
+   810→      padding: 10px;
+   811→      border-radius: 10px;
+   812→      text-align: center;
+   813→      font-size: 14px;
+   814→      font-weight: 500;
+   815→      color: var(--fg-muted);
+   816→      cursor: pointer;
+   817→      transition: all 0.2s ease;
+   818→    }
+   819→
+   820→    .tab-btn.active {
+   821→      background: var(--bg-card);
+   822→      color: var(--fg-primary);
+   823→    }
+   824→
+   825→    /* 设置项样式 */
+   826→    .setting-item {
+   827→      display: flex;
+   828→      align-items: center;
+   829→      gap: 14px;
+   830→      padding: 14px 16px;
+   831→      border-radius: 14px;
+   832→      cursor: pointer;
+   833→      transition: all 0.2s ease;
+   834→      margin-bottom: 4px;
+   835→    }
+   836→
+   837→    .setting-item:hover {
+   838→      background: rgba(255,255,255,0.05);
+   839→    }
+   840→
+   841→    .setting-item:active {
+   842→      transform: scale(0.98);
+   843→    }
+   844→
+   845→    .setting-icon {
+   846→      width: 40px;
+   847→      height: 40px;
+   848→      border-radius: 12px;
+   849→      display: flex;
+   850→      align-items: center;
+   851→      justify-content: center;
+   852→      flex-shrink: 0;
+   853→      background: var(--bg-secondary);
+   854→    }
+   855→
+   856→    .setting-icon svg {
+   857→      width: 20px;
+   858→      height: 20px;
+   859→      stroke: var(--fg-secondary);
+   860→      stroke-width: 2;
+   861→    }
+   862→
+   863→    .setting-text {
+   864→      flex: 1;
+   865→    }
+   866→
+   867→    .setting-text h4 {
+   868→      font-size: 15px;
+   869→      font-weight: 500;
+   870→      color: var(--fg-primary);
+   871→      margin: 0 0 2px;
+   872→    }
+   873→
+   874→    .setting-text p {
+   875→      font-size: 12px;
+   876→      color: var(--fg-muted);
+   877→      margin: 0;
+   878→    }
+   879→
+   880→    .setting-arrow {
+   881→      width: 20px;
+   882→      height: 20px;
+   883→      stroke: var(--fg-muted);
+   884→      stroke-width: 2;
+   885→    }
+   886→
+   887→    /* 开关样式 */
+   888→    .toggle-switch {
+   889→      width: 48px;
+   890→      height: 28px;
+   891→      background: var(--bg-secondary);
+   892→      border-radius: 14px;
+   893→      position: relative;
+   894→      cursor: pointer;
+   895→      transition: all 0.3s ease;
+   896→    }
+   897→
+   898→    .toggle-switch.active {
+   899→      background: var(--accent-warm);
+   900→    }
+   901→
+   902→    .toggle-switch::after {
+   903→      content: '';
+   904→      position: absolute;
+   905→      width: 22px;
+   906→      height: 22px;
+   907→      background: var(--fg-primary);
+   908→      border-radius: 50%;
+   909→      top: 3px;
+   910→      left: 3px;
+   911→      transition: all 0.3s ease;
+   912→    }
+   913→
+   914→    .toggle-switch.active::after {
+   915→      left: 23px;
+   916→    }
+   917→
+   918→    @media (min-width: 768px) {
+   919→      body {
+   920→        display: flex;
+   921→        justify-content: center;
+   922→        align-items: center;
+   923→        min-height: 100vh;
+   924→        background: #0a0a0a;
+   925→      }
+   926→    }
+   927→
+   928→    @media (max-width: 400px) {
+   929→      .phone-frame {
+   930→        width: 100vw;
+   931→        height: 100vh;
+   932→        border-radius: 0;
+   933→        box-shadow: none;
+   934→      }
+   935→      .notch {
+   936→        display: none;
+   937→      }
+   938→    }
+   939→
+   940→    @media (prefers-reduced-motion: reduce) {
+   941→      *, *::before, *::after {
+   942→        animation-duration: 0.01ms !important;
+   943→        transition-duration: 0.01ms !important;
+   944→      }
+   945→    }
+   946→  </style>
+   947→</head>
+   948→<body>
+   949→
+   950→<div class="phone-frame" id="app">
+   951→  <div class="notch"></div>
+   952→  
+   953→  <div class="animated-bg">
+   954→    <div class="blob blob-1"></div>
+   955→    <div class="blob blob-2"></div>
+   956→    <div class="blob blob-3"></div>
+   957→  </div>
+   958→
+   959→  <div class="toast" id="toast"></div>
+   960→
+   961→  <div class="page active" id="page-home">
+   962→    <div class="px-6 stagger-in" style="padding-bottom: 20px;">
+   963→      <div class="flex justify-between items-center mb-2" style="animation-delay: 0.1s">
+   964→        <div>
+   965→          <p class="text-sm" style="color: var(--fg-secondary)">今天</p>
+   966→          <p class="font-display text-2xl font-medium" style="color: var(--fg-primary)" id="homeDate">1月15日 周三</p>
+   967→        </div>
+   968→        <button class="w-10 h-10 rounded-full flex items-center justify-center" style="background: var(--bg-card); border: 1px solid var(--border)">
+   969→          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--fg-secondary)" stroke-width="2" stroke-linecap="round">
+   970→            <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/>
+   971→            <path d="M13.73 21a2 2 0 0 1-3.46 0"/>
+   972→          </svg>
+   973→        </button>
+   974→      </div>
+   975→
+   976→      <div class="card mb-4" style="animation-delay: 0.2s">
+   977→        <div class="flex items-center gap-3 mb-3">
+   978→          <div class="w-3 h-3 rounded-full" style="background: var(--accent-sage); box-shadow: 0 0 12px var(--accent-sage)"></div>
+   979→          <span class="text-sm font-medium" style="color: var(--accent-sage)">卵泡期 第7天</span>
+   980→        </div>
+   981→        <p class="text-lg font-light mb-2" style="color: var(--fg-primary)">能量回升期</p>
+   982→        <p class="text-sm" style="color: var(--fg-secondary)">雌激素水平上升，适合进行高强度运动和创造性工作</p>
+   983→      </div>
+   984→
+   985→      <div class="flex flex-col items-center my-6" style="animation-delay: 0.3s">
+   986→        <div class="cycle-ring">
+   987→          <svg width="260" height="260" viewBox="0 0 260 260">
+   988→            <defs>
+   989→              <linearGradient id="ringGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+   990→                <stop offset="0%" stop-color="#e07a5f"/>
+   991→                <stop offset="50%" stop-color="#d4a574"/>
+   992→                <stop offset="100%" stop-color="#81b29a"/>
+   993→              </linearGradient>
+   994→            </defs>
+   995→            <circle class="ring-track" cx="130" cy="130" r="120"/>
+   996→            <circle class="ring-glow" cx="130" cy="130" r="120" id="ringGlow"/>
+   997→            <circle class="ring-progress" cx="130" cy="130" r="120" id="ringProgress"/>
+   998→          </svg>
+   999→          <div class="cycle-center" id="cycleCenter">
+  1000→            <p class="text-sm mb-1" style="color: var(--fg-muted)">下次经期预计</p>
+  1001→            <p class="font-display text-4xl font-light" style="color: var(--fg-primary)">15</p>
+  1002→            <p class="text-sm" style="color: var(--fg-secondary)">天后</p>
+  1003→            <span class="long-press-hint">点击日历记录</span>
+  1004→          </div>
+  1005→        </div>
+  1006→      </div>
+  1007→
+  1008→      <div class="grid grid-cols-2 gap-3" style="animation-delay: 0.4s">
+  1009→        <div class="card !p-4">
+  1010→          <p class="text-xs mb-1" style="color: var(--fg-muted)">周期长度</p>
+  1011→          <p class="font-display text-2xl font-light" style="color: var(--fg-primary)">28<span class="text-sm ml-1" style="color: var(--fg-secondary)">天</span></p>
+  1012→        </div>
+  1013→        <div class="card !p-4">
+  1014→          <p class="text-xs mb-1" style="color: var(--fg-muted)">经期长度</p>
+  1015→          <p class="font-display text-2xl font-light" style="color: var(--fg-primary)">5<span class="text-sm ml-1" style="color: var(--fg-secondary)">天</span></p>
+  1016→        </div>
+  1017→      </div>
+  1018→    </div>
+  1019→  </div>
+  1020→
+  1021→  <div class="page" id="page-calendar">
+  1022→    <div class="px-6 stagger-in" style="padding-bottom: 20px;">
+  1023→      <div class="flex justify-between items-center mb-4" style="animation-delay: 0.1s">
+  1024→        <button class="w-10 h-10 rounded-xl flex items-center justify-center" style="background: var(--bg-card)" onclick="changeMonth(-1)">
+  1025→          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--fg-secondary)" stroke-width="2"><path d="M15 18l-6-6 6-6"/></svg>
+  1026→        </button>
+  1027→        <p class="font-display text-xl" style="color: var(--fg-primary)" id="calendarTitle">2025年1月</p>
+  1028→        <button class="w-10 h-10 rounded-xl flex items-center justify-center" style="background: var(--bg-card)" onclick="changeMonth(1)">
+  1029→          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--fg-secondary)" stroke-width="2"><path d="M9 18l6-6-6-6"/></svg>
+  1030→        </button>
+  1031→      </div>
+  1032→
+  1033→      <div class="grid grid-cols-7 gap-1 mb-2" style="animation-delay: 0.15s">
+  1034→        <div class="text-center text-xs py-2" style="color: var(--fg-muted)">日</div>
+  1035→        <div class="text-center text-xs py-2" style="color: var(--fg-muted)">一</div>
+  1036→        <div class="text-center text-xs py-2" style="color: var(--fg-muted)">二</div>
+  1037→        <div class="text-center text-xs py-2" style="color: var(--fg-muted)">三</div>
+  1038→        <div class="text-center text-xs py-2" style="color: var(--fg-muted)">四</div>
+  1039→        <div class="text-center text-xs py-2" style="color: var(--fg-muted)">五</div>
+  1040→        <div class="text-center text-xs py-2" style="color: var(--fg-muted)">六</div>
+  1041→      </div>
+  1042→
+  1043→      <div class="grid grid-cols-7 gap-1 mb-6" id="calendarGrid" style="animation-delay: 0.2s">
+  1044→      </div>
+  1045→
+  1046→      <div class="card" style="animation-delay: 0.3s">
+  1047→        <p class="text-sm font-medium mb-4" style="color: var(--fg-primary)">日历图例</p>
+  1048→        <div class="space-y-3">
+  1049→          <div class="legend-item">
+  1050→            <div class="legend-dot period">
+  1051→              <div class="w-3 h-3 rounded-full" style="background: var(--accent-warm)"></div>
+  1052→            </div>
+  1053→            <div class="flex-1">
+  1054→              <p class="text-sm font-medium" style="color: var(--fg-primary)">经期</p>
+  1055→              <p class="text-xs" style="color: var(--fg-muted)">点击日期可记录或取消</p>
+  1056→            </div>
+  1057→          </div>
+  1058→          <div class="legend-item">
+  1059→            <div class="legend-dot predicted">
+  1060→              <div class="w-3 h-3 rounded-full" style="border: 2px dashed var(--accent-sage)"></div>
+  1061→            </div>
+  1062→            <div class="flex-1">
+  1063→              <p class="text-sm font-medium" style="color: var(--fg-primary)">预测经期</p>
+  1064→              <p class="text-xs" style="color: var(--fg-muted)">根据周期推算的下次日期</p>
+  1065→            </div>
+  1066→          </div>
+  1067→          <div class="legend-item">
+  1068→            <div class="legend-dot fertile">
+  1069→              <div class="w-3 h-3 rounded-full" style="background: var(--accent-soft)"></div>
+  1070→            </div>
+  1071→            <div class="flex-1">
+  1072→              <p class="text-sm font-medium" style="color: var(--fg-primary)">易孕期</p>
+  1073→              <p class="text-xs" style="color: var(--fg-muted)">排卵期前后，受孕几率较高</p>
+  1074→            </div>
+  1075→          </div>
+  1076→        </div>
+  1077→      </div>
+  1078→    </div>
+  1079→  </div>
+  1080→
+  1081→  <div class="page" id="page-log">
+  1082→    <div class="px-6 stagger-in" style="padding-bottom: 20px;">
+  1083→      <div class="text-center mb-4" style="animation-delay: 0.1s">
+  1084→        <p class="font-display text-2xl font-light" style="color: var(--fg-primary)">健康记录</p>
+  1085→        <p class="text-sm mt-1" style="color: var(--fg-secondary)" id="logDate">1月15日 周三</p>
+  1086→      </div>
+  1087→
+  1088→      <div class="tab-container" style="animation-delay: 0.15s">
+  1089→        <div class="tab-btn active" onclick="switchLogTab('record')">记录</div>
+  1090→        <div class="tab-btn" onclick="switchLogTab('history')">历史记录</div>
+  1091→      </div>
+  1092→
+  1093→      <div id="recordSection">
+  1094→        <div class="record-section" style="animation-delay: 0.2s">
+  1095→          <div class="record-section-title">流量</div>
+  1096→          <div class="flow-selector">
+  1097→            <div class="flow-option" onclick="selectFlow(this, 1)">
+  1098→              <div class="flow-dot"></div>
+  1099→              <span class="text-xs" style="color: var(--fg-secondary)">点滴</span>
+  1100→            </div>
+  1101→            <div class="flow-option selected" onclick="selectFlow(this, 2)">
+  1102→              <div class="flow-dot"></div>
+  1103→              <span class="text-xs" style="color: var(--accent-warm)">少量</span>
+  1104→            </div>
+  1105→            <div class="flow-option" onclick="selectFlow(this, 3)">
+  1106→              <div class="flow-dot"></div>
+  1107→              <span class="text-xs" style="color: var(--fg-secondary)">中等</span>
+  1108→            </div>
+  1109→            <div class="flow-option" onclick="selectFlow(this, 4)">
+  1110→              <div class="flow-dot"></div>
+  1111→              <span class="text-xs" style="color: var(--fg-secondary)">大量</span>
+  1112→            </div>
+  1113→          </div>
+  1114→        </div>
+  1115→
+  1116→        <div class="record-section" style="animation-delay: 0.3s">
+  1117→          <div class="record-section-title">症状</div>
+  1118→          <div class="flex flex-wrap gap-2" id="symptomContainer">
+  1119→            <button class="symptom-tag selected">痛经</button>
+  1120→            <button class="symptom-tag">腰酸</button>
+  1121→            <button class="symptom-tag">头痛</button>
+  1122→            <button class="symptom-tag selected">疲劳</button>
+  1123→            <button class="symptom-tag">腹胀</button>
+  1124→            <button class="symptom-tag">乳房胀痛</button>
+  1125→            <button class="symptom-tag symptom-add" onclick="openAddSymptom()">
+  1126→              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 5v14M5 12h14"/></svg>
+  1127→              自定义
+  1128→            </button>
+  1129→          </div>
+  1130→        </div>
+  1131→
+  1132→        <div class="record-section" style="animation-delay: 0.4s">
+  1133→          <div class="record-section-title">情绪</div>
+  1134→          <div class="flex justify-between gap-2">
+  1135→            <button class="flex flex-col items-center gap-2 p-3 rounded-xl transition-all flex-1" onclick="selectMood(this, 1)">
+  1136→              <span class="text-2xl">😊</span>
+  1137→              <span class="text-xs" style="color: var(--fg-secondary)">开心</span>
+  1138→            </button>
+  1139→            <button class="flex flex-col items-center gap-2 p-3 rounded-xl transition-all flex-1" style="background: rgba(224,122,95,0.15)" onclick="selectMood(this, 2)">
+  1140→              <span class="text-2xl">😌</span>
+  1141→              <span class="text-xs" style="color: var(--accent-warm)">平静</span>
+  1142→            </button>
+  1143→            <button class="flex flex-col items-center gap-2 p-3 rounded-xl transition-all flex-1" onclick="selectMood(this, 3)">
+  1144→              <span class="text-2xl">😔</span>
+  1145→              <span class="text-xs" style="color: var(--fg-secondary)">低落</span>
+  1146→            </button>
+  1147→            <button class="flex flex-col items-center gap-2 p-3 rounded-xl transition-all flex-1" onclick="selectMood(this, 4)">
+  1148→              <span class="text-2xl">😤</span>
+  1149→              <span class="text-xs" style="color: var(--fg-secondary)">烦躁</span>
+  1150→            </button>
+  1151→            <button class="flex flex-col items-center gap-2 p-3 rounded-xl transition-all flex-1" onclick="selectMood(this, 5)">
+  1152→              <span class="text-2xl">😰</span>
+  1153→              <span class="text-xs" style="color: var(--fg-secondary)">焦虑</span>
+  1154→            </button>
+  1155→          </div>
+  1156→        </div>
+  1157→
+  1158→        <div class="record-section" style="animation-delay: 0.5s">
+  1159→          <div class="record-section-title">备注</div>
+  1160→          <textarea class="custom-input" rows="3" placeholder="记录更多细节..." id="noteInput"></textarea>
+  1161→        </div>
+  1162→
+  1163→        <button class="w-full py-4 rounded-2xl font-medium text-lg transition-all" style="background: linear-gradient(135deg, var(--accent-warm), var(--accent-soft)); color: var(--bg-primary)" onclick="saveRecord()">
+  1164→          保存记录
+  1165→        </button>
+  1166→      </div>
+  1167→
+  1168→      <div id="historySection" style="display: none;">
+  1169→        <div id="historyList"></div>
+  1170→      </div>
+  1171→    </div>
+  1172→  </div>
+  1173→
+  1174→  <div class="page" id="page-profile">
+  1175→    <div class="px-6 stagger-in" style="padding-bottom: 20px;">
+  1176→      <!-- 用户头像和基本信息 -->
+  1177→      <div class="flex items-center gap-4 mb-6" style="animation-delay: 0.1s">
+  1178→        <div class="w-16 h-16 rounded-full flex items-center justify-center" style="background: linear-gradient(135deg, var(--accent-warm), var(--accent-sage))">
+  1179→          <span class="font-display text-2xl" style="color: var(--bg-primary)">L</span>
+  1180→        </div>
+  1181→        <div>
+  1182→          <p class="font-display text-xl" style="color: var(--fg-primary)">Luna</p>
+  1183→          <p class="text-sm" style="color: var(--fg-secondary)">已记录 128 天</p>
+  1184→        </div>
+  1185→      </div>
+  1186→
+  1187→      <!-- 健康档案 -->
+  1188→      <div class="card mb-4" style="animation-delay: 0.15s">
+  1189→        <p class="text-sm font-medium mb-4" style="color: var(--fg-primary)">健康档案</p>
+  1190→        <div class="space-y-4">
+  1191→          <div class="flex justify-between items-center">
+  1192→            <span class="text-sm" style="color: var(--fg-secondary)">平均周期</span>
+  1193→            <span class="text-sm font-medium" style="color: var(--fg-primary)">28 天</span>
+  1194→          </div>
+  1195→          <div class="flex justify-between items-center">
+  1196→            <span class="text-sm" style="color: var(--fg-secondary)">平均经期</span>
+  1197→            <span class="text-sm font-medium" style="color: var(--fg-primary)">5 天</span>
+  1198→          </div>
+  1199→          <div class="flex justify-between items-center">
+  1200→            <span class="text-sm" style="color: var(--fg-secondary)">上次经期</span>
+  1201→            <span class="text-sm font-medium" style="color: var(--fg-primary)">1月8日</span>
+  1202→          </div>
+  1203→          <div class="flex justify-between items-center">
+  1204→            <span class="text-sm" style="color: var(--fg-secondary)">周期规律</span>
+  1205→            <span class="text-sm font-medium" style="color: var(--accent-sage)">规律</span>
+  1206→          </div>
+  1207→        </div>
+  1208→      </div>
+  1209→
+  1210→      <!-- 提醒设置 -->
+  1211→      <div class="card mb-4" style="animation-delay: 0.2s">
+  1212→        <p class="text-sm font-medium mb-3" style="color: var(--fg-primary)">提醒设置</p>
+  1213→        
+  1214→        <div class="setting-item" onclick="toggleSetting(this)">
+  1215→          <div class="setting-icon">
+  1216→            <svg viewBox="0 0 24 24" fill="none" stroke-linecap="round"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
+  1217→          </div>
+  1218→          <div class="setting-text">
+  1219→            <h4>经期提醒</h4>
+  1220→            <p>经期开始前1天提醒</p>
+  1221→          </div>
+  1222→          <div class="toggle-switch active"></div>
+  1223→        </div>
+  1224→
+  1225→        <div class="setting-item" onclick="toggleSetting(this)">
+  1226→          <div class="setting-icon">
+  1227→            <svg viewBox="0 0 24 24" fill="none" stroke-linecap="round"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/></svg>
+  1228→          </div>
+  1229→          <div class="setting-text">
+  1230→            <h4>记录提醒</h4>
+  1231→            <p>每日21:00 提醒记录</p>
+  1232→          </div>
+  1233→          <div class="toggle-switch active"></div>
+  1234→        </div>
+  1235→
+  1236→        <div class="setting-item" onclick="toggleSetting(this)">
+  1237→          <div class="setting-icon">
+  1238→            <svg viewBox="0 0 24 24" fill="none" stroke-linecap="round"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>
+  1239→          </div>
+  1240→          <div class="setting-text">
+  1241→            <h4>排卵期提醒</h4>
+  1242→            <p>易孕期开始时提醒</p>
+  1243→          </div>
+  1244→          <div class="toggle-switch"></div>
+  1245→        </div>
+  1246→      </div>
+  1247→
+  1248→      <!-- 隐私与安全 -->
+  1249→      <div class="card mb-4" style="animation-delay: 0.25s">
+  1250→        <p class="text-sm font-medium mb-3" style="color: var(--fg-primary)">隐私与安全</p>
+  1251→        
+  1252→        <div class="setting-item" onclick="showToast('已开启应用锁')">
+  1253→          <div class="setting-icon">
+  1254→            <svg viewBox="0 0 24 24" fill="none" stroke-linecap="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+  1255→          </div>
+  1256→          <div class="setting-text">
+  1257→            <h4>应用锁</h4>
+  1258→            <p>Face ID / 指纹解锁</p>
+  1259→          </div>
+  1260→          <div class="toggle-switch active"></div>
+  1261→        </div>
+  1262→
+  1263→        <div class="setting-item" onclick="showToast('已开启伪装图标')">
+  1264→          <div class="setting-icon">
+  1265→            <svg viewBox="0 0 24 24" fill="none" stroke-linecap="round"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M9 9h6M9 15h6"/></svg>
+  1266→          </div>
+  1267→          <div class="setting-text">
+  1268→            <h4>隐私模式</h4>
+  1269→            <p>伪装成计算器图标</p>
+  1270→          </div>
+  1271→          <svg class="setting-arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 18l6-6-6-6"/></svg>
+  1272→        </div>
+  1273→
+  1274→        <div class="setting-item" onclick="showToast('数据已加密')">
+  1275→          <div class="setting-icon">
+  1276→            <svg viewBox="0 0 24 24" fill="none" stroke-linecap="round"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+  1277→          </div>
+  1278→          <div class="setting-text">
+  1279→            <h4>数据加密</h4>
+  1280→            <p>端到端加密存储</p>
+  1281→          </div>
+  1282→          <svg class="setting-arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 18l6-6-6-6"/></svg>
+  1283→        </div>
+  1284→      </div>
+  1285→
+  1286→      <!-- 外观主题 -->
+  1287→      <div class="card mb-4" style="animation-delay: 0.3s">
+  1288→        <p class="text-sm font-medium mb-3" style="color: var(--fg-primary)">外观主题</p>
+  1289→        
+  1290→        <div class="setting-item" onclick="showToast('已切换深色模式')">
+  1291→          <div class="setting-icon">
+  1292→            <svg viewBox="0 0 24 24" fill="none" stroke-linecap="round"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
+  1293→          </div>
+  1294→          <div class="setting-text">
+  1295→            <h4>深色模式</h4>
+  1296→            <p>保护眼睛，节省电量</p>
+  1297→          </div>
+  1298→          <div class="toggle-switch active"></div>
+  1299→        </div>
+  1300→
+  1301→        <div class="setting-item" onclick="showToast('主题设置')">
+  1302→          <div class="setting-icon">
+  1303→            <svg viewBox="0 0 24 24" fill="none" stroke-linecap="round"><circle cx="12" cy="12" r="3"/><path d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42"/></svg>
+  1304→          </div>
+  1305→          <div class="setting-text">
+  1306→            <h4>主题颜色</h4>
+  1307→            <p>自定义界面配色</p>
+  1308→          </div>
+  1309→          <svg class="setting-arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 18l6-6-6-6"/></svg>
+  1310→        </div>
+  1311→      </div>
+  1312→
+  1313→      <!-- 数据管理 -->
+  1314→      <div class="card mb-4" style="animation-delay: 0.35s">
+  1315→        <p class="text-sm font-medium mb-3" style="color: var(--fg-primary)">数据管理</p>
+  1316→        
+  1317→        <div class="setting-item" onclick="showToast('正在导出数据...')">
+  1318→          <div class="setting-icon">
+  1319→            <svg viewBox="0 0 24 24" fill="none" stroke-linecap="round"><path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8"/><polyline points="16 6 12 2 8 6"/><line x1="12" y1="2" x2="12" y2="15"/></svg>
+  1320→          </div>
+  1321→          <div class="setting-text">
+  1322→            <h4>导出数据</h4>
+  1323→            <p>导出为 PDF / CSV</p>
+  1324→          </div>
+  1325→          <svg class="setting-arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 18l6-6-6-6"/></svg>
+  1326→        </div>
+  1327→
+  1328→        <div class="setting-item" onclick="showToast('已连接 iCloud')">
+  1329→          <div class="setting-icon">
+  1330→            <svg viewBox="0 0 24 24" fill="none" stroke-linecap="round"><path d="M18 10h-1.26A8 8 0 1 0 9 20h9a5 5 0 0 0 0-10z"/></svg>
+  1331→          </div>
+  1332→          <div class="setting-text">
+  1333→            <h4>云同步</h4>
+  1334→            <p>已连接 iCloud</p>
+  1335→          </div>
+  1336→          <svg class="setting-arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 18l6-6-6-6"/></svg>
+  1337→        </div>
+  1338→
+  1339→        <div class="setting-item" onclick="showToast('恢复成功')">
+  1340→          <div class="setting-icon">
+  1341→            <svg viewBox="0 0 24 24" fill="none" stroke-linecap="round"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg>
+  1342→          </div>
+  1343→          <div class="setting-text">
+  1344→            <h4>恢复数据</h4>
+  1345→            <p>从备份恢复</p>
+  1346→          </div>
+  1347→          <svg class="setting-arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 18l6-6-6-6"/></svg>
+  1348→        </div>
+  1349→      </div>
+  1350→
+  1351→      <!-- 其他设置 -->
+  1352→      <div class="card mb-4" style="animation-delay: 0.4s">
+  1353→        <p class="text-sm font-medium mb-3" style="color: var(--fg-primary)">其他</p>
+  1354→        
+  1355→        <div class="setting-item" onclick="showToast('语言设置')">
+  1356→          <div class="setting-icon">
+  1357→            <svg viewBox="0 0 24 24" fill="none" stroke-linecap="round"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>
+  1358→          </div>
+  1359→          <div class="setting-text">
+  1360→            <h4>语言</h4>
+  1361→            <p>简体中文</p>
+  1362→          </div>
+  1363→          <svg class="setting-arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 18l6-6-6-6"/></svg>
+  1364→        </div>
+  1365→
+  1366→        <div class="setting-item" onclick="showToast('版本 1.0.0')">
+  1367→          <div class="setting-icon">
+  1368→            <svg viewBox="0 0 24 24" fill="none" stroke-linecap="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>
+  1369→          </div>
+  1370→          <div class="setting-text">
+  1371→            <h4>关于我们</h4>
+  1372→            <p>版本 1.0.0</p>
+  1373→          </div>
+  1374→          <svg class="setting-arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 18l6-6-6-6"/></svg>
+  1375→        </div>
+  1376→
+  1377→        <div class="setting-item" onclick="showToast('感谢反馈')">
+  1378→          <div class="setting-icon">
+  1379→            <svg viewBox="0 0 24 24" fill="none" stroke-linecap="round"><path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"/></svg>
+  1380→          </div>
+  1381→          <div class="setting-text">
+  1382→            <h4>意见反馈</h4>
+  1383→            <p>帮助我们改进</p>
+  1384→          </div>
+  1385→          <svg class="setting-arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 18l6-6-6-6"/></svg>
+  1386→        </div>
+  1387→      </div>
+  1388→
+  1389→      <!-- 数据安全提示 -->
+  1390→      <div class="mt-4 text-center" style="animation-delay: 0.45s">
+  1391→        <p class="text-xs" style="color: var(--fg-muted)">您的数据采用端到端加密存储</p>
+  1392→        <p class="text-xs mt-1" style="color: var(--fg-muted)">仅存储于您的设备与加密云端</p>
+  1393→      </div>
+  1394→    </div>
+  1395→  </div>
+  1396→
+  1397→  <div class="bottom-nav">
+  1398→    <div class="nav-item active" data-page="home">
+  1399→      <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round">
+  1400→        <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/>
+  1401→        <polyline points="9 22 9 12 15 12 15 22"/>
+  1402→      </svg>
+  1403→      <span>首页</span>
+  1404→    </div>
+  1405→    <div class="nav-item" data-page="calendar">
+  1406→      <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round">
+  1407→        <rect x="3" y="4" width="18" height="18" rx="2"/>
+  1408→        <path d="M16 2v4M8 2v4M3 10h18"/>
+  1409→      </svg>
+  1410→      <span>日历</span>
+  1411→    </div>
+  1412→    <div class="fab" onclick="openActionSheet('today')">
+  1413→      <svg viewBox="0 0 24 24" fill="none" stroke-linecap="round">
+  1414→        <line x1="12" y1="5" x2="12" y2="19"/>
+  1415→        <line x1="5" y1="12" x2="19" y2="12"/>
+  1416→      </svg>
+  1417→    </div>
+  1418→    <div class="nav-item" data-page="log">
+  1419→      <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round">
+  1420→        <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+  1421→        <polyline points="14 2 14 8 20 8"/>
+  1422→        <line x1="16" y1="13" x2="8" y2="13"/>
+  1423→        <line x1="16" y1="17" x2="8" y2="17"/>
+  1424→      </svg>
+  1425→      <span>记录</span>
+  1426→    </div>
+  1427→    <div class="nav-item" data-page="profile">
+  1428→      <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round">
+  1429→        <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/>
+  1430→        <circle cx="12" cy="7" r="4"/>
+  1431→      </svg>
+  1432→      <span>我的</span>
+  1433→    </div>
+  1434→  </div>
+  1435→
+  1436→  <!-- 日历操作菜单 -->
+  1437→  <div class="action-sheet" id="actionSheet">
+  1438→    <div class="action-sheet-content">
+  1439→      <div class="action-sheet-handle"></div>
+  1440→      <div class="action-sheet-title">
+  1441→        <span id="actionSheetDate">1月15日</span>
+  1442→      </div>
+  1443→      <div id="actionSheetOptions"></div>
+  1444→      <div class="action-cancel" onclick="closeActionSheet()">取消</div>
+  1445→    </div>
+  1446→  </div>
+  1447→
+  1448→  <!-- 添加症状弹窗 -->
+  1449→  <div class="action-sheet" id="addSymptomSheet">
+  1450→    <div class="action-sheet-content">
+  1451→      <div class="action-sheet-handle"></div>
+  1452→      <div class="action-sheet-title">
+  1453→        <strong>添加自定义症状</strong>
+  1454→      </div>
+  1455→      <div style="margin-bottom: 16px;">
+  1456→        <input type="text" class="custom-input" placeholder="输入症状名称..." id="newSymptomInput">
+  1457→      </div>
+  1458→      <button class="w-full py-4 rounded-2xl font-medium text-lg" style="background: linear-gradient(135deg, var(--accent-warm), var(--accent-soft)); color: var(--bg-primary)" onclick="addCustomSymptom()">
+  1459→        添加
+  1460→      </button>
+  1461→      <div class="action-cancel" onclick="closeAddSymptom()">取消</div>
+  1462→    </div>
+  1463→  </div>
+  1464→</div>
+  1465→
+  1466→<script>
+  1467→let currentPage = 'home';
+  1468→let currentYear = 2025;
+  1469→let currentMonth = 1;
+  1470→let selectedDay = null;
+  1471→
+  1472→let periodData = {
+  1473→  periods: [
+  1474→    { start: '2025-01-08', end: '2025-01-12' }
+  1475→  ]
+  1476→};
+  1477→
+  1478→let dailyRecords = [
+  1479→  { date: '2025-01-15', flow: 2, symptoms: ['痛经', '疲劳'], mood: 2, note: '今天感觉还可以' },
+  1480→  { date: '2025-01-14', flow: 3, symptoms: ['腰酸'], mood: 3, note: '记得多喝热水' },
+  1481→  { date: '2025-01-13', flow: 1, symptoms: ['头痛', '疲劳'], mood: 4, note: '' },
+  1482→];
+  1483→
+  1484→const app = document.getElementById('app');
+  1485→const calendarGrid = document.getElementById('calendarGrid');
+  1486→const calendarTitle = document.getElementById('calendarTitle');
+  1487→const actionSheet = document.getElementById('actionSheet');
+  1488→const actionSheetDate = document.getElementById('actionSheetDate');
+  1489→const actionSheetOptions = document.getElementById('actionSheetOptions');
+  1490→const toast = document.getElementById('toast');
+  1491→const ringProgress = document.getElementById('ringProgress');
+  1492→const ringGlow = document.getElementById('ringGlow');
+  1493→const homeDate = document.getElementById('homeDate');
+  1494→const logDate = document.getElementById('logDate');
+  1495→const addSymptomSheet = document.getElementById('addSymptomSheet');
+  1496→
+  1497→const weekdays = ['周日', '周一', '周二', '周三', '周四', '周五', '周六'];
+  1498→const flowLabels = ['', '点滴', '少量', '中等', '大量'];
+  1499→const moodLabels = ['', '开心', '平静', '低落', '烦躁', '焦虑'];
+  1500→
+  1501→function getTodayStr() {
+  1502→  const today = new Date();
+  1503→  return `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
+  1504→}
+  1505→
+  1506→function formatDate(date) {
+  1507→  const month = date.getMonth() + 1;
+  1508→  const day = date.getDate();
+  1509→  const weekday = weekdays[date.getDay()];
+  1510→  return `${month}月${day}日 ${weekday}`;
+  1511→}
+  1512→
+  1513→function updateTodayDisplay() {
+  1514→  const today = new Date();
+  1515→  if (homeDate) homeDate.textContent = formatDate(today);
+  1516→  if (logDate) logDate.textContent = formatDate(today);
+  1517→}
+  1518→
+  1519→function showToast(message) {
+  1520→  if (!toast) return;
+  1521→  toast.textContent = message;
+  1522→  toast.classList.add('show');
+  1523→  setTimeout(() => toast.classList.remove('show'), 2500);
+  1524→}
+  1525→
+  1526→document.querySelectorAll('.nav-item').forEach(item => {
+  1527→  item.addEventListener('click', function() {
+  1528→    const page = this.dataset.page;
+  1529→    if (!page) return;
+  1530→    
+  1531→    document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+  1532→    this.classList.add('active');
+  1533→    
+  1534→    document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+  1535→    document.getElementById('page-' + page).classList.add('active');
+  1536→    
+  1537→    currentPage = page;
+  1538→  });
+  1539→});
+  1540→
+  1541→function generateCalendar() {
+  1542→  if (!calendarGrid) return;
+  1543→  
+  1544→  const firstDay = new Date(currentYear, currentMonth - 1, 1);
+  1545→  const lastDay = new Date(currentYear, currentMonth, 0);
+  1546→  const startDayOfWeek = firstDay.getDay();
+  1547→  const totalDays = lastDay.getDate();
+  1548→  
+  1549→  const todayStr = getTodayStr();
+  1550→  
+  1551→  let html = '';
+  1552→  
+  1553→  for (let i = 0; i < startDayOfWeek; i++) {
+  1554→    html += '<div class="calendar-day other-month"></div>';
+  1555→  }
+  1556→  
+  1557→  for (let day = 1; day <= totalDays; day++) {
+  1558→    const dateStr = `${currentYear}-${String(currentMonth).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+  1559→    const isToday = dateStr === todayStr;
+  1560→    const periodInfo = getPeriodInfo(dateStr);
+  1561→    
+  1562→    let classes = 'calendar-day';
+  1563→    
+  1564→    if (periodInfo.isPeriod) {
+  1565→      if (periodInfo.isActive) {
+  1566→        classes += ' period period-active';
+  1567→      } else {
+  1568→        classes += ' period';
+  1569→        if (periodInfo.isStart && periodInfo.isEnd) classes += ' period-single';
+  1570→        else if (periodInfo.isStart) classes += ' period-start';
+  1571→        else if (periodInfo.isEnd) classes += ' period-end';
+  1572→        else classes += ' period-middle';
+  1573→      }
+  1574→    }
+  1575→    
+  1576→    if (isToday) {
+  1577→      classes += ' today';
+  1578→    }
+  1579→    
+  1580→    html += `<div class="${classes}" data-date="${dateStr}" onclick="handleDayClick('${dateStr}', ${day}, ${isToday})">${day}</div>`;
+  1581→  }
+  1582→  
+  1583→  calendarGrid.innerHTML = html;
+  1584→}
+  1585→
+  1586→function getPeriodInfo(dateStr) {
+  1587→  let isPeriod = false;
+  1588→  let isStart = false;
+  1589→  let isEnd = false;
+  1590→  let isActive = false;
+  1591→  
+  1592→  for (const period of periodData.periods) {
+  1593→    if (period.start && !period.end) {
+  1594→      if (dateStr === period.start) {
+  1595→        isPeriod = true;
+  1596→        isStart = true;
+  1597→        isEnd = true;
+  1598→        isActive = true;
+  1599→        break;
+  1600→      }
+  1601→    } else if (period.start && period.end) {
+  1602→      if (dateStr >= period.start && dateStr <= period.end) {
+  1603→        isPeriod = true;
+  1604→        if (dateStr === period.start) isStart = true;
+  1605→        if (dateStr === period.end) isEnd = true;
+  1606→        break;
+  1607→      }
+  1608→    }
+  1609→  }
+  1610→  
+  1611→  return { isPeriod, isStart, isEnd, isActive };
+  1612→}
+  1613→
+  1614→function hasActivePeriod() {
+  1615→  for (const period of periodData.periods) {
+  1616→    if (period.start && !period.end) return period;
+  1617→  }
+  1618→  return null;
+  1619→}
+  1620→
+  1621→function getPeriodByDate(dateStr) {
+  1622→  for (const period of periodData.periods) {
+  1623→    if (period.start && !period.end) {
+  1624→      if (dateStr === period.start) return period;
+  1625→    } else if (period.start && period.end) {
+  1626→      if (dateStr >= period.start && dateStr <= period.end) return period;
+  1627→    }
+  1628→  }
+  1629→  return null;
+  1630→}
+  1631→
+  1632→function getNextDay(dateStr) {
+  1633→  const d = new Date(dateStr);
+  1634→  d.setDate(d.getDate() + 1);
+  1635→  return d.toISOString().split('T')[0];
+  1636→}
+  1637→
+  1638→function getPrevDay(dateStr) {
+  1639→  const d = new Date(dateStr);
+  1640→  d.setDate(d.getDate() - 1);
+  1641→  return d.toISOString().split('T')[0];
+  1642→}
+  1643→
+  1644→function handleDayClick(dateStr, day, isToday) {
+  1645→  selectedDay = { dateStr, day, isToday };
+  1646→  
+  1647→  const periodInfo = getPeriodInfo(dateStr);
+  1648→  const activePeriod = hasActivePeriod();
+  1649→  const existingPeriod = getPeriodByDate(dateStr);
+  1650→  
+  1651→  actionSheetDate.innerHTML = `<strong>${currentMonth}月${day}日</strong>`;
+  1652→  
+  1653→  let optionsHtml = '';
+  1654→  
+  1655→  if (activePeriod) {
+  1656→    if (dateStr === activePeriod.start) {
+  1657→      optionsHtml = `
+  1658→        <div class="action-option sage" onclick="endPeriod('${dateStr}')">
+  1659→          <div class="action-option-icon">
+  1660→            <svg viewBox="0 0 24 24" fill="none" stroke-linecap="round"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
+  1661→          </div>
+  1662→          <div class="action-option-text">
+  1663→            <h4>经期走了</h4>
+  1664→            <p>标记经期在这一天结束</p>
+  1665→          </div>
+  1666→        </div>
+  1667→        <div class="action-option danger" onclick="cancelActivePeriod()">
+  1668→          <div class="action-option-icon">
+  1669→            <svg viewBox="0 0 24 24" fill="none" stroke-linecap="round"><path d="M18 6L6 18M6 6l12 12"/></svg>
+  1670→          </div>
+  1671→          <div class="action-option-text">
+  1672→            <h4>取消本次记录</h4>
+  1673→            <p>删除当前进行中的经期</p>
+  1674→          </div>
+  1675→        </div>
+  1676→      `;
+  1677→    } else if (dateStr < activePeriod.start) {
+  1678→      optionsHtml = `
+  1679→        <div class="action-option primary" onclick="updateStart('${dateStr}')">
+  1680→          <div class="action-option-icon">
+  1681→            <svg viewBox="0 0 24 24" fill="none" stroke-linecap="round"><path d="M11 17l-5-5 5-5M18 17l-5-5 5-5"/></svg>
+  1682→          </div>
+  1683→          <div class="action-option-text">
+  1684→            <h4>修改开始日期</h4>
+  1685→            <p>将经期开始提前至此日</p>
+  1686→          </div>
+  1687→        </div>
+  1688→        <div class="action-option danger" onclick="cancelActivePeriod()">
+  1689→          <div class="action-option-icon">
+  1690→            <svg viewBox="0 0 24 24" fill="none" stroke-linecap="round"><path d="M18 6L6 18M6 6l12 12"/></svg>
+  1691→          </div>
+  1692→          <div class="action-option-text">
+  1693→            <h4>取消本次记录</h4>
+  1694→            <p>删除当前进行中的经期</p>
+  1695→          </div>
+  1696→        </div>
+  1697→      `;
+  1698→    } else {
+  1699→      optionsHtml = `
+  1700→        <div class="action-option sage" onclick="endPeriod('${dateStr}')">
+  1701→          <div class="action-option-icon">
+  1702→            <svg viewBox="0 0 24 24" fill="none" stroke-linecap="round"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
+  1703→          </div>
+  1704→          <div class="action-option-text">
+  1705→            <h4>经期走了</h4>
+  1706→            <p>标记经期在这一天结束</p>
+  1707→          </div>
+  1708→        </div>
+  1709→        <div class="action-option danger" onclick="cancelActivePeriod()">
+  1710→          <div class="action-option-icon">
+  1711→            <svg viewBox="0 0 24 24" fill="none" stroke-linecap="round"><path d="M18 6L6 18M6 6l12 12"/></svg>
+  1712→          </div>
+  1713→          <div class="action-option-text">
+  1714→            <h4>取消本次记录</h4>
+  1715→            <p>删除当前进行中的经期</p>
+  1716→          </div>
+  1717→        </div>
+  1718→      `;
+  1719→    }
+  1720→  } else if (periodInfo.isPeriod) {
+  1721→    optionsHtml = `
+  1722→      <div class="action-option primary" onclick="extendPeriod('${dateStr}')">
+  1723→        <div class="action-option-icon">
+  1724→          <svg viewBox="0 0 24 24" fill="none" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>
+  1725→        </div>
+  1726→        <div class="action-option-text">
+  1727→          <h4>延长经期</h4>
+  1728→          <p>将经期结束日期延后一天</p>
+  1729→        </div>
+  1730→      </div>
+  1731→      <div class="action-option danger" onclick="cancelPeriod('${dateStr}')">
+  1732→        <div class="action-option-icon">
+  1733→          <svg viewBox="0 0 24 24" fill="none" stroke-linecap="round"><path d="M18 6L6 18M6 6l12 12"/></svg>
+  1734→        </div>
+  1735→        <div class="action-option-text">
+  1736→          <h4>取消经期记录</h4>
+  1737→          <p>删除这一天的经期标记</p>
+  1738→        </div>
+  1739→      </div>
+  1740→    `;
+  1741→  } else {
+  1742→    const lastPeriod = periodData.periods[periodData.periods.length - 1];
+  1743→    if (lastPeriod && lastPeriod.end) {
+  1744→      const dayAfterEnd = getNextDay(lastPeriod.end);
+  1745→      if (dateStr === dayAfterEnd) {
+  1746→        optionsHtml = `
+  1747→          <div class="action-option primary" onclick="extendPeriod('${dateStr}')">
+  1748→            <div class="action-option-icon">
+  1749→              <svg viewBox="0 0 24 24" fill="none" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>
+  1750→            </div>
+  1751→            <div class="action-option-text">
+  1752→              <h4>延长经期</h4>
+  1753→              <p>将上一次经期延长至此</p>
+  1754→            </div>
+  1755→          </div>
+  1756→          <div class="action-option sage" onclick="startPeriod('${dateStr}')">
+  1757→            <div class="action-option-icon">
+  1758→              <svg viewBox="0 0 24 24" fill="none" stroke-linecap="round"><path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83"/></svg>
+  1759→            </div>
+  1760→            <div class="action-option-text">
+  1761→              <h4>新经期开始</h4>
+  1762→              <p>标记这一天为新经期开始</p>
+  1763→            </div>
+  1764→          </div>
+  1765→        `;
+  1766→      } else {
+  1767→        optionsHtml = `
+  1768→          <div class="action-option primary" onclick="startPeriod('${dateStr}')">
+  1769→            <div class="action-option-icon">
+  1770→              <svg viewBox="0 0 24 24" fill="none" stroke-linecap="round"><path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83"/></svg>
+  1771→            </div>
+  1772→            <div class="action-option-text">
+  1773→              <h4>经期来了</h4>
+  1774→              <p>标记这一天为经期开始</p>
+  1775→            </div>
+  1776→          </div>
+  1777→        `;
+  1778→      }
+  1779→    } else {
+  1780→      optionsHtml = `
+  1781→        <div class="action-option primary" onclick="startPeriod('${dateStr}')">
+  1782→          <div class="action-option-icon">
+  1783→            <svg viewBox="0 0 24 24" fill="none" stroke-linecap="round"><path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83"/></svg>
+  1784→          </div>
+  1785→          <div class="action-option-text">
+  1786→            <h4>经期来了</h4>
+  1787→            <p>标记这一天为经期开始</p>
+  1788→          </div>
+  1789→        </div>
+  1790→      `;
+  1791→    }
+  1792→  }
+  1793→  
+  1794→  actionSheetOptions.innerHTML = optionsHtml;
+  1795→  openActionSheet();
+  1796→}
+  1797→
+  1798→function startPeriod(dateStr) {
+  1799→  periodData.periods.push({ start: dateStr, end: null });
+  1800→  closeActionSheet();
+  1801→  generateCalendar();
+  1802→  showToast('已记录经期开始');
+  1803→}
+  1804→
+  1805→function updateStart(dateStr) {
+  1806→  const activePeriod = hasActivePeriod();
+  1807→  if (activePeriod) {
+  1808→    activePeriod.start = dateStr;
+  1809→    closeActionSheet();
+  1810→    generateCalendar();
+  1811→    showToast('开始日期已更新');
+  1812→  }
+  1813→}
+  1814→
+  1815→function endPeriod(dateStr) {
+  1816→  const activePeriod = hasActivePeriod();
+  1817→  if (activePeriod) {
+  1818→    if (dateStr < activePeriod.start) {
+  1819→      showToast('结束日期不能早于开始日期');
+  1820→      return;
+  1821→    }
+  1822→    activePeriod.end = dateStr;
+  1823→    closeActionSheet();
+  1824→    generateCalendar();
+  1825→    showToast('经期已结束，记录完成');
+  1826→  }
+  1827→}
+  1828→
+  1829→function extendPeriod(dateStr) {
+  1830→  const lastPeriod = periodData.periods[periodData.periods.length - 1];
+  1831→  if (lastPeriod && lastPeriod.end) {
+  1832→    lastPeriod.end = dateStr;
+  1833→    closeActionSheet();
+  1834→    generateCalendar();
+  1835→    showToast('经期已延长');
+  1836→  }
+  1837→}
+  1838→
+  1839→function cancelActivePeriod() {
+  1840→  periodData.periods = periodData.periods.filter(p => p.end);
+  1841→  closeActionSheet();
+  1842→  generateCalendar();
+  1843→  showToast('已取消当前记录');
+  1844→}
+  1845→
+  1846→function cancelPeriod(dateStr) {
+  1847→  periodData.periods = periodData.periods.filter(period => {
+  1848→    if (period.start && !period.end) {
+  1849→      if (dateStr === period.start) return false;
+  1850→    } else if (period.start && period.end) {
+  1851→      if (dateStr >= period.start && dateStr <= period.end) {
+  1852→        if (dateStr === period.start && dateStr === period.end) {
+  1853→          return false;
+  1854→        } else if (dateStr === period.start) {
+  1855→          period.start = getNextDay(dateStr);
+  1856→          if (period.start > period.end) return false;
+  1857→        } else if (dateStr === period.end) {
+  1858→          period.end = getPrevDay(dateStr);
+  1859→          if (period.end < period.start) return false;
+  1860→        } else {
+  1861→          periodData.periods.push({ start: period.start, end: getPrevDay(dateStr) });
+  1862→          periodData.periods.push({ start: getNextDay(dateStr), end: period.end });
+  1863→          return false;
+  1864→        }
+  1865→      }
+  1866→    }
+  1867→    return true;
+  1868→  });
+  1869→  
+  1870→  closeActionSheet();
+  1871→  generateCalendar();
+  1872→  showToast('已取消该日期的经期记录');
+  1873→}
+  1874→
+  1875→function changeMonth(delta) {
+  1876→  currentMonth += delta;
+  1877→  if (currentMonth > 12) {
+  1878→    currentMonth = 1;
+  1879→    currentYear++;
+  1880→  } else if (currentMonth < 1) {
+  1881→    currentMonth = 12;
+  1882→    currentYear--;
+  1883→  }
+  1884→  calendarTitle.textContent = `${currentYear}年${currentMonth}月`;
+  1885→  generateCalendar();
+  1886→}
+  1887→
+  1888→function openActionSheet(mode) {
+  1889→  if (mode === 'today') {
+  1890→    const today = new Date();
+  1891→    const dateStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
+  1892→    currentYear = today.getFullYear();
+  1893→    currentMonth = today.getMonth() + 1;
+  1894→    calendarTitle.textContent = `${currentYear}年${currentMonth}月`;
+  1895→    generateCalendar();
+  1896→    handleDayClick(dateStr, today.getDate(), true);
+  1897→    return;
+  1898→  }
+  1899→  actionSheet.classList.add('active');
+  1900→}
+  1901→
+  1902→function closeActionSheet() {
+  1903→  actionSheet.classList.remove('active');
+  1904→}
+  1905→
+  1906→if (actionSheet) {
+  1907→  actionSheet.addEventListener('click', function(e) {
+  1908→    if (e.target === this) closeActionSheet();
+  1909→  });
+  1910→}
+  1911→
+  1912→function animateRing() {
+  1913→  const circumference = 2 * Math.PI * 120;
+  1914→  const progress = 0.46;
+  1915→  const offset = circumference * (1 - progress);
+  1916→  
+  1917→  setTimeout(() => {
+  1918→    if (ringProgress) ringProgress.style.strokeDashoffset = offset;
+  1919→    if (ringGlow) ringGlow.style.strokeDashoffset = offset;
+  1920→  }, 500);
+  1921→}
+  1922→
+  1923→let currentFlow = 2;
+  1924→let currentMood = 2;
+  1925→
+  1926→function selectFlow(el, level) {
+  1927→  document.querySelectorAll('.flow-option').forEach(opt => {
+  1928→    opt.classList.remove('selected');
+  1929→    opt.querySelector('span').style.color = 'var(--fg-secondary)';
+  1930→  });
+  1931→  el.classList.add('selected');
+  1932→  el.querySelector('span').style.color = 'var(--accent-warm)';
+  1933→  currentFlow = level;
+  1934→}
+  1935→
+  1936→function selectMood(el, mood) {
+  1937→  document.querySelectorAll('.record-section .flex.justify-between button').forEach(btn => {
+  1938→    btn.style.background = 'transparent';
+  1939→    btn.querySelector('span').style.color = 'var(--fg-secondary)';
+  1940→  });
+  1941→  el.style.background = 'rgba(224,122,95,0.15)';
+  1942→  el.querySelector('span').style.color = 'var(--accent-warm)';
+  1943→  currentMood = mood;
+  1944→}
+  1945→
+  1946→function openAddSymptom() {
+  1947→  addSymptomSheet.classList.add('active');
+  1948→}
+  1949→
+  1950→function closeAddSymptom() {
+  1951→  addSymptomSheet.classList.remove('active');
+  1952→  document.getElementById('newSymptomInput').value = '';
+  1953→}
+  1954→
+  1955→if (addSymptomSheet) {
+  1956→  addSymptomSheet.addEventListener('click', function(e) {
+  1957→    if (e.target === this) closeAddSymptom();
+  1958→  });
+  1959→}
+  1960→
+  1961→function addCustomSymptom() {
+  1962→  const input = document.getElementById('newSymptomInput');
+  1963→  const value = input.value.trim();
+  1964→  if (!value) {
+  1965→    showToast('请输入症状名称');
+  1966→    return;
+  1967→  }
+  1968→  
+  1969→  const container = document.getElementById('symptomContainer');
+  1970→  const addBtn = container.querySelector('.symptom-add');
+  1971→  
+  1972→  const newTag = document.createElement('button');
+  1973→  newTag.className = 'symptom-tag';
+  1974→  newTag.textContent = value;
+  1975→  newTag.onclick = function() { this.classList.toggle('selected'); };
+  1976→  
+  1977→  container.insertBefore(newTag, addBtn);
+  1978→  
+  1979→  closeAddSymptom();
+  1980→  showToast('已添加自定义症状');
+  1981→}
+  1982→
+  1983→function switchLogTab(tab) {
+  1984→  document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
+  1985→  event.target.classList.add('active');
+  1986→  
+  1987→  if (tab === 'record') {
+  1988→    document.getElementById('recordSection').style.display = 'block';
+  1989→    document.getElementById('historySection').style.display = 'none';
+  1990→  } else {
+  1991→    document.getElementById('recordSection').style.display = 'none';
+  1992→    document.getElementById('historySection').style.display = 'block';
+  1993→    renderHistory();
+  1994→  }
+  1995→}
+  1996→
+  1997→function renderHistory() {
+  1998→  const container = document.getElementById('historyList');
+  1999→  if (!container) return;
+  2000→  
+
+[showing lines 1-2000 of 2120; use offset=2001 with limit to continue reading]

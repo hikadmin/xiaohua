@@ -1,0 +1,43 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model UserProfile {
+  id              String   @id @default(cuid())
+  name            String   @default("Luna")
+  cycleLength     Int      @default(28)
+  periodLength    Int      @default(5)
+  lastPeriodStart String?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+}
+
+model Period {
+  id        String   @id @default(cuid())
+  startDate String
+  endDate   String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model DailyRecord {
+  id        String   @id @default(cuid())
+  date      String   @unique
+  flow      Int      @default(0)
+  mood      Int      @default(0)
+  symptoms  String   @default("[]")
+  note      String   @default("")
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Setting {
+  id    String @id @default(cuid())
+  key   String @unique
+  value String @default("")
+}

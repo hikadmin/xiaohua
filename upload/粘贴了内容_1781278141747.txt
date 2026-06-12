@@ -1,0 +1,2120 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>Luna - 经期追踪原型</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@300;400;500;600&family=Noto+Sans+SC:wght@300;400;500;600&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg-primary: #0f1419;
+      --bg-secondary: #1a2027;
+      --bg-card: #232b35;
+      --fg-primary: #f0ece4;
+      --fg-secondary: #a8a29e;
+      --fg-muted: #6b7280;
+      --accent-warm: #e07a5f;
+      --accent-soft: #d4a574;
+      --accent-sage: #81b29a;
+      --accent-coral: #f2cc8f;
+      --border: rgba(255,255,255,0.08);
+    }
+
+    * {
+      -webkit-tap-highlight-color: transparent;
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: 'Noto Sans SC', sans-serif;
+      background: var(--bg-primary);
+      color: var(--fg-primary);
+      overflow-x: hidden;
+    }
+
+    .font-display {
+      font-family: 'Cormorant Garamond', serif;
+    }
+
+    .phone-frame {
+      width: 375px;
+      height: 812px;
+      background: var(--bg-primary);
+      border-radius: 40px;
+      overflow: hidden;
+      position: relative;
+      box-shadow: 
+        0 0 0 12px #1a1a1a,
+        0 0 0 14px #333,
+        0 25px 50px -12px rgba(0,0,0,0.5);
+    }
+
+    .notch {
+      position: absolute;
+      top: 0;
+      left: 50%;
+      transform: translateX(-50%);
+      width: 150px;
+      height: 30px;
+      background: #000;
+      border-radius: 0 0 20px 20px;
+      z-index: 100;
+    }
+
+    .animated-bg {
+      position: absolute;
+      inset: 0;
+      overflow: hidden;
+      z-index: 0;
+    }
+
+    .blob {
+      position: absolute;
+      border-radius: 50%;
+      filter: blur(60px);
+      opacity: 0.4;
+      animation: float 20s ease-in-out infinite;
+    }
+
+    .blob-1 {
+      width: 300px;
+      height: 300px;
+      background: linear-gradient(135deg, var(--accent-warm), transparent);
+      top: -100px;
+      right: -100px;
+      animation-delay: 0s;
+    }
+
+    .blob-2 {
+      width: 250px;
+      height: 250px;
+      background: linear-gradient(135deg, var(--accent-sage), transparent);
+      bottom: 200px;
+      left: -100px;
+      animation-delay: -7s;
+    }
+
+    .blob-3 {
+      width: 200px;
+      height: 200px;
+      background: linear-gradient(135deg, var(--accent-soft), transparent);
+      bottom: -50px;
+      right: -50px;
+      animation-delay: -14s;
+    }
+
+    @keyframes float {
+      0%, 100% { transform: translate(0, 0) scale(1); }
+      33% { transform: translate(30px, -30px) scale(1.1); }
+      66% { transform: translate(-20px, 20px) scale(0.9); }
+    }
+
+    .cycle-ring {
+      position: relative;
+      width: 260px;
+      height: 260px;
+    }
+
+    .cycle-ring svg {
+      transform: rotate(-90deg);
+    }
+
+    .ring-track {
+      fill: none;
+      stroke: var(--border);
+      stroke-width: 8;
+    }
+
+    .ring-progress {
+      fill: none;
+      stroke: url(#ringGradient);
+      stroke-width: 8;
+      stroke-linecap: round;
+      stroke-dasharray: 754;
+      stroke-dashoffset: 754;
+      transition: stroke-dashoffset 1.5s ease-out;
+    }
+
+    .ring-glow {
+      fill: none;
+      stroke: url(#ringGradient);
+      stroke-width: 16;
+      stroke-linecap: round;
+      stroke-dasharray: 754;
+      stroke-dashoffset: 754;
+      filter: blur(8px);
+      opacity: 0.5;
+      transition: stroke-dashoffset 1.5s ease-out;
+    }
+
+    .cycle-center {
+      position: absolute;
+      inset: 30px;
+      border-radius: 50%;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      transition: all 0.3s ease;
+      user-select: none;
+    }
+
+    .cycle-center::before {
+      content: '';
+      position: absolute;
+      inset: 0;
+      border-radius: 50%;
+      background: radial-gradient(circle, rgba(224, 122, 95, 0.1) 0%, transparent 70%);
+      opacity: 0;
+      transition: opacity 0.3s ease;
+    }
+
+    .cycle-center:hover::before {
+      opacity: 1;
+    }
+
+    .cycle-center:active {
+      transform: scale(0.95);
+    }
+
+    .long-press-hint {
+      position: absolute;
+      bottom: -30px;
+      left: 50%;
+      transform: translateX(-50%);
+      font-size: 11px;
+      color: var(--fg-muted);
+      opacity: 0;
+      transition: opacity 0.3s ease;
+      white-space: nowrap;
+    }
+
+    .cycle-center:hover .long-press-hint {
+      opacity: 1;
+    }
+
+    .page {
+      position: absolute;
+      inset: 0;
+      padding-top: 50px;
+      padding-bottom: 90px;
+      opacity: 0;
+      visibility: hidden;
+      transition: opacity 0.4s ease, transform 0.4s ease;
+      transform: translateX(20px);
+      z-index: 1;
+      overflow-y: auto;
+      overflow-x: hidden;
+      -webkit-overflow-scrolling: touch;
+    }
+
+    .page::-webkit-scrollbar {
+      width: 0;
+      display: none;
+    }
+
+    .page.active {
+      opacity: 1;
+      visibility: visible;
+      transform: translateX(0);
+      z-index: 2;
+    }
+
+    .bottom-nav {
+      position: absolute;
+      bottom: 0;
+      left: 0;
+      right: 0;
+      height: 85px;
+      background: linear-gradient(to top, var(--bg-primary) 70%, transparent);
+      display: flex;
+      justify-content: space-around;
+      align-items: center;
+      padding-bottom: 20px;
+      z-index: 50;
+    }
+
+    .nav-item {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 4px;
+      padding: 8px 16px;
+      border-radius: 16px;
+      transition: all 0.3s ease;
+      cursor: pointer;
+    }
+
+    .nav-item svg {
+      width: 24px;
+      height: 24px;
+      stroke: var(--fg-muted);
+      transition: all 0.3s ease;
+    }
+
+    .nav-item span {
+      font-size: 11px;
+      color: var(--fg-muted);
+      transition: all 0.3s ease;
+    }
+
+    .nav-item.active svg {
+      stroke: var(--accent-warm);
+    }
+
+    .nav-item.active span {
+      color: var(--accent-warm);
+    }
+
+    .nav-item:hover {
+      background: rgba(255,255,255,0.05);
+    }
+
+    .fab {
+      width: 56px;
+      height: 56px;
+      border-radius: 50%;
+      background: linear-gradient(135deg, var(--accent-warm), var(--accent-soft));
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      box-shadow: 0 8px 24px rgba(224, 122, 95, 0.4);
+      cursor: pointer;
+      transition: all 0.3s ease;
+      margin-top: -20px;
+    }
+
+    .fab:hover {
+      transform: scale(1.1);
+      box-shadow: 0 12px 32px rgba(224, 122, 95, 0.5);
+    }
+
+    .fab:active {
+      transform: scale(0.95);
+    }
+
+    .fab svg {
+      width: 28px;
+      height: 28px;
+      stroke: var(--bg-primary);
+      stroke-width: 2.5;
+    }
+
+    .card {
+      background: var(--bg-card);
+      border-radius: 20px;
+      border: 1px solid var(--border);
+      padding: 20px;
+      transition: all 0.3s ease;
+    }
+
+    .card:hover {
+      border-color: rgba(255,255,255,0.15);
+      transform: translateY(-2px);
+    }
+
+    .calendar-day {
+      width: 40px;
+      height: 40px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      border-radius: 12px;
+      font-size: 14px;
+      cursor: pointer;
+      transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+      position: relative;
+      background: transparent;
+      color: var(--fg-primary);
+      user-select: none;
+      -webkit-user-select: none;
+    }
+
+    .calendar-day:hover {
+      background: rgba(255,255,255,0.08);
+    }
+
+    .calendar-day:active {
+      transform: scale(0.92);
+    }
+
+    .calendar-day.today {
+      background: linear-gradient(135deg, var(--accent-soft), var(--accent-coral)) !important;
+      color: var(--bg-primary) !important;
+      font-weight: 700 !important;
+      transform: scale(1.08);
+      z-index: 10;
+    }
+
+    .calendar-day.period {
+      background: var(--accent-warm);
+      color: var(--bg-primary);
+      font-weight: 500;
+    }
+
+    .calendar-day.today.period {
+      background: var(--accent-warm) !important;
+      color: var(--bg-primary) !important;
+      box-shadow: 0 0 0 3px var(--accent-soft) !important;
+      transform: scale(1.08);
+      z-index: 10;
+    }
+
+    .calendar-day.period-start {
+      border-top-left-radius: 20px;
+      border-bottom-left-radius: 20px;
+      border-top-right-radius: 4px;
+      border-bottom-right-radius: 4px;
+    }
+
+    .calendar-day.period-end {
+      border-top-right-radius: 20px;
+      border-bottom-right-radius: 20px;
+      border-top-left-radius: 4px;
+      border-bottom-left-radius: 4px;
+    }
+
+    .calendar-day.period-middle {
+      border-radius: 4px;
+    }
+
+    .calendar-day.period-single {
+      border-radius: 20px;
+    }
+
+    .calendar-day.period-active {
+      animation: period-pulse 2s ease-in-out infinite;
+    }
+
+    @keyframes period-pulse {
+      0%, 100% { box-shadow: 0 0 0 0 rgba(224, 122, 95, 0.4); }
+      50% { box-shadow: 0 0 0 6px rgba(224, 122, 95, 0.2); }
+    }
+
+    .calendar-day.today.period-active {
+      animation: none; 
+    }
+
+    .calendar-day.predicted {
+      background: rgba(129, 178, 154, 0.2);
+      color: var(--accent-sage);
+    }
+
+    .calendar-day.fertile {
+      background: rgba(212, 165, 116, 0.2);
+      color: var(--accent-soft);
+    }
+
+    .calendar-day.other-month {
+      color: var(--fg-muted);
+      opacity: 0.4;
+    }
+
+    .action-sheet {
+      position: absolute;
+      inset: 0;
+      background: rgba(0,0,0,0.6);
+      backdrop-filter: blur(8px);
+      z-index: 200;
+      opacity: 0;
+      visibility: hidden;
+      transition: all 0.3s ease;
+    }
+
+    .action-sheet.active {
+      opacity: 1;
+      visibility: visible;
+    }
+
+    .action-sheet-content {
+      position: absolute;
+      bottom: 0;
+      left: 0;
+      right: 0;
+      background: var(--bg-secondary);
+      border-radius: 24px 24px 0 0;
+      padding: 12px 20px 34px;
+      transform: translateY(100%);
+      transition: transform 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+      max-height: 80vh;
+      overflow-y: auto;
+    }
+
+    .action-sheet.active .action-sheet-content {
+      transform: translateY(0);
+    }
+
+    .action-sheet-handle {
+      width: 36px;
+      height: 4px;
+      background: var(--fg-muted);
+      border-radius: 2px;
+      margin: 0 auto 16px;
+      opacity: 0.5;
+    }
+
+    .action-sheet-title {
+      text-align: center;
+      margin-bottom: 16px;
+    }
+
+    .action-sheet-title span {
+      font-size: 13px;
+      color: var(--fg-muted);
+    }
+
+    .action-sheet-title strong {
+      color: var(--fg-primary);
+      font-weight: 500;
+    }
+
+    .action-option {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      padding: 16px;
+      border-radius: 14px;
+      cursor: pointer;
+      transition: all 0.2s ease;
+      margin-bottom: 8px;
+    }
+
+    .action-option:hover {
+      background: rgba(255,255,255,0.05);
+    }
+
+    .action-option:active {
+      transform: scale(0.98);
+    }
+
+    .action-option.primary {
+      background: rgba(224, 122, 95, 0.15);
+      border: 1px solid rgba(224, 122, 95, 0.3);
+    }
+
+    .action-option.primary:hover {
+      background: rgba(224, 122, 95, 0.25);
+    }
+
+    .action-option.sage {
+      background: rgba(129, 178, 154, 0.15);
+      border: 1px solid rgba(129, 178, 154, 0.3);
+    }
+
+    .action-option.sage:hover {
+      background: rgba(129, 178, 154, 0.25);
+    }
+
+    .action-option.danger {
+      background: rgba(239, 68, 68, 0.1);
+      border: 1px solid rgba(239, 68, 68, 0.2);
+    }
+
+    .action-option.danger:hover {
+      background: rgba(239, 68, 68, 0.2);
+    }
+
+    .action-option-icon {
+      width: 44px;
+      height: 44px;
+      border-radius: 12px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+    }
+
+    .action-option.primary .action-option-icon {
+      background: linear-gradient(135deg, var(--accent-warm), var(--accent-soft));
+    }
+
+    .action-option.sage .action-option-icon {
+      background: linear-gradient(135deg, var(--accent-sage), #6b9e85);
+    }
+
+    .action-option.danger .action-option-icon {
+      background: linear-gradient(135deg, #ef4444, #dc2626);
+    }
+
+    .action-option-icon svg {
+      width: 22px;
+      height: 22px;
+      stroke: var(--bg-primary);
+      stroke-width: 2;
+    }
+
+    .action-option-text h4 {
+      font-size: 15px;
+      font-weight: 500;
+      color: var(--fg-primary);
+      margin: 0 0 2px;
+    }
+
+    .action-option-text p {
+      font-size: 12px;
+      color: var(--fg-muted);
+      margin: 0;
+    }
+
+    .action-cancel {
+      text-align: center;
+      padding: 16px;
+      color: var(--fg-muted);
+      font-size: 14px;
+      cursor: pointer;
+      transition: color 0.2s;
+      margin-top: 8px;
+    }
+
+    .action-cancel:hover {
+      color: var(--fg-secondary);
+    }
+
+    .stagger-in > * {
+      opacity: 0;
+      transform: translateY(20px);
+      animation: staggerFadeIn 0.6s ease forwards;
+    }
+
+    @keyframes staggerFadeIn {
+      to {
+        opacity: 1;
+        transform: translateY(0);
+      }
+    }
+
+    .toast {
+      position: fixed;
+      top: 60px;
+      left: 50%;
+      transform: translateX(-50%) translateY(-20px);
+      background: var(--bg-card);
+      border: 1px solid var(--accent-sage);
+      padding: 12px 24px;
+      border-radius: 12px;
+      font-size: 14px;
+      color: var(--accent-sage);
+      opacity: 0;
+      visibility: hidden;
+      transition: all 0.3s ease;
+      z-index: 300;
+      box-shadow: 0 8px 24px rgba(0,0,0,0.3);
+    }
+
+    .toast.show {
+      opacity: 1;
+      visibility: visible;
+      transform: translateX(-50%) translateY(0);
+    }
+
+    .legend-item {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 12px;
+      border-radius: 12px;
+      background: var(--bg-secondary);
+      transition: all 0.2s ease;
+    }
+
+    .legend-item:hover {
+      background: rgba(255,255,255,0.05);
+    }
+
+    .legend-dot {
+      width: 32px;
+      height: 32px;
+      border-radius: 10px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+    }
+
+    .legend-dot.period {
+      background: rgba(224, 122, 95, 0.25);
+      border: 2px solid var(--accent-warm);
+    }
+
+    .legend-dot.predicted {
+      background: transparent;
+      border: 2px dashed var(--accent-sage);
+    }
+
+    .legend-dot.fertile {
+      background: rgba(212, 165, 116, 0.25);
+      border: 2px solid var(--accent-soft);
+    }
+
+    /* 记录页增强样式 */
+    .record-section {
+      margin-bottom: 24px;
+    }
+
+    .record-section-title {
+      font-size: 14px;
+      font-weight: 500;
+      color: var(--fg-primary);
+      margin-bottom: 12px;
+    }
+
+    .flow-selector {
+      display: flex;
+      gap: 12px;
+      justify-content: space-between;
+    }
+
+    .flow-option {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 8px;
+      padding: 12px;
+      border-radius: 16px;
+      background: var(--bg-secondary);
+      border: 1px solid var(--border);
+      cursor: pointer;
+      transition: all 0.2s ease;
+      flex: 1;
+    }
+
+    .flow-option:hover {
+      background: rgba(255,255,255,0.05);
+    }
+
+    .flow-option.selected {
+      background: rgba(224, 122, 95, 0.15);
+      border-color: var(--accent-warm);
+    }
+
+    .flow-dot {
+      width: 24px;
+      height: 24px;
+      border-radius: 50%;
+      background: var(--fg-muted);
+      transition: all 0.2s ease;
+    }
+
+    .flow-option.selected .flow-dot {
+      background: var(--accent-warm);
+      box-shadow: 0 0 12px var(--accent-warm);
+    }
+
+    .flow-option:nth-child(2) .flow-dot { width: 28px; height: 28px; }
+    .flow-option:nth-child(3) .flow-dot { width: 32px; height: 32px; }
+    .flow-option:nth-child(4) .flow-dot { width: 36px; height: 36px; }
+
+    .symptom-tag {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 10px 16px;
+      border-radius: 12px;
+      background: var(--bg-secondary);
+      border: 1px solid var(--border);
+      font-size: 14px;
+      cursor: pointer;
+      transition: all 0.2s ease;
+      user-select: none;
+    }
+
+    .symptom-tag.selected {
+      background: rgba(224, 122, 95, 0.15);
+      border-color: var(--accent-warm);
+      color: var(--accent-warm);
+    }
+
+    .symptom-tag:hover {
+      background: rgba(255,255,255,0.08);
+    }
+
+    .symptom-add {
+      background: transparent;
+      border: 1px dashed var(--border);
+      color: var(--fg-muted);
+    }
+
+    .symptom-add:hover {
+      border-color: var(--accent-soft);
+      color: var(--accent-soft);
+    }
+
+    .custom-input {
+      width: 100%;
+      background: var(--bg-secondary);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 12px 16px;
+      color: var(--fg-primary);
+      font-size: 14px;
+      outline: none;
+      transition: all 0.2s ease;
+    }
+
+    .custom-input:focus {
+      border-color: var(--accent-soft);
+    }
+
+    .custom-input::placeholder {
+      color: var(--fg-muted);
+    }
+
+    .history-item {
+      background: var(--bg-card);
+      border-radius: 16px;
+      padding: 16px;
+      margin-bottom: 12px;
+      border: 1px solid var(--border);
+    }
+
+    .history-item-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 8px;
+    }
+
+    .history-item-date {
+      font-weight: 500;
+      color: var(--fg-primary);
+    }
+
+    .history-item-tags {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+    }
+
+    .history-tag {
+      font-size: 12px;
+      padding: 4px 10px;
+      border-radius: 8px;
+      background: rgba(224, 122, 95, 0.1);
+      color: var(--accent-warm);
+    }
+
+    .tab-container {
+      display: flex;
+      background: var(--bg-secondary);
+      border-radius: 14px;
+      padding: 4px;
+      margin-bottom: 20px;
+    }
+
+    .tab-btn {
+      flex: 1;
+      padding: 10px;
+      border-radius: 10px;
+      text-align: center;
+      font-size: 14px;
+      font-weight: 500;
+      color: var(--fg-muted);
+      cursor: pointer;
+      transition: all 0.2s ease;
+    }
+
+    .tab-btn.active {
+      background: var(--bg-card);
+      color: var(--fg-primary);
+    }
+
+    /* 设置项样式 */
+    .setting-item {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      padding: 14px 16px;
+      border-radius: 14px;
+      cursor: pointer;
+      transition: all 0.2s ease;
+      margin-bottom: 4px;
+    }
+
+    .setting-item:hover {
+      background: rgba(255,255,255,0.05);
+    }
+
+    .setting-item:active {
+      transform: scale(0.98);
+    }
+
+    .setting-icon {
+      width: 40px;
+      height: 40px;
+      border-radius: 12px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+      background: var(--bg-secondary);
+    }
+
+    .setting-icon svg {
+      width: 20px;
+      height: 20px;
+      stroke: var(--fg-secondary);
+      stroke-width: 2;
+    }
+
+    .setting-text {
+      flex: 1;
+    }
+
+    .setting-text h4 {
+      font-size: 15px;
+      font-weight: 500;
+      color: var(--fg-primary);
+      margin: 0 0 2px;
+    }
+
+    .setting-text p {
+      font-size: 12px;
+      color: var(--fg-muted);
+      margin: 0;
+    }
+
+    .setting-arrow {
+      width: 20px;
+      height: 20px;
+      stroke: var(--fg-muted);
+      stroke-width: 2;
+    }
+
+    /* 开关样式 */
+    .toggle-switch {
+      width: 48px;
+      height: 28px;
+      background: var(--bg-secondary);
+      border-radius: 14px;
+      position: relative;
+      cursor: pointer;
+      transition: all 0.3s ease;
+    }
+
+    .toggle-switch.active {
+      background: var(--accent-warm);
+    }
+
+    .toggle-switch::after {
+      content: '';
+      position: absolute;
+      width: 22px;
+      height: 22px;
+      background: var(--fg-primary);
+      border-radius: 50%;
+      top: 3px;
+      left: 3px;
+      transition: all 0.3s ease;
+    }
+
+    .toggle-switch.active::after {
+      left: 23px;
+    }
+
+    @media (min-width: 768px) {
+      body {
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        min-height: 100vh;
+        background: #0a0a0a;
+      }
+    }
+
+    @media (max-width: 400px) {
+      .phone-frame {
+        width: 100vw;
+        height: 100vh;
+        border-radius: 0;
+        box-shadow: none;
+      }
+      .notch {
+        display: none;
+      }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      *, *::before, *::after {
+        animation-duration: 0.01ms !important;
+        transition-duration: 0.01ms !important;
+      }
+    }
+  </style>
+</head>
+<body>
+
+<div class="phone-frame" id="app">
+  <div class="notch"></div>
+  
+  <div class="animated-bg">
+    <div class="blob blob-1"></div>
+    <div class="blob blob-2"></div>
+    <div class="blob blob-3"></div>
+  </div>
+
+  <div class="toast" id="toast"></div>
+
+  <div class="page active" id="page-home">
+    <div class="px-6 stagger-in" style="padding-bottom: 20px;">
+      <div class="flex justify-between items-center mb-2" style="animation-delay: 0.1s">
+        <div>
+          <p class="text-sm" style="color: var(--fg-secondary)">今天</p>
+          <p class="font-display text-2xl font-medium" style="color: var(--fg-primary)" id="homeDate">1月15日 周三</p>
+        </div>
+        <button class="w-10 h-10 rounded-full flex items-center justify-center" style="background: var(--bg-card); border: 1px solid var(--border)">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--fg-secondary)" stroke-width="2" stroke-linecap="round">
+            <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/>
+            <path d="M13.73 21a2 2 0 0 1-3.46 0"/>
+          </svg>
+        </button>
+      </div>
+
+      <div class="card mb-4" style="animation-delay: 0.2s">
+        <div class="flex items-center gap-3 mb-3">
+          <div class="w-3 h-3 rounded-full" style="background: var(--accent-sage); box-shadow: 0 0 12px var(--accent-sage)"></div>
+          <span class="text-sm font-medium" style="color: var(--accent-sage)">卵泡期 第7天</span>
+        </div>
+        <p class="text-lg font-light mb-2" style="color: var(--fg-primary)">能量回升期</p>
+        <p class="text-sm" style="color: var(--fg-secondary)">雌激素水平上升，适合进行高强度运动和创造性工作</p>
+      </div>
+
+      <div class="flex flex-col items-center my-6" style="animation-delay: 0.3s">
+        <div class="cycle-ring">
+          <svg width="260" height="260" viewBox="0 0 260 260">
+            <defs>
+              <linearGradient id="ringGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+                <stop offset="0%" stop-color="#e07a5f"/>
+                <stop offset="50%" stop-color="#d4a574"/>
+                <stop offset="100%" stop-color="#81b29a"/>
+              </linearGradient>
+            </defs>
+            <circle class="ring-track" cx="130" cy="130" r="120"/>
+            <circle class="ring-glow" cx="130" cy="130" r="120" id="ringGlow"/>
+            <circle class="ring-progress" cx="130" cy="130" r="120" id="ringProgress"/>
+          </svg>
+          <div class="cycle-center" id="cycleCenter">
+            <p class="text-sm mb-1" style="color: var(--fg-muted)">下次经期预计</p>
+            <p class="font-display text-4xl font-light" style="color: var(--fg-primary)">15</p>
+            <p class="text-sm" style="color: var(--fg-secondary)">天后</p>
+            <span class="long-press-hint">点击日历记录</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="grid grid-cols-2 gap-3" style="animation-delay: 0.4s">
+        <div class="card !p-4">
+          <p class="text-xs mb-1" style="color: var(--fg-muted)">周期长度</p>
+          <p class="font-display text-2xl font-light" style="color: var(--fg-primary)">28<span class="text-sm ml-1" style="color: var(--fg-secondary)">天</span></p>
+        </div>
+        <div class="card !p-4">
+          <p class="text-xs mb-1" style="color: var(--fg-muted)">经期长度</p>
+          <p class="font-display text-2xl font-light" style="color: var(--fg-primary)">5<span class="text-sm ml-1" style="color: var(--fg-secondary)">天</span></p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="page" id="page-calendar">
+    <div class="px-6 stagger-in" style="padding-bottom: 20px;">
+      <div class="flex justify-between items-center mb-4" style="animation-delay: 0.1s">
+        <button class="w-10 h-10 rounded-xl flex items-center justify-center" style="background: var(--bg-card)" onclick="changeMonth(-1)">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--fg-secondary)" stroke-width="2"><path d="M15 18l-6-6 6-6"/></svg>
+        </button>
+        <p class="font-display text-xl" style="color: var(--fg-primary)" id="calendarTitle">2025年1月</p>
+        <button class="w-10 h-10 rounded-xl flex items-center justify-center" style="background: var(--bg-card)" onclick="changeMonth(1)">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--fg-secondary)" stroke-width="2"><path d="M9 18l6-6-6-6"/></svg>
+        </button>
+      </div>
+
+      <div class="grid grid-cols-7 gap-1 mb-2" style="animation-delay: 0.15s">
+        <div class="text-center text-xs py-2" style="color: var(--fg-muted)">日</div>
+        <div class="text-center text-xs py-2" style="color: var(--fg-muted)">一</div>
+        <div class="text-center text-xs py-2" style="color: var(--fg-muted)">二</div>
+        <div class="text-center text-xs py-2" style="color: var(--fg-muted)">三</div>
+        <div class="text-center text-xs py-2" style="color: var(--fg-muted)">四</div>
+        <div class="text-center text-xs py-2" style="color: var(--fg-muted)">五</div>
+        <div class="text-center text-xs py-2" style="color: var(--fg-muted)">六</div>
+      </div>
+
+      <div class="grid grid-cols-7 gap-1 mb-6" id="calendarGrid" style="animation-delay: 0.2s">
+      </div>
+
+      <div class="card" style="animation-delay: 0.3s">
+        <p class="text-sm font-medium mb-4" style="color: var(--fg-primary)">日历图例</p>
+        <div class="space-y-3">
+          <div class="legend-item">
+            <div class="legend-dot period">
+              <div class="w-3 h-3 rounded-full" style="background: var(--accent-warm)"></div>
+            </div>
+            <div class="flex-1">
+              <p class="text-sm font-medium" style="color: var(--fg-primary)">经期</p>
+              <p class="text-xs" style="color: var(--fg-muted)">点击日期可记录或取消</p>
+            </div>
+          </div>
+          <div class="legend-item">
+            <div class="legend-dot predicted">
+              <div class="w-3 h-3 rounded-full" style="border: 2px dashed var(--accent-sage)"></div>
+            </div>
+            <div class="flex-1">
+              <p class="text-sm font-medium" style="color: var(--fg-primary)">预测经期</p>
+              <p class="text-xs" style="color: var(--fg-muted)">根据周期推算的下次日期</p>
+            </div>
+          </div>
+          <div class="legend-item">
+            <div class="legend-dot fertile">
+              <div class="w-3 h-3 rounded-full" style="background: var(--accent-soft)"></div>
+            </div>
+            <div class="flex-1">
+              <p class="text-sm font-medium" style="color: var(--fg-primary)">易孕期</p>
+              <p class="text-xs" style="color: var(--fg-muted)">排卵期前后，受孕几率较高</p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="page" id="page-log">
+    <div class="px-6 stagger-in" style="padding-bottom: 20px;">
+      <div class="text-center mb-4" style="animation-delay: 0.1s">
+        <p class="font-display text-2xl font-light" style="color: var(--fg-primary)">健康记录</p>
+        <p class="text-sm mt-1" style="color: var(--fg-secondary)" id="logDate">1月15日 周三</p>
+      </div>
+
+      <div class="tab-container" style="animation-delay: 0.15s">
+        <div class="tab-btn active" onclick="switchLogTab('record')">记录</div>
+        <div class="tab-btn" onclick="switchLogTab('history')">历史记录</div>
+      </div>
+
+      <div id="recordSection">
+        <div class="record-section" style="animation-delay: 0.2s">
+          <div class="record-section-title">流量</div>
+          <div class="flow-selector">
+            <div class="flow-option" onclick="selectFlow(this, 1)">
+              <div class="flow-dot"></div>
+              <span class="text-xs" style="color: var(--fg-secondary)">点滴</span>
+            </div>
+            <div class="flow-option selected" onclick="selectFlow(this, 2)">
+              <div class="flow-dot"></div>
+              <span class="text-xs" style="color: var(--accent-warm)">少量</span>
+            </div>
+            <div class="flow-option" onclick="selectFlow(this, 3)">
+              <div class="flow-dot"></div>
+              <span class="text-xs" style="color: var(--fg-secondary)">中等</span>
+            </div>
+            <div class="flow-option" onclick="selectFlow(this, 4)">
+              <div class="flow-dot"></div>
+              <span class="text-xs" style="color: var(--fg-secondary)">大量</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="record-section" style="animation-delay: 0.3s">
+          <div class="record-section-title">症状</div>
+          <div class="flex flex-wrap gap-2" id="symptomContainer">
+            <button class="symptom-tag selected">痛经</button>
+            <button class="symptom-tag">腰酸</button>
+            <button class="symptom-tag">头痛</button>
+            <button class="symptom-tag selected">疲劳</button>
+            <button class="symptom-tag">腹胀</button>
+            <button class="symptom-tag">乳房胀痛</button>
+            <button class="symptom-tag symptom-add" onclick="openAddSymptom()">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 5v14M5 12h14"/></svg>
+              自定义
+            </button>
+          </div>
+        </div>
+
+        <div class="record-section" style="animation-delay: 0.4s">
+          <div class="record-section-title">情绪</div>
+          <div class="flex justify-between gap-2">
+            <button class="flex flex-col items-center gap-2 p-3 rounded-xl transition-all flex-1" onclick="selectMood(this, 1)">
+              <span class="text-2xl">😊</span>
+              <span class="text-xs" style="color: var(--fg-secondary)">开心</span>
+            </button>
+            <button class="flex flex-col items-center gap-2 p-3 rounded-xl transition-all flex-1" style="background: rgba(224,122,95,0.15)" onclick="selectMood(this, 2)">
+              <span class="text-2xl">😌</span>
+              <span class="text-xs" style="color: var(--accent-warm)">平静</span>
+            </button>
+            <button class="flex flex-col items-center gap-2 p-3 rounded-xl transition-all flex-1" onclick="selectMood(this, 3)">
+              <span class="text-2xl">😔</span>
+              <span class="text-xs" style="color: var(--fg-secondary)">低落</span>
+            </button>
+            <button class="flex flex-col items-center gap-2 p-3 rounded-xl transition-all flex-1" onclick="selectMood(this, 4)">
+              <span class="text-2xl">😤</span>
+              <span class="text-xs" style="color: var(--fg-secondary)">烦躁</span>
+            </button>
+            <button class="flex flex-col items-center gap-2 p-3 rounded-xl transition-all flex-1" onclick="selectMood(this, 5)">
+              <span class="text-2xl">😰</span>
+              <span class="text-xs" style="color: var(--fg-secondary)">焦虑</span>
+            </button>
+          </div>
+        </div>
+
+        <div class="record-section" style="animation-delay: 0.5s">
+          <div class="record-section-title">备注</div>
+          <textarea class="custom-input" rows="3" placeholder="记录更多细节..." id="noteInput"></textarea>
+        </div>
+
+        <button class="w-full py-4 rounded-2xl font-medium text-lg transition-all" style="background: linear-gradient(135deg, var(--accent-warm), var(--accent-soft)); color: var(--bg-primary)" onclick="saveRecord()">
+          保存记录
+        </button>
+      </div>
+
+      <div id="historySection" style="display: none;">
+        <div id="historyList"></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="page" id="page-profile">
+    <div class="px-6 stagger-in" style="padding-bottom: 20px;">
+      <!-- 用户头像和基本信息 -->
+      <div class="flex items-center gap-4 mb-6" style="animation-delay: 0.1s">
+        <div class="w-16 h-16 rounded-full flex items-center justify-center" style="background: linear-gradient(135deg, var(--accent-warm), var(--accent-sage))">
+          <span class="font-display text-2xl" style="color: var(--bg-primary)">L</span>
+        </div>
+        <div>
+          <p class="font-display text-xl" style="color: var(--fg-primary)">Luna</p>
+          <p class="text-sm" style="color: var(--fg-secondary)">已记录 128 天</p>
+        </div>
+      </div>
+
+      <!-- 健康档案 -->
+      <div class="card mb-4" style="animation-delay: 0.15s">
+        <p class="text-sm font-medium mb-4" style="color: var(--fg-primary)">健康档案</p>
+        <div class="space-y-4">
+          <div class="flex justify-between items-center">
+            <span class="text-sm" style="color: var(--fg-secondary)">平均周期</span>
+            <span class="text-sm font-medium" style="color: var(--fg-primary)">28 天</span>
+          </div>
+          <div class="flex justify-between items-center">
+            <span class="text-sm" style="color: var(--fg-secondary)">平均经期</span>
+            <span class="text-sm font-medium" style="color: var(--fg-primary)">5 天</span>
+          </div>
+          <div class="flex justify-between items-center">
+            <span class="text-sm" style="color: var(--fg-secondary)">上次经期</span>
+            <span class="text-sm font-medium" style="color: var(--fg-primary)">1月8日</span>
+          </div>
+          <div class="flex justify-between items-center">
+            <span class="text-sm" style="color: var(--fg-secondary)">周期规律</span>
+            <span class="text-sm font-medium" style="color: var(--accent-sage)">规律</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- 提醒设置 -->
+      <div class="card mb-4" style="animation-delay: 0.2s">
+        <p class="text-sm font-medium mb-3" style="color: var(--fg-primary)">提醒设置</p>
+        
+        <div class="setting-item" onclick="toggleSetting(this)">
+          <div class="setting-icon">
+            <svg viewBox="0 0 24 24" fill="none" stroke-linecap="round"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
+          </div>
+          <div class="setting-text">
+            <h4>经期提醒</h4>
+            <p>经期开始前1天提醒</p>
+          </div>
+          <div class="toggle-switch active"></div>
+        </div>
+
+        <div class="setting-item" onclick="toggleSetting(this)">
+          <div class="setting-icon">
+            <svg viewBox="0 0 24 24" fill="none" stroke-linecap="round"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/></svg>
+          </div>
+          <div class="setting-text">
+            <h4>记录提醒</h4>
+            <p>每日21:00 提醒记录</p>
+          </div>
+          <div class="toggle-switch active"></div>
+        </div>
+
+        <div class="setting-item" onclick="toggleSetting(this)">
+          <div class="setting-icon">
+            <svg viewBox="0 0 24 24" fill="none" stroke-linecap="round"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>
+          </div>
+          <div class="setting-text">
+            <h4>排卵期提醒</h4>
+            <p>易孕期开始时提醒</p>
+          </div>
+          <div class="toggle-switch"></div>
+        </div>
+      </div>
+
+      <!-- 隐私与安全 -->
+      <div class="card mb-4" style="animation-delay: 0.25s">
+        <p class="text-sm font-medium mb-3" style="color: var(--fg-primary)">隐私与安全</p>
+        
+        <div class="setting-item" onclick="showToast('已开启应用锁')">
+          <div class="setting-icon">
+            <svg viewBox="0 0 24 24" fill="none" stroke-linecap="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+          </div>
+          <div class="setting-text">
+            <h4>应用锁</h4>
+            <p>Face ID / 指纹解锁</p>
+          </div>
+          <div class="toggle-switch active"></div>
+        </div>
+
+        <div class="setting-item" onclick="showToast('已开启伪装图标')">
+          <div class="setting-icon">
+            <svg viewBox="0 0 24 24" fill="none" stroke-linecap="round"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M9 9h6M9 15h6"/></svg>
+          </div>
+          <div class="setting-text">
+            <h4>隐私模式</h4>
+            <p>伪装成计算器图标</p>
+          </div>
+          <svg class="setting-arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 18l6-6-6-6"/></svg>
+        </div>
+
+        <div class="setting-item" onclick="showToast('数据已加密')">
+          <div class="setting-icon">
+            <svg viewBox="0 0 24 24" fill="none" stroke-linecap="round"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+          </div>
+          <div class="setting-text">
+            <h4>数据加密</h4>
+            <p>端到端加密存储</p>
+          </div>
+          <svg class="setting-arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 18l6-6-6-6"/></svg>
+        </div>
+      </div>
+
+      <!-- 外观主题 -->
+      <div class="card mb-4" style="animation-delay: 0.3s">
+        <p class="text-sm font-medium mb-3" style="color: var(--fg-primary)">外观主题</p>
+        
+        <div class="setting-item" onclick="showToast('已切换深色模式')">
+          <div class="setting-icon">
+            <svg viewBox="0 0 24 24" fill="none" stroke-linecap="round"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
+          </div>
+          <div class="setting-text">
+            <h4>深色模式</h4>
+            <p>保护眼睛，节省电量</p>
+          </div>
+          <div class="toggle-switch active"></div>
+        </div>
+
+        <div class="setting-item" onclick="showToast('主题设置')">
+          <div class="setting-icon">
+            <svg viewBox="0 0 24 24" fill="none" stroke-linecap="round"><circle cx="12" cy="12" r="3"/><path d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42"/></svg>
+          </div>
+          <div class="setting-text">
+            <h4>主题颜色</h4>
+            <p>自定义界面配色</p>
+          </div>
+          <svg class="setting-arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 18l6-6-6-6"/></svg>
+        </div>
+      </div>
+
+      <!-- 数据管理 -->
+      <div class="card mb-4" style="animation-delay: 0.35s">
+        <p class="text-sm font-medium mb-3" style="color: var(--fg-primary)">数据管理</p>
+        
+        <div class="setting-item" onclick="showToast('正在导出数据...')">
+          <div class="setting-icon">
+            <svg viewBox="0 0 24 24" fill="none" stroke-linecap="round"><path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8"/><polyline points="16 6 12 2 8 6"/><line x1="12" y1="2" x2="12" y2="15"/></svg>
+          </div>
+          <div class="setting-text">
+            <h4>导出数据</h4>
+            <p>导出为 PDF / CSV</p>
+          </div>
+          <svg class="setting-arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 18l6-6-6-6"/></svg>
+        </div>
+
+        <div class="setting-item" onclick="showToast('已连接 iCloud')">
+          <div class="setting-icon">
+            <svg viewBox="0 0 24 24" fill="none" stroke-linecap="round"><path d="M18 10h-1.26A8 8 0 1 0 9 20h9a5 5 0 0 0 0-10z"/></svg>
+          </div>
+          <div class="setting-text">
+            <h4>云同步</h4>
+            <p>已连接 iCloud</p>
+          </div>
+          <svg class="setting-arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 18l6-6-6-6"/></svg>
+        </div>
+
+        <div class="setting-item" onclick="showToast('恢复成功')">
+          <div class="setting-icon">
+            <svg viewBox="0 0 24 24" fill="none" stroke-linecap="round"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg>
+          </div>
+          <div class="setting-text">
+            <h4>恢复数据</h4>
+            <p>从备份恢复</p>
+          </div>
+          <svg class="setting-arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 18l6-6-6-6"/></svg>
+        </div>
+      </div>
+
+      <!-- 其他设置 -->
+      <div class="card mb-4" style="animation-delay: 0.4s">
+        <p class="text-sm font-medium mb-3" style="color: var(--fg-primary)">其他</p>
+        
+        <div class="setting-item" onclick="showToast('语言设置')">
+          <div class="setting-icon">
+            <svg viewBox="0 0 24 24" fill="none" stroke-linecap="round"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>
+          </div>
+          <div class="setting-text">
+            <h4>语言</h4>
+            <p>简体中文</p>
+          </div>
+          <svg class="setting-arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 18l6-6-6-6"/></svg>
+        </div>
+
+        <div class="setting-item" onclick="showToast('版本 1.0.0')">
+          <div class="setting-icon">
+            <svg viewBox="0 0 24 24" fill="none" stroke-linecap="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>
+          </div>
+          <div class="setting-text">
+            <h4>关于我们</h4>
+            <p>版本 1.0.0</p>
+          </div>
+          <svg class="setting-arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 18l6-6-6-6"/></svg>
+        </div>
+
+        <div class="setting-item" onclick="showToast('感谢反馈')">
+          <div class="setting-icon">
+            <svg viewBox="0 0 24 24" fill="none" stroke-linecap="round"><path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"/></svg>
+          </div>
+          <div class="setting-text">
+            <h4>意见反馈</h4>
+            <p>帮助我们改进</p>
+          </div>
+          <svg class="setting-arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 18l6-6-6-6"/></svg>
+        </div>
+      </div>
+
+      <!-- 数据安全提示 -->
+      <div class="mt-4 text-center" style="animation-delay: 0.45s">
+        <p class="text-xs" style="color: var(--fg-muted)">您的数据采用端到端加密存储</p>
+        <p class="text-xs mt-1" style="color: var(--fg-muted)">仅存储于您的设备与加密云端</p>
+      </div>
+    </div>
+  </div>
+
+  <div class="bottom-nav">
+    <div class="nav-item active" data-page="home">
+      <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round">
+        <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/>
+        <polyline points="9 22 9 12 15 12 15 22"/>
+      </svg>
+      <span>首页</span>
+    </div>
+    <div class="nav-item" data-page="calendar">
+      <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round">
+        <rect x="3" y="4" width="18" height="18" rx="2"/>
+        <path d="M16 2v4M8 2v4M3 10h18"/>
+      </svg>
+      <span>日历</span>
+    </div>
+    <div class="fab" onclick="openActionSheet('today')">
+      <svg viewBox="0 0 24 24" fill="none" stroke-linecap="round">
+        <line x1="12" y1="5" x2="12" y2="19"/>
+        <line x1="5" y1="12" x2="19" y2="12"/>
+      </svg>
+    </div>
+    <div class="nav-item" data-page="log">
+      <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round">
+        <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+        <polyline points="14 2 14 8 20 8"/>
+        <line x1="16" y1="13" x2="8" y2="13"/>
+        <line x1="16" y1="17" x2="8" y2="17"/>
+      </svg>
+      <span>记录</span>
+    </div>
+    <div class="nav-item" data-page="profile">
+      <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round">
+        <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/>
+        <circle cx="12" cy="7" r="4"/>
+      </svg>
+      <span>我的</span>
+    </div>
+  </div>
+
+  <!-- 日历操作菜单 -->
+  <div class="action-sheet" id="actionSheet">
+    <div class="action-sheet-content">
+      <div class="action-sheet-handle"></div>
+      <div class="action-sheet-title">
+        <span id="actionSheetDate">1月15日</span>
+      </div>
+      <div id="actionSheetOptions"></div>
+      <div class="action-cancel" onclick="closeActionSheet()">取消</div>
+    </div>
+  </div>
+
+  <!-- 添加症状弹窗 -->
+  <div class="action-sheet" id="addSymptomSheet">
+    <div class="action-sheet-content">
+      <div class="action-sheet-handle"></div>
+      <div class="action-sheet-title">
+        <strong>添加自定义症状</strong>
+      </div>
+      <div style="margin-bottom: 16px;">
+        <input type="text" class="custom-input" placeholder="输入症状名称..." id="newSymptomInput">
+      </div>
+      <button class="w-full py-4 rounded-2xl font-medium text-lg" style="background: linear-gradient(135deg, var(--accent-warm), var(--accent-soft)); color: var(--bg-primary)" onclick="addCustomSymptom()">
+        添加
+      </button>
+      <div class="action-cancel" onclick="closeAddSymptom()">取消</div>
+    </div>
+  </div>
+</div>
+
+<script>
+let currentPage = 'home';
+let currentYear = 2025;
+let currentMonth = 1;
+let selectedDay = null;
+
+let periodData = {
+  periods: [
+    { start: '2025-01-08', end: '2025-01-12' }
+  ]
+};
+
+let dailyRecords = [
+  { date: '2025-01-15', flow: 2, symptoms: ['痛经', '疲劳'], mood: 2, note: '今天感觉还可以' },
+  { date: '2025-01-14', flow: 3, symptoms: ['腰酸'], mood: 3, note: '记得多喝热水' },
+  { date: '2025-01-13', flow: 1, symptoms: ['头痛', '疲劳'], mood: 4, note: '' },
+];
+
+const app = document.getElementById('app');
+const calendarGrid = document.getElementById('calendarGrid');
+const calendarTitle = document.getElementById('calendarTitle');
+const actionSheet = document.getElementById('actionSheet');
+const actionSheetDate = document.getElementById('actionSheetDate');
+const actionSheetOptions = document.getElementById('actionSheetOptions');
+const toast = document.getElementById('toast');
+const ringProgress = document.getElementById('ringProgress');
+const ringGlow = document.getElementById('ringGlow');
+const homeDate = document.getElementById('homeDate');
+const logDate = document.getElementById('logDate');
+const addSymptomSheet = document.getElementById('addSymptomSheet');
+
+const weekdays = ['周日', '周一', '周二', '周三', '周四', '周五', '周六'];
+const flowLabels = ['', '点滴', '少量', '中等', '大量'];
+const moodLabels = ['', '开心', '平静', '低落', '烦躁', '焦虑'];
+
+function getTodayStr() {
+  const today = new Date();
+  return `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
+}
+
+function formatDate(date) {
+  const month = date.getMonth() + 1;
+  const day = date.getDate();
+  const weekday = weekdays[date.getDay()];
+  return `${month}月${day}日 ${weekday}`;
+}
+
+function updateTodayDisplay() {
+  const today = new Date();
+  if (homeDate) homeDate.textContent = formatDate(today);
+  if (logDate) logDate.textContent = formatDate(today);
+}
+
+function showToast(message) {
+  if (!toast) return;
+  toast.textContent = message;
+  toast.classList.add('show');
+  setTimeout(() => toast.classList.remove('show'), 2500);
+}
+
+document.querySelectorAll('.nav-item').forEach(item => {
+  item.addEventListener('click', function() {
+    const page = this.dataset.page;
+    if (!page) return;
+    
+    document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+    this.classList.add('active');
+    
+    document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+    document.getElementById('page-' + page).classList.add('active');
+    
+    currentPage = page;
+  });
+});
+
+function generateCalendar() {
+  if (!calendarGrid) return;
+  
+  const firstDay = new Date(currentYear, currentMonth - 1, 1);
+  const lastDay = new Date(currentYear, currentMonth, 0);
+  const startDayOfWeek = firstDay.getDay();
+  const totalDays = lastDay.getDate();
+  
+  const todayStr = getTodayStr();
+  
+  let html = '';
+  
+  for (let i = 0; i < startDayOfWeek; i++) {
+    html += '<div class="calendar-day other-month"></div>';
+  }
+  
+  for (let day = 1; day <= totalDays; day++) {
+    const dateStr = `${currentYear}-${String(currentMonth).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+    const isToday = dateStr === todayStr;
+    const periodInfo = getPeriodInfo(dateStr);
+    
+    let classes = 'calendar-day';
+    
+    if (periodInfo.isPeriod) {
+      if (periodInfo.isActive) {
+        classes += ' period period-active';
+      } else {
+        classes += ' period';
+        if (periodInfo.isStart && periodInfo.isEnd) classes += ' period-single';
+        else if (periodInfo.isStart) classes += ' period-start';
+        else if (periodInfo.isEnd) classes += ' period-end';
+        else classes += ' period-middle';
+      }
+    }
+    
+    if (isToday) {
+      classes += ' today';
+    }
+    
+    html += `<div class="${classes}" data-date="${dateStr}" onclick="handleDayClick('${dateStr}', ${day}, ${isToday})">${day}</div>`;
+  }
+  
+  calendarGrid.innerHTML = html;
+}
+
+function getPeriodInfo(dateStr) {
+  let isPeriod = false;
+  let isStart = false;
+  let isEnd = false;
+  let isActive = false;
+  
+  for (const period of periodData.periods) {
+    if (period.start && !period.end) {
+      if (dateStr === period.start) {
+        isPeriod = true;
+        isStart = true;
+        isEnd = true;
+        isActive = true;
+        break;
+      }
+    } else if (period.start && period.end) {
+      if (dateStr >= period.start && dateStr <= period.end) {
+        isPeriod = true;
+        if (dateStr === period.start) isStart = true;
+        if (dateStr === period.end) isEnd = true;
+        break;
+      }
+    }
+  }
+  
+  return { isPeriod, isStart, isEnd, isActive };
+}
+
+function hasActivePeriod() {
+  for (const period of periodData.periods) {
+    if (period.start && !period.end) return period;
+  }
+  return null;
+}
+
+function getPeriodByDate(dateStr) {
+  for (const period of periodData.periods) {
+    if (period.start && !period.end) {
+      if (dateStr === period.start) return period;
+    } else if (period.start && period.end) {
+      if (dateStr >= period.start && dateStr <= period.end) return period;
+    }
+  }
+  return null;
+}
+
+function getNextDay(dateStr) {
+  const d = new Date(dateStr);
+  d.setDate(d.getDate() + 1);
+  return d.toISOString().split('T')[0];
+}
+
+function getPrevDay(dateStr) {
+  const d = new Date(dateStr);
+  d.setDate(d.getDate() - 1);
+  return d.toISOString().split('T')[0];
+}
+
+function handleDayClick(dateStr, day, isToday) {
+  selectedDay = { dateStr, day, isToday };
+  
+  const periodInfo = getPeriodInfo(dateStr);
+  const activePeriod = hasActivePeriod();
+  const existingPeriod = getPeriodByDate(dateStr);
+  
+  actionSheetDate.innerHTML = `<strong>${currentMonth}月${day}日</strong>`;
+  
+  let optionsHtml = '';
+  
+  if (activePeriod) {
+    if (dateStr === activePeriod.start) {
+      optionsHtml = `
+        <div class="action-option sage" onclick="endPeriod('${dateStr}')">
+          <div class="action-option-icon">
+            <svg viewBox="0 0 24 24" fill="none" stroke-linecap="round"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
+          </div>
+          <div class="action-option-text">
+            <h4>经期走了</h4>
+            <p>标记经期在这一天结束</p>
+          </div>
+        </div>
+        <div class="action-option danger" onclick="cancelActivePeriod()">
+          <div class="action-option-icon">
+            <svg viewBox="0 0 24 24" fill="none" stroke-linecap="round"><path d="M18 6L6 18M6 6l12 12"/></svg>
+          </div>
+          <div class="action-option-text">
+            <h4>取消本次记录</h4>
+            <p>删除当前进行中的经期</p>
+          </div>
+        </div>
+      `;
+    } else if (dateStr < activePeriod.start) {
+      optionsHtml = `
+        <div class="action-option primary" onclick="updateStart('${dateStr}')">
+          <div class="action-option-icon">
+            <svg viewBox="0 0 24 24" fill="none" stroke-linecap="round"><path d="M11 17l-5-5 5-5M18 17l-5-5 5-5"/></svg>
+          </div>
+          <div class="action-option-text">
+            <h4>修改开始日期</h4>
+            <p>将经期开始提前至此日</p>
+          </div>
+        </div>
+        <div class="action-option danger" onclick="cancelActivePeriod()">
+          <div class="action-option-icon">
+            <svg viewBox="0 0 24 24" fill="none" stroke-linecap="round"><path d="M18 6L6 18M6 6l12 12"/></svg>
+          </div>
+          <div class="action-option-text">
+            <h4>取消本次记录</h4>
+            <p>删除当前进行中的经期</p>
+          </div>
+        </div>
+      `;
+    } else {
+      optionsHtml = `
+        <div class="action-option sage" onclick="endPeriod('${dateStr}')">
+          <div class="action-option-icon">
+            <svg viewBox="0 0 24 24" fill="none" stroke-linecap="round"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
+          </div>
+          <div class="action-option-text">
+            <h4>经期走了</h4>
+            <p>标记经期在这一天结束</p>
+          </div>
+        </div>
+        <div class="action-option danger" onclick="cancelActivePeriod()">
+          <div class="action-option-icon">
+            <svg viewBox="0 0 24 24" fill="none" stroke-linecap="round"><path d="M18 6L6 18M6 6l12 12"/></svg>
+          </div>
+          <div class="action-option-text">
+            <h4>取消本次记录</h4>
+            <p>删除当前进行中的经期</p>
+          </div>
+        </div>
+      `;
+    }
+  } else if (periodInfo.isPeriod) {
+    optionsHtml = `
+      <div class="action-option primary" onclick="extendPeriod('${dateStr}')">
+        <div class="action-option-icon">
+          <svg viewBox="0 0 24 24" fill="none" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>
+        </div>
+        <div class="action-option-text">
+          <h4>延长经期</h4>
+          <p>将经期结束日期延后一天</p>
+        </div>
+      </div>
+      <div class="action-option danger" onclick="cancelPeriod('${dateStr}')">
+        <div class="action-option-icon">
+          <svg viewBox="0 0 24 24" fill="none" stroke-linecap="round"><path d="M18 6L6 18M6 6l12 12"/></svg>
+        </div>
+        <div class="action-option-text">
+          <h4>取消经期记录</h4>
+          <p>删除这一天的经期标记</p>
+        </div>
+      </div>
+    `;
+  } else {
+    const lastPeriod = periodData.periods[periodData.periods.length - 1];
+    if (lastPeriod && lastPeriod.end) {
+      const dayAfterEnd = getNextDay(lastPeriod.end);
+      if (dateStr === dayAfterEnd) {
+        optionsHtml = `
+          <div class="action-option primary" onclick="extendPeriod('${dateStr}')">
+            <div class="action-option-icon">
+              <svg viewBox="0 0 24 24" fill="none" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>
+            </div>
+            <div class="action-option-text">
+              <h4>延长经期</h4>
+              <p>将上一次经期延长至此</p>
+            </div>
+          </div>
+          <div class="action-option sage" onclick="startPeriod('${dateStr}')">
+            <div class="action-option-icon">
+              <svg viewBox="0 0 24 24" fill="none" stroke-linecap="round"><path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83"/></svg>
+            </div>
+            <div class="action-option-text">
+              <h4>新经期开始</h4>
+              <p>标记这一天为新经期开始</p>
+            </div>
+          </div>
+        `;
+      } else {
+        optionsHtml = `
+          <div class="action-option primary" onclick="startPeriod('${dateStr}')">
+            <div class="action-option-icon">
+              <svg viewBox="0 0 24 24" fill="none" stroke-linecap="round"><path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83"/></svg>
+            </div>
+            <div class="action-option-text">
+              <h4>经期来了</h4>
+              <p>标记这一天为经期开始</p>
+            </div>
+          </div>
+        `;
+      }
+    } else {
+      optionsHtml = `
+        <div class="action-option primary" onclick="startPeriod('${dateStr}')">
+          <div class="action-option-icon">
+            <svg viewBox="0 0 24 24" fill="none" stroke-linecap="round"><path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83"/></svg>
+          </div>
+          <div class="action-option-text">
+            <h4>经期来了</h4>
+            <p>标记这一天为经期开始</p>
+          </div>
+        </div>
+      `;
+    }
+  }
+  
+  actionSheetOptions.innerHTML = optionsHtml;
+  openActionSheet();
+}
+
+function startPeriod(dateStr) {
+  periodData.periods.push({ start: dateStr, end: null });
+  closeActionSheet();
+  generateCalendar();
+  showToast('已记录经期开始');
+}
+
+function updateStart(dateStr) {
+  const activePeriod = hasActivePeriod();
+  if (activePeriod) {
+    activePeriod.start = dateStr;
+    closeActionSheet();
+    generateCalendar();
+    showToast('开始日期已更新');
+  }
+}
+
+function endPeriod(dateStr) {
+  const activePeriod = hasActivePeriod();
+  if (activePeriod) {
+    if (dateStr < activePeriod.start) {
+      showToast('结束日期不能早于开始日期');
+      return;
+    }
+    activePeriod.end = dateStr;
+    closeActionSheet();
+    generateCalendar();
+    showToast('经期已结束，记录完成');
+  }
+}
+
+function extendPeriod(dateStr) {
+  const lastPeriod = periodData.periods[periodData.periods.length - 1];
+  if (lastPeriod && lastPeriod.end) {
+    lastPeriod.end = dateStr;
+    closeActionSheet();
+    generateCalendar();
+    showToast('经期已延长');
+  }
+}
+
+function cancelActivePeriod() {
+  periodData.periods = periodData.periods.filter(p => p.end);
+  closeActionSheet();
+  generateCalendar();
+  showToast('已取消当前记录');
+}
+
+function cancelPeriod(dateStr) {
+  periodData.periods = periodData.periods.filter(period => {
+    if (period.start && !period.end) {
+      if (dateStr === period.start) return false;
+    } else if (period.start && period.end) {
+      if (dateStr >= period.start && dateStr <= period.end) {
+        if (dateStr === period.start && dateStr === period.end) {
+          return false;
+        } else if (dateStr === period.start) {
+          period.start = getNextDay(dateStr);
+          if (period.start > period.end) return false;
+        } else if (dateStr === period.end) {
+          period.end = getPrevDay(dateStr);
+          if (period.end < period.start) return false;
+        } else {
+          periodData.periods.push({ start: period.start, end: getPrevDay(dateStr) });
+          periodData.periods.push({ start: getNextDay(dateStr), end: period.end });
+          return false;
+        }
+      }
+    }
+    return true;
+  });
+  
+  closeActionSheet();
+  generateCalendar();
+  showToast('已取消该日期的经期记录');
+}
+
+function changeMonth(delta) {
+  currentMonth += delta;
+  if (currentMonth > 12) {
+    currentMonth = 1;
+    currentYear++;
+  } else if (currentMonth < 1) {
+    currentMonth = 12;
+    currentYear--;
+  }
+  calendarTitle.textContent = `${currentYear}年${currentMonth}月`;
+  generateCalendar();
+}
+
+function openActionSheet(mode) {
+  if (mode === 'today') {
+    const today = new Date();
+    const dateStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
+    currentYear = today.getFullYear();
+    currentMonth = today.getMonth() + 1;
+    calendarTitle.textContent = `${currentYear}年${currentMonth}月`;
+    generateCalendar();
+    handleDayClick(dateStr, today.getDate(), true);
+    return;
+  }
+  actionSheet.classList.add('active');
+}
+
+function closeActionSheet() {
+  actionSheet.classList.remove('active');
+}
+
+if (actionSheet) {
+  actionSheet.addEventListener('click', function(e) {
+    if (e.target === this) closeActionSheet();
+  });
+}
+
+function animateRing() {
+  const circumference = 2 * Math.PI * 120;
+  const progress = 0.46;
+  const offset = circumference * (1 - progress);
+  
+  setTimeout(() => {
+    if (ringProgress) ringProgress.style.strokeDashoffset = offset;
+    if (ringGlow) ringGlow.style.strokeDashoffset = offset;
+  }, 500);
+}
+
+let currentFlow = 2;
+let currentMood = 2;
+
+function selectFlow(el, level) {
+  document.querySelectorAll('.flow-option').forEach(opt => {
+    opt.classList.remove('selected');
+    opt.querySelector('span').style.color = 'var(--fg-secondary)';
+  });
+  el.classList.add('selected');
+  el.querySelector('span').style.color = 'var(--accent-warm)';
+  currentFlow = level;
+}
+
+function selectMood(el, mood) {
+  document.querySelectorAll('.record-section .flex.justify-between button').forEach(btn => {
+    btn.style.background = 'transparent';
+    btn.querySelector('span').style.color = 'var(--fg-secondary)';
+  });
+  el.style.background = 'rgba(224,122,95,0.15)';
+  el.querySelector('span').style.color = 'var(--accent-warm)';
+  currentMood = mood;
+}
+
+function openAddSymptom() {
+  addSymptomSheet.classList.add('active');
+}
+
+function closeAddSymptom() {
+  addSymptomSheet.classList.remove('active');
+  document.getElementById('newSymptomInput').value = '';
+}
+
+if (addSymptomSheet) {
+  addSymptomSheet.addEventListener('click', function(e) {
+    if (e.target === this) closeAddSymptom();
+  });
+}
+
+function addCustomSymptom() {
+  const input = document.getElementById('newSymptomInput');
+  const value = input.value.trim();
+  if (!value) {
+    showToast('请输入症状名称');
+    return;
+  }
+  
+  const container = document.getElementById('symptomContainer');
+  const addBtn = container.querySelector('.symptom-add');
+  
+  const newTag = document.createElement('button');
+  newTag.className = 'symptom-tag';
+  newTag.textContent = value;
+  newTag.onclick = function() { this.classList.toggle('selected'); };
+  
+  container.insertBefore(newTag, addBtn);
+  
+  closeAddSymptom();
+  showToast('已添加自定义症状');
+}
+
+function switchLogTab(tab) {
+  document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
+  event.target.classList.add('active');
+  
+  if (tab === 'record') {
+    document.getElementById('recordSection').style.display = 'block';
+    document.getElementById('historySection').style.display = 'none';
+  } else {
+    document.getElementById('recordSection').style.display = 'none';
+    document.getElementById('historySection').style.display = 'block';
+    renderHistory();
+  }
+}
+
+function renderHistory() {
+  const container = document.getElementById('historyList');
+  if (!container) return;
+  
+  if (dailyRecords.length === 0) {
+    container.innerHTML = `
+      <div class="text-center py-12" style="color: var(--fg-muted)">
+        <p>暂无记录</p>
+      </div>
+    `;
+    return;
+  }
+  
+  let html = '';
+  dailyRecords.forEach(record => {
+    const date = new Date(record.date);
+    const dateStr = `${date.getMonth() + 1}月${date.getDate()}日`;
+    
+    html += `
+      <div class="history-item">
+        <div class="history-item-header">
+          <span class="history-item-date">${dateStr}</span>
+          <span class="text-xs" style="color: var(--fg-muted)">${moodLabels[record.mood]}</span>
+        </div>
+        <div class="flex items-center gap-3 mb-2">
+          <span class="text-xs" style="color: var(--fg-muted)">流量:</span>
+          <span class="text-xs" style="color: var(--accent-warm)">${flowLabels[record.flow]}</span>
+        </div>
+        <div class="history-item-tags">
+          ${record.symptoms.map(s => `<span class="history-tag">${s}</span>`).join('')}
+        </div>
+        ${record.note ? `<p class="text-xs mt-2" style="color: var(--fg-secondary)">${record.note}</p>` : ''}
+      </div>
+    `;
+  });
+  
+  container.innerHTML = html;
+}
+
+function saveRecord() {
+  const selectedSymptoms = [];
+  document.querySelectorAll('#symptomContainer .symptom-tag.selected').forEach(tag => {
+    selectedSymptoms.push(tag.textContent);
+  });
+  
+  const note = document.getElementById('noteInput').value;
+  
+  const todayStr = getTodayStr();
+  
+  const newRecord = {
+    date: todayStr,
+    flow: currentFlow,
+    symptoms: selectedSymptoms,
+    mood: currentMood,
+    note: note
+  };
+  
+  const existingIndex = dailyRecords.findIndex(r => r.date === todayStr);
+  if (existingIndex >= 0) {
+    dailyRecords[existingIndex] = newRecord;
+  } else {
+    dailyRecords.unshift(newRecord);
+  }
+  
+  showToast('记录已保存');
+  document.getElementById('noteInput').value = '';
+}
+
+function toggleSetting(el) {
+  const toggle = el.querySelector('.toggle-switch');
+  if (toggle) {
+    toggle.classList.toggle('active');
+  }
+}
+
+document.querySelectorAll('#symptomContainer .symptom-tag:not(.symptom-add)').forEach(tag => {
+  tag.addEventListener('click', function() {
+    this.classList.toggle('selected');
+  });
+});
+
+document.addEventListener('DOMContentLoaded', function() {
+  const today = new Date();
+  currentYear = today.getFullYear();
+  currentMonth = today.getMonth() + 1;
+  calendarTitle.textContent = `${currentYear}年${currentMonth}月`;
+  
+  updateTodayDisplay();
+  animateRing();
+  generateCalendar();
+});
+
+let touchStartX = 0;
+let touchEndX = 0;
+
+if (app) {
+  app.addEventListener('touchstart', e => {
+    touchStartX = e.changedTouches[0].screenX;
+  }, false);
+
+  app.addEventListener('touchend', e => {
+    touchEndX = e.changedTouches[0].screenX;
+    handleSwipe();
+  }, false);
+}
+
+function handleSwipe() {
+  const pages = ['home', 'calendar', 'log', 'profile'];
+  const currentIndex = pages.indexOf(currentPage);
+  
+  if (touchEndX < touchStartX - 50 && currentIndex < pages.length - 1) {
+    const nextPage = pages[currentIndex + 1];
+    document.querySelector(`[data-page="${nextPage}"]`).click();
+  }
+  
+  if (touchEndX > touchStartX + 50 && currentIndex > 0) {
+    const prevPage = pages[currentIndex - 1];
+    document.querySelector(`[data-page="${prevPage}"]`).click();
+  }
+}
+</script>
+
+</body>
+</html>
