@@ -1,57 +1,110 @@
 import { db } from '@/lib/db'
 import { NextResponse } from 'next/server'
 
-// POST /api/seed - Seed initial data matching the prototype
+// POST /api/seed - Seed initial data with current dates
 export async function POST() {
   try {
+    const today = new Date()
+    const todayStr = today.toISOString().split('T')[0]
+
     // Create default user profile if none exists
-    const existingProfile = await db.userProfile.findFirst()
-    if (!existingProfile) {
-      await db.userProfile.create({
+    let profile = await db.userProfile.findFirst()
+    if (!profile) {
+      profile = await db.userProfile.create({
         data: {
           name: 'Luna',
           cycleLength: 28,
           periodLength: 5,
-          lastPeriodStart: '2025-01-08',
+          lastPeriodStart: todayStr,
         },
       })
     }
 
-    // Create a sample period matching the prototype
+    // Create a recent period (started a few days ago)
+    const periodStart = new Date(today)
+    periodStart.setDate(today.getDate() - 2)
+    const periodStartStr = periodStart.toISOString().split('T')[0]
+
+    const periodEnd = new Date(periodStart)
+    periodEnd.setDate(periodStart.getDate() + 4)
+    const periodEndStr = periodEnd.toISOString().split('T')[0]
+
     const existingPeriod = await db.period.findFirst({
-      where: { startDate: '2025-01-08' },
+      where: { startDate: periodStartStr },
     })
     if (!existingPeriod) {
       await db.period.create({
         data: {
-          startDate: '2025-01-08',
-          endDate: '2025-01-12',
+          startDate: periodStartStr,
+          endDate: periodEndStr,
         },
       })
     }
 
-    // Create sample daily records matching the prototype
+    // Create a previous period (28 days before current)
+    const prevStart = new Date(periodStart)
+    prevStart.setDate(periodStart.getDate() - 28)
+    const prevStartStr = prevStart.toISOString().split('T')[0]
+
+    const prevEnd = new Date(prevStart)
+    prevEnd.setDate(prevStart.getDate() + 4)
+    const prevEndStr = prevEnd.toISOString().split('T')[0]
+
+    const existingPrevPeriod = await db.period.findFirst({
+      where: { startDate: prevStartStr },
+    })
+    if (!existingPrevPeriod) {
+      await db.period.create({
+        data: {
+          startDate: prevStartStr,
+          endDate: prevEndStr,
+        },
+      })
+    }
+
+    // Create one more period before that
+    const prevPrevStart = new Date(prevStart)
+    prevPrevStart.setDate(prevStart.getDate() - 27)
+    const prevPrevStartStr = prevPrevStart.toISOString().split('T')[0]
+
+    const prevPrevEnd = new Date(prevPrevStart)
+    prevPrevEnd.setDate(prevPrevStart.getDate() + 5)
+    const prevPrevEndStr = prevPrevEnd.toISOString().split('T')[0]
+
+    const existingPrevPrevPeriod = await db.period.findFirst({
+      where: { startDate: prevPrevStartStr },
+    })
+    if (!existingPrevPrevPeriod) {
+      await db.period.create({
+        data: {
+          startDate: prevPrevStartStr,
+          endDate: prevPrevEndStr,
+        },
+      })
+    }
+
+    // Create sample daily records with Chinese symptoms
+    const day1 = new Date(periodStart)
+    const day1Str = day1.toISOString().split('T')[0]
+
+    const day2 = new Date(periodStart)
+    day2.setDate(periodStart.getDate() + 1)
+    const day2Str = day2.toISOString().split('T')[0]
+
     const sampleRecords = [
       {
-        date: '2025-01-15',
+        date: day1Str,
         flow: 2,
-        mood: 2,
-        symptoms: JSON.stringify(['痛经', '疲劳']),
-        note: '今天感觉还可以',
-      },
-      {
-        date: '2025-01-14',
-        flow: 3,
         mood: 3,
-        symptoms: JSON.stringify(['腰酸']),
-        note: '记得多喝热水',
+        symptoms: JSON.stringify(['痛经', '疲劳']),
+        note: '经期第一天，注意保暖',
       },
       {
-        date: '2025-01-13',
-        flow: 1,
+        date: day2Str,
+        flow: 3,
         mood: 4,
-        symptoms: JSON.stringify(['头痛', '疲劳']),
-        note: '',
+        symptoms: JSON.stringify(['腰酸', '头痛']),
+        note: '记得多喝热水',
       },
     ]
 

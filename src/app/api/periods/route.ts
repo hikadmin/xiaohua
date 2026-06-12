@@ -33,7 +33,7 @@ export async function POST(request: NextRequest) {
     const period = await db.period.create({
       data: {
         startDate,
-        endDate: endDate || null,
+        ...(endDate !== undefined && endDate !== null && endDate !== '' ? { endDate } : {}),
       },
     })
 
