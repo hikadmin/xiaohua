@@ -1,6 +1,9 @@
-// ============ 前端 API 服务层 ============
-// 统一封装所有 API 调用，提供类型安全的接口
-// 前端只通过此模块与后端通信
+// ============ 前端 API 服务层 — 双模式适配 ============
+// 支持两种运行模式：
+// 1. Server 模式：通过 fetch() 调用后端 API（开发/网页版）
+// 2. Local 模式：使用 IndexedDB 本地存储（Capacitor/Android APK）
+//
+// 模式切换：检测 window.__LUNA_LOCAL_MODE__ 或 Capacitor 环境
 
 import type {
   ApiResponse,
@@ -18,19 +21,55 @@ import type {
   FeedbackItem,
   CreateFeedbackRequest,
   CycleStatsResponse,
-  CycleInfoResponse,
   DashboardResponse,
   CalendarMonthResponse,
   ExportDataResponse,
 } from '@/lib/api/types'
 
-// ============ 通用请求封装 ============
+import {
+  localPeriodsApi, localRecordsApi, localProfileApi, localSettingsApi,
+  localFeedbackApi, localGetCycleStats, localGetDashboard,
+  localGetCalendarMonth, localExportData, localSeedData,
+} from './local-api'
+
+// ============ 模式检测 ============
+
+export type ApiMode = 'server' | 'local'
+
+let currentMode: ApiMode = 'server'
+
+/** 获取当前 API 模式 */
+export function getApiMode(): ApiMode {
+  return currentMode
+}
+
+/** 设置 API 模式 */
+export function setApiMode(mode: ApiMode) {
+  currentMode = mode
+}
+
+/** 自动检测模式：优先检查 Capacitor 环境 */
+function detectMode(): ApiMode {
+  if (typeof window === 'undefined') return 'server'
+  // 如果标记了本地模式或检测到 Capacitor 环境
+  if ((window as Record<string, unknown>).__LUNA_LOCAL_MODE__) return 'local'
+  // Capacitor 环境检测
+  if (typeof (window as Record<string, unknown>).Capacitor !== 'undefined') return 'local'
+  return 'server'
+}
+
+// 初始化模式
+if (typeof window !== 'undefined') {
+  currentMode = detectMode()
+}
+
+// ============ 通用请求封装 (Server 模式) ============
 
 class ApiError extends Error {
   status: number
-  data: ApiErrorResponse | null
+  data: { error: string } | null
 
-  constructor(message: string, status: number, data: ApiErrorResponse | null = null) {
+  constructor(message: string, status: number, data: { error: string } | null = null) {
     super(message)
     this.name = 'ApiError'
     this.status = status
@@ -38,20 +77,10 @@ class ApiError extends Error {
   }
 }
 
-interface ApiErrorResponse {
-  success: false
-  error: string
-  data: null
-  message: null
-  timestamp: string
-}
-
 async function request<T>(
   url: string,
   options: RequestInit = {}
 ): Promise<T> {
-  const { method = 'GET' } = options
-
   const config: RequestInit = {
     ...options,
     headers: {
@@ -68,7 +97,7 @@ async function request<T>(
       throw new ApiError(
         json.error || `请求失败 (${res.status})`,
         res.status,
-        json as unknown as ApiErrorResponse
+        json as unknown as { error: string }
       )
     }
 
@@ -79,174 +108,141 @@ async function request<T>(
   }
 }
 
-// ============ Periods API ============
+// ============ 双模式 API 接口 ============
 
 export const periodsApi = {
-  /** 获取所有经期记录 */
   getAll(): Promise<PeriodItem[]> {
-    return request<PeriodItem[]>('/api/periods')
+    return currentMode === 'local'
+      ? localPeriodsApi.getAll()
+      : request<PeriodItem[]>('/api/periods')
   },
-
-  /** 创建新经期记录 */
   create(data: CreatePeriodRequest): Promise<PeriodItem> {
-    return request<PeriodItem>('/api/periods', {
-      method: 'POST',
-      body: JSON.stringify(data),
-    })
+    return currentMode === 'local'
+      ? localPeriodsApi.create(data)
+      : request<PeriodItem>('/api/periods', { method: 'POST', body: JSON.stringify(data) })
   },
-
-  /** 更新经期记录 */
   update(id: string, data: UpdatePeriodRequest): Promise<PeriodItem> {
-    return request<PeriodItem>(`/api/periods/${id}`, {
-      method: 'PUT',
-      body: JSON.stringify(data),
-    })
+    return currentMode === 'local'
+      ? localPeriodsApi.update(id, data)
+      : request<PeriodItem>(`/api/periods/${id}`, { method: 'PUT', body: JSON.stringify(data) })
   },
-
-  /** 删除经期记录 */
   delete(id: string): Promise<void> {
-    return request<void>(`/api/periods/${id}`, { method: 'DELETE' })
+    return currentMode === 'local'
+      ? localPeriodsApi.delete(id)
+      : request<void>(`/api/periods/${id}`, { method: 'DELETE' })
   },
 }
-
-// ============ Records API ============
 
 export const recordsApi = {
-  /** 获取所有每日记录 */
   getAll(): Promise<DailyRecordItem[]> {
-    return request<DailyRecordItem[]>('/api/records')
+    return currentMode === 'local'
+      ? localRecordsApi.getAll()
+      : request<DailyRecordItem[]>('/api/records')
   },
-
-  /** 创建或更新每日记录 (Upsert by date) */
   upsert(data: CreateRecordRequest): Promise<DailyRecordItem> {
-    return request<DailyRecordItem>('/api/records', {
-      method: 'POST',
-      body: JSON.stringify(data),
-    })
+    return currentMode === 'local'
+      ? localRecordsApi.upsert(data)
+      : request<DailyRecordItem>('/api/records', { method: 'POST', body: JSON.stringify(data) })
   },
-
-  /** 获取指定日期记录 */
   getByDate(date: string): Promise<DailyRecordItem> {
-    return request<DailyRecordItem>(`/api/records/${date}`)
+    return currentMode === 'local'
+      ? localRecordsApi.getByDate(date)
+      : request<DailyRecordItem>(`/api/records/${date}`)
   },
-
-  /** 更新指定日期记录 */
   updateByDate(date: string, data: UpdateRecordRequest): Promise<DailyRecordItem> {
-    return request<DailyRecordItem>(`/api/records/${date}`, {
-      method: 'PUT',
-      body: JSON.stringify(data),
-    })
+    return currentMode === 'local'
+      ? localRecordsApi.updateByDate(date, data)
+      : request<DailyRecordItem>(`/api/records/${date}`, { method: 'PUT', body: JSON.stringify(data) })
   },
-
-  /** 删除指定日期记录 */
   deleteByDate(date: string): Promise<void> {
-    return request<void>(`/api/records/${date}`, { method: 'DELETE' })
+    return currentMode === 'local'
+      ? localRecordsApi.deleteByDate(date)
+      : request<void>(`/api/records/${date}`, { method: 'DELETE' })
   },
 }
-
-// ============ Profile API ============
 
 export const profileApi = {
-  /** 获取用户资料 */
   get(): Promise<UserProfileItem> {
-    return request<UserProfileItem>('/api/profile')
+    return currentMode === 'local'
+      ? localProfileApi.get()
+      : request<UserProfileItem>('/api/profile')
   },
-
-  /** 更新用户资料 */
   update(data: UpdateProfileRequest): Promise<UserProfileItem> {
-    return request<UserProfileItem>('/api/profile', {
-      method: 'PUT',
-      body: JSON.stringify(data),
-    })
+    return currentMode === 'local'
+      ? localProfileApi.update(data)
+      : request<UserProfileItem>('/api/profile', { method: 'PUT', body: JSON.stringify(data) })
   },
 }
-
-// ============ Settings API ============
 
 export const settingsApi = {
-  /** 获取所有设置项 */
   getAll(): Promise<SettingItem[]> {
-    return request<SettingItem[]>('/api/settings')
+    return currentMode === 'local'
+      ? localSettingsApi.getAll()
+      : request<SettingItem[]>('/api/settings')
   },
-
-  /** 更新单个设置项 */
   update(data: UpdateSettingRequest): Promise<SettingItem> {
-    return request<SettingItem>('/api/settings', {
-      method: 'PUT',
-      body: JSON.stringify(data),
-    })
+    return currentMode === 'local'
+      ? localSettingsApi.update(data)
+      : request<SettingItem>('/api/settings', { method: 'PUT', body: JSON.stringify(data) })
   },
-
-  /** 批量更新设置项 */
   batchUpdate(data: BatchUpdateSettingsRequest): Promise<void> {
-    return request<void>('/api/settings', {
-      method: 'POST',
-      body: JSON.stringify(data),
-    })
+    return currentMode === 'local'
+      ? localSettingsApi.batchUpdate(data)
+      : request<void>('/api/settings', { method: 'POST', body: JSON.stringify(data) })
   },
 }
-
-// ============ Feedback API ============
 
 export const feedbackApi = {
-  /** 获取所有反馈 */
   getAll(): Promise<FeedbackItem[]> {
-    return request<FeedbackItem[]>('/api/feedback')
+    return currentMode === 'local'
+      ? localFeedbackApi.getAll()
+      : request<FeedbackItem[]>('/api/feedback')
   },
-
-  /** 提交新反馈 */
   create(data: CreateFeedbackRequest): Promise<FeedbackItem> {
-    return request<FeedbackItem>('/api/feedback', {
-      method: 'POST',
-      body: JSON.stringify(data),
-    })
+    return currentMode === 'local'
+      ? localFeedbackApi.create(data)
+      : request<FeedbackItem>('/api/feedback', { method: 'POST', body: JSON.stringify(data) })
   },
 }
-
-// ============ Stats API ============
 
 export const statsApi = {
-  /** 获取周期统计数据 */
   getCycleStats(): Promise<CycleStatsResponse> {
-    return request<CycleStatsResponse>('/api/stats')
+    return currentMode === 'local'
+      ? localGetCycleStats()
+      : request<CycleStatsResponse>('/api/stats')
   },
 }
-
-// ============ Dashboard API ============
 
 export const dashboardApi = {
-  /** 获取首页仪表盘数据 */
   get(): Promise<DashboardResponse> {
-    return request<DashboardResponse>('/api/dashboard')
+    return currentMode === 'local'
+      ? localGetDashboard()
+      : request<DashboardResponse>('/api/dashboard')
   },
 }
-
-// ============ Calendar API ============
 
 export const calendarApi = {
-  /** 获取指定月份日历数据 */
   getMonth(year: number, month: number): Promise<CalendarMonthResponse> {
-    return request<CalendarMonthResponse>(`/api/calendar?year=${year}&month=${month}`)
+    return currentMode === 'local'
+      ? localGetCalendarMonth(year, month)
+      : request<CalendarMonthResponse>(`/api/calendar?year=${year}&month=${month}`)
   },
 }
-
-// ============ Export API ============
 
 export const exportApi = {
-  /** 导出所有数据 */
   getData(): Promise<ExportDataResponse> {
-    return request<ExportDataResponse>('/api/export')
+    return currentMode === 'local'
+      ? localExportData() as Promise<ExportDataResponse>
+      : request<ExportDataResponse>('/api/export')
   },
 }
-
-// ============ Seed API ============
 
 export const seedApi = {
-  /** 初始化种子数据 */
   create(): Promise<unknown> {
-    return request<unknown>('/api/seed', { method: 'POST' })
+    return currentMode === 'local'
+      ? localSeedData()
+      : request<unknown>('/api/seed', { method: 'POST' })
   },
 }
 
-// 导出错误类，供前端 catch 使用
 export { ApiError }

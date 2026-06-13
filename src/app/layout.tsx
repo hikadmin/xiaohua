@@ -6,7 +6,14 @@ export const metadata: Metadata = {
   title: "Luna - 经期追踪",
   description: "智能经期追踪，守护女性健康",
   icons: {
-    icon: "https://z-cdn.chatglm.cn/z-ai/static/logo.svg",
+    icon: "/icons/icon-192x192.png",
+    apple: "/icons/icon-152x152.png",
+  },
+  manifest: "/manifest.json",
+  appleWebApp: {
+    capable: true,
+    statusBarStyle: "black-translucent",
+    title: "Luna",
   },
 };
 
@@ -16,6 +23,7 @@ export const viewport: Viewport = {
   maximumScale: 1,
   userScalable: false,
   viewportFit: "cover",
+  themeColor: "#0f1419",
 };
 
 export default function RootLayout({
@@ -25,6 +33,10 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="zh-CN" suppressHydrationWarning>
+      <head>
+        <link rel="apple-touch-icon" href="/icons/icon-152x152.png" />
+        <meta name="apple-mobile-web-app-capable" content="yes" />
+      </head>
       <body className="antialiased">
         {children}
         <Toaster />
