@@ -57,6 +57,50 @@ const PHASE_INFO: Record<string, { name: string; desc: string; tip: string; colo
   luteal: { name: '黄体期', desc: '平缓期', tip: '注意情绪波动，适合轻度运动和放松', color: '#f2cc8f', icon: '🌙' },
 };
 
+// Precomputed tick marks for cycle ring (avoid hydration mismatch from floating-point)
+const RING_TICK_MARKS = Array.from({ length: 28 }, (_, i) => {
+  const angle = (i / 28) * 360;
+  const rad = (angle * Math.PI) / 180;
+  return {
+    x1: +(120 + 105 * Math.cos(rad)).toFixed(2),
+    y1: +(120 + 105 * Math.sin(rad)).toFixed(2),
+    x2: +(120 + 98 * Math.cos(rad)).toFixed(2),
+    y2: +(120 + 98 * Math.sin(rad)).toFixed(2),
+  };
+});
+
+// Daily health tips by phase
+const DAILY_TIPS: Record<string, string[]> = {
+  period: [
+    '🧣 今天适合穿暖色衣服，给自己温暖的呵护',
+    '🍵 喝一杯红糖姜茶，温暖整个身体',
+    '🛁 温水泡脚15分钟，缓解经期不适',
+    '😴 早睡1小时，让身体充分休息',
+    '🧘 轻柔的冥想呼吸，帮助放松身心',
+  ],
+  follicular: [
+    '🏃 今天精力充沛，适合进行高强度运动',
+    '🎨 创造力高峰期，尝试新的创意活动',
+    '🥗 多吃富含铁质的食物，补充流失营养',
+    '💪 体力和耐力提升，挑战新的运动目标',
+    '📚 学习效率最佳，适合阅读和思考',
+  ],
+  ovulation: [
+    '✨ 社交能力最佳，适合与朋友聚会',
+    '💝 自信魅力高峰，适合重要约会和演讲',
+    '🥑 补充健康脂肪，维持激素平衡',
+    '🎯 注意力集中，处理重要工作',
+    '🌟 魅力四射的一天，展现最好的自己',
+  ],
+  luteal: [
+    '🧘 瑜伽和拉伸运动，缓解身体不适',
+    '🍫 适量吃些黑巧克力，提升心情',
+    '📝 记录情绪变化，更好地了解自己',
+    '🎵 听舒缓的音乐，放松紧张情绪',
+    '🌿 补充镁和维生素B6，稳定情绪',
+  ],
+};
+
 // ============ Utility Functions ============
 function formatDateStr(date: Date): string {
   return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
@@ -132,6 +176,21 @@ export default function LunaApp() {
   const [selectedSymptoms, setSelectedSymptoms] = useState<string[]>([]);
   const [customSymptoms, setCustomSymptoms] = useState<string[]>([]);
   const [noteText, setNoteText] = useState('');
+
+  // Profile editing state
+  const [profileEditOpen, setProfileEditOpen] = useState(false);
+  const [editName, setEditName] = useState('');
+  const [editCycleLength, setEditCycleLength] = useState(28);
+  const [editPeriodLength, setEditPeriodLength] = useState(5);
+
+  // Delete confirmation state
+  const [deleteConfirm, setDeleteConfirm] = useState<{ open: boolean; recordId: string; date: string }>({ open: false, recordId: '', date: '' });
+
+  // Daily tip state
+  const [dailyTipIndex, setDailyTipIndex] = useState(() => {
+    const t = new Date();
+    return (t.getFullYear() * 366 + t.getMonth() * 31 + t.getDate()) % 5;
+  });
 
   const { toast } = useToast();
 
@@ -389,6 +448,53 @@ export default function LunaApp() {
     await fetchSettings();
   }
 
+  async function saveProfile() {
+    await fetch('/api/profile', {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        name: editName,
+        cycleLength: editCycleLength,
+        periodLength: editPeriodLength,
+      }),
+    });
+    await fetchProfile();
+    setProfileEditOpen(false);
+    toast({ description: '个人资料已更新 ✅' });
+  }
+
+  async function deleteRecord(id: string) {
+    const d = deleteConfirm.date;
+    await fetch(`/api/records/${d}`, { method: 'DELETE' });
+    setDeleteConfirm({ open: false, recordId: '', date: '' });
+    await fetchRecords();
+    toast({ description: '记录已删除' });
+  }
+
+  function exportCSV() {
+    const headers = ['日期', '流量', '情绪', '症状', '备注'];
+    const rows = records.map(r => {
+      const symptoms = JSON.parse(r.symptoms || '[]');
+      return [
+        r.date,
+        FLOW_LABELS[r.flow] || '',
+        MOOD_LABELS[r.mood] || '',
+        symptoms.join(';'),
+        `"${(r.note || '').replace(/"/g, '""')}"`,
+      ];
+    });
+    const csv = [headers.join(','), ...rows.map(r => r.join(','))].join('\n');
+    const BOM = '\uFEFF';
+    const blob = new Blob([BOM + csv], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `luna_records_${formatDateStr(new Date())}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+    toast({ description: '数据导出成功 📁' });
+  }
+
   // ============ Calendar Generation ============
   function generateCalendarDays() {
     const firstDay = new Date(calYear, calMonth - 1, 1);
@@ -564,18 +670,10 @@ export default function LunaApp() {
                       {/* Track */}
                       <circle cx="120" cy="120" r="105" fill="none" stroke="rgba(255,255,255,0.06)" strokeWidth="7" />
                       {/* Subtle tick marks */}
-                      {[...Array(28)].map((_, i) => {
-                        const angle = (i / 28) * 360;
-                        const rad = (angle * Math.PI) / 180;
-                        const x1 = 120 + 105 * Math.cos(rad);
-                        const y1 = 120 + 105 * Math.sin(rad);
-                        const x2 = 120 + 98 * Math.cos(rad);
-                        const y2 = 120 + 98 * Math.sin(rad);
-                        return (
-                          <line key={i} x1={x1} y1={y1} x2={x2} y2={y2}
-                            stroke="rgba(255,255,255,0.08)" strokeWidth="1" />
-                        );
-                      })}
+                      {RING_TICK_MARKS.map((tick, i) => (
+                        <line key={i} x1={tick.x1} y1={tick.y1} x2={tick.x2} y2={tick.y2}
+                          stroke="rgba(255,255,255,0.08)" strokeWidth="1" />
+                      ))}
                       {/* Progress */}
                       <circle
                         cx="120" cy="120" r="105" fill="none"
@@ -730,6 +828,92 @@ export default function LunaApp() {
                         </div>
                       );
                     })}
+                  </div>
+                </StaggerIn>
+              )}
+
+              {/* Daily Health Tip */}
+              <StaggerIn delay={0.45}>
+                <div className="mt-4 rounded-[20px] p-5 relative overflow-hidden"
+                  style={{
+                    background: `linear-gradient(135deg, ${phaseData.color}15, #232b3580)`,
+                    border: `1px solid ${phaseData.color}20`,
+                    backdropFilter: 'blur(20px)',
+                  }}>
+                  <div className="absolute top-0 right-0 w-24 h-24 rounded-full opacity-10"
+                    style={{ background: phaseData.color, filter: 'blur(30px)', transform: 'translate(30%, -30%)' }} />
+                  <div className="flex items-start gap-3">
+                    <div className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0"
+                      style={{ background: `${phaseData.color}20` }}>
+                      <span className="text-lg">💡</span>
+                    </div>
+                    <div className="flex-1">
+                      <p className="text-sm font-medium mb-1">今日小贴士</p>
+                      <motion.p
+                        className="text-sm leading-relaxed"
+                        style={{ color: '#a8a29e' }}
+                        key={dailyTipIndex}
+                        initial={{ opacity: 0, y: 5 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        transition={{ duration: 0.3 }}
+                      >
+                        {DAILY_TIPS[cycleInfo.phase]?.[dailyTipIndex] || DAILY_TIPS.follicular[0]}
+                      </motion.p>
+                    </div>
+                    <button className="flex-shrink-0 w-8 h-8 rounded-lg flex items-center justify-center transition-all hover:scale-110 active:scale-95"
+                      style={{ background: 'rgba(255,255,255,0.05)' }}
+                      onClick={() => setDailyTipIndex(prev => (prev + 1) % 5)}>
+                      <ArrowRight size={14} style={{ color: '#a8a29e' }} />
+                    </button>
+                  </div>
+                </div>
+              </StaggerIn>
+
+              {/* Cycle Trend Mini Chart */}
+              {cycleStats.cycleLengths.length > 0 && (
+                <StaggerIn delay={0.5}>
+                  <div className="mt-4 rounded-[20px] p-5" style={{ background: '#232b35', border: '1px solid rgba(255,255,255,0.08)' }}>
+                    <div className="flex justify-between items-center mb-4">
+                      <p className="text-sm font-medium">周期趋势</p>
+                      <span className="text-xs" style={{ color: '#6b7280' }}>最近{Math.min(cycleStats.cycleLengths.length, 6)}个周期</span>
+                    </div>
+                    <div className="flex items-end gap-2 h-20">
+                      {cycleStats.cycleLengths.slice(-6).map((len, i) => {
+                        const maxLen = Math.max(...cycleStats.cycleLengths.slice(-6));
+                        const minLen = Math.min(...cycleStats.cycleLengths.slice(-6));
+                        const range = maxLen - minLen || 1;
+                        const height = 20 + ((len - minLen) / range) * 60;
+                        const isLast = i === cycleStats.cycleLengths.slice(-6).length - 1;
+                        return (
+                          <motion.div key={i} className="flex-1 flex flex-col items-center gap-1"
+                            initial={{ height: 0, opacity: 0 }}
+                            animate={{ height: 'auto', opacity: 1 }}
+                            transition={{ delay: 0.1 * i, duration: 0.4 }}>
+                            <span className="text-[10px]" style={{ color: '#6b7280' }}>{len}</span>
+                            <motion.div
+                              className="w-full rounded-t-md"
+                              style={{
+                                height,
+                                background: isLast
+                                  ? 'linear-gradient(to top, #e07a5f, #d4a574)'
+                                  : 'rgba(255,255,255,0.08)',
+                                minHeight: 8,
+                              }}
+                              initial={{ scaleY: 0 }}
+                              animate={{ scaleY: 1 }}
+                              transition={{ delay: 0.15 * i, duration: 0.4 }}
+                            />
+                          </motion.div>
+                        );
+                      })}
+                    </div>
+                    <div className="flex items-center justify-between mt-2 pt-2" style={{ borderTop: '1px solid rgba(255,255,255,0.04)' }}>
+                      <span className="text-[11px]" style={{ color: '#6b7280' }}>平均 {cycleStats.avgCycle} 天</span>
+                      <div className="flex items-center gap-1">
+                        <div className="w-2 h-2 rounded-full" style={{ background: '#e07a5f' }} />
+                        <span className="text-[11px]" style={{ color: '#6b7280' }}>最近</span>
+                      </div>
+                    </div>
                   </div>
                 </StaggerIn>
               )}
@@ -1112,9 +1296,16 @@ export default function LunaApp() {
                                 </span>
                               )}
                             </div>
-                            <span className="text-xs" style={{ color: '#6b7280' }}>
-                              {MOOD_EMOJIS[record.mood]} {MOOD_LABELS[record.mood]}
-                            </span>
+                            <div className="flex items-center gap-2">
+                              <span className="text-xs" style={{ color: '#6b7280' }}>
+                                {MOOD_EMOJIS[record.mood]} {MOOD_LABELS[record.mood]}
+                              </span>
+                              <button className="w-7 h-7 rounded-lg flex items-center justify-center transition-all hover:scale-110 active:scale-90"
+                                style={{ background: 'rgba(239,68,68,0.08)' }}
+                                onClick={() => setDeleteConfirm({ open: true, recordId: record.id, date: record.date })}>
+                                <X size={12} style={{ color: '#ef4444' }} />
+                              </button>
+                            </div>
                           </div>
                           <div className="flex items-center gap-3 mb-2">
                             <span className="text-xs" style={{ color: '#6b7280' }}>流量:</span>
@@ -1169,10 +1360,20 @@ export default function LunaApp() {
                       {profile?.name?.charAt(0) || 'L'}
                     </span>
                   </div>
-                  <div>
+                  <div className="flex-1">
                     <p className="text-xl font-light" style={{ fontFamily: 'Georgia, serif' }}>{profile?.name || 'Luna'}</p>
                     <p className="text-sm" style={{ color: '#a8a29e' }}>已记录 {records.length} 天 · {cycleStats.totalCycles} 个周期</p>
                   </div>
+                  <button className="w-10 h-10 rounded-xl flex items-center justify-center transition-all hover:scale-105 active:scale-95"
+                    style={{ background: '#232b35', border: '1px solid rgba(255,255,255,0.08)' }}
+                    onClick={() => {
+                      setEditName(profile?.name || 'Luna');
+                      setEditCycleLength(profile?.cycleLength || 28);
+                      setEditPeriodLength(profile?.periodLength || 5);
+                      setProfileEditOpen(true);
+                    }}>
+                    <Target size={16} style={{ color: '#a8a29e' }} />
+                  </button>
                 </div>
               </StaggerIn>
 
@@ -1313,12 +1514,12 @@ export default function LunaApp() {
                 <div className="rounded-[20px] p-5 mb-4" style={{ background: '#232b35', border: '1px solid rgba(255,255,255,0.08)' }}>
                   <p className="text-sm font-medium mb-3">数据管理</p>
                   {[
-                    { icon: Download, label: '导出数据', desc: '导出为 PDF / CSV' },
-                    { icon: Cloud, label: '云同步', desc: '连接云端备份' },
-                    { icon: RotateCcw, label: '恢复数据', desc: '从备份恢复' },
+                    { icon: Download, label: '导出数据', desc: '导出为 CSV', action: () => exportCSV() },
+                    { icon: Cloud, label: '云同步', desc: '连接云端备份', action: () => toast({ description: '云同步功能开发中' }) },
+                    { icon: RotateCcw, label: '恢复数据', desc: '从备份恢复', action: () => toast({ description: '恢复数据功能开发中' }) },
                   ].map((item, i) => (
                     <div key={i} className="flex items-center gap-3.5 py-3.5 cursor-pointer transition-all active:scale-[0.98]"
-                      onClick={() => toast({ description: `${item.label}功能开发中` })}>
+                      onClick={item.action}>
                       <div className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0" style={{ background: '#1a2027' }}>
                         <item.icon size={20} style={{ color: '#a8a29e' }} />
                       </div>
@@ -1611,6 +1812,155 @@ export default function LunaApp() {
                 animate={{ scaleX: [0.5, 1, 0.5] }}
                 transition={{ duration: 1.5, repeat: Infinity, ease: 'easeInOut' }}
               />
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* ============ Profile Edit Sheet ============ */}
+      <AnimatePresence>
+        {profileEditOpen && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-[200]"
+            style={{ background: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(8px)' }}
+            onClick={() => setProfileEditOpen(false)}
+          >
+            <motion.div
+              initial={{ y: '100%' }}
+              animate={{ y: 0 }}
+              exit={{ y: '100%' }}
+              transition={{ type: 'spring', damping: 25, stiffness: 300 }}
+              className="absolute bottom-0 left-0 right-0 rounded-t-3xl p-5 pb-8"
+              style={{ background: '#1a2027' }}
+              onClick={e => e.stopPropagation()}
+            >
+              <div className="w-9 h-1 rounded-full mx-auto mb-4 opacity-50" style={{ background: '#6b7280' }} />
+              <div className="text-center mb-5"><span className="text-lg font-medium">编辑个人资料</span></div>
+
+              {/* Name */}
+              <div className="mb-5">
+                <label className="text-sm mb-2 block" style={{ color: '#a8a29e' }}>昵称</label>
+                <input type="text"
+                  className="w-full rounded-xl p-3 text-sm outline-none transition-all"
+                  style={{ background: '#232b35', border: '1.5px solid rgba(255,255,255,0.06)', color: '#f0ece4' }}
+                  placeholder="输入昵称..."
+                  value={editName}
+                  onChange={e => setEditName(e.target.value)}
+                  onFocus={e => e.currentTarget.style.borderColor = '#d4a57440'}
+                  onBlur={e => e.currentTarget.style.borderColor = 'rgba(255,255,255,0.06)'}
+                />
+              </div>
+
+              {/* Cycle Length */}
+              <div className="mb-5">
+                <label className="text-sm mb-2 block" style={{ color: '#a8a29e' }}>周期长度</label>
+                <div className="flex items-center gap-4">
+                  <button className="w-12 h-12 rounded-xl flex items-center justify-center transition-all active:scale-90"
+                    style={{ background: '#232b35', border: '1px solid rgba(255,255,255,0.08)' }}
+                    onClick={() => setEditCycleLength(prev => Math.max(15, prev - 1))}>
+                    <span style={{ color: '#a8a29e', fontSize: 20 }}>-</span>
+                  </button>
+                  <div className="flex-1 text-center">
+                    <span className="text-3xl font-light" style={{ fontFamily: 'Georgia, serif' }}>{editCycleLength}</span>
+                    <span className="text-sm ml-1" style={{ color: '#a8a29e' }}>天</span>
+                  </div>
+                  <button className="w-12 h-12 rounded-xl flex items-center justify-center transition-all active:scale-90"
+                    style={{ background: '#232b35', border: '1px solid rgba(255,255,255,0.08)' }}
+                    onClick={() => setEditCycleLength(prev => Math.min(45, prev + 1))}>
+                    <span style={{ color: '#a8a29e', fontSize: 20 }}>+</span>
+                  </button>
+                </div>
+                <div className="flex justify-between mt-2 px-1">
+                  <span className="text-[11px]" style={{ color: '#6b7280' }}>15天</span>
+                  <span className="text-[11px]" style={{ color: '#6b7280' }}>45天</span>
+                </div>
+              </div>
+
+              {/* Period Length */}
+              <div className="mb-6">
+                <label className="text-sm mb-2 block" style={{ color: '#a8a29e' }}>经期长度</label>
+                <div className="flex items-center gap-4">
+                  <button className="w-12 h-12 rounded-xl flex items-center justify-center transition-all active:scale-90"
+                    style={{ background: '#232b35', border: '1px solid rgba(255,255,255,0.08)' }}
+                    onClick={() => setEditPeriodLength(prev => Math.max(1, prev - 1))}>
+                    <span style={{ color: '#a8a29e', fontSize: 20 }}>-</span>
+                  </button>
+                  <div className="flex-1 text-center">
+                    <span className="text-3xl font-light" style={{ fontFamily: 'Georgia, serif' }}>{editPeriodLength}</span>
+                    <span className="text-sm ml-1" style={{ color: '#a8a29e' }}>天</span>
+                  </div>
+                  <button className="w-12 h-12 rounded-xl flex items-center justify-center transition-all active:scale-90"
+                    style={{ background: '#232b35', border: '1px solid rgba(255,255,255,0.08)' }}
+                    onClick={() => setEditPeriodLength(prev => Math.min(10, prev + 1))}>
+                    <span style={{ color: '#a8a29e', fontSize: 20 }}>+</span>
+                  </button>
+                </div>
+                <div className="flex justify-between mt-2 px-1">
+                  <span className="text-[11px]" style={{ color: '#6b7280' }}>1天</span>
+                  <span className="text-[11px]" style={{ color: '#6b7280' }}>10天</span>
+                </div>
+              </div>
+
+              <motion.button
+                className="w-full py-4 rounded-2xl font-medium text-lg"
+                style={{ background: 'linear-gradient(135deg, #e07a5f, #d4a574)', color: '#0f1419' }}
+                whileTap={{ scale: 0.97 }}
+                onClick={saveProfile}>
+                保存
+              </motion.button>
+              <div className="text-center py-4 cursor-pointer transition-colors"
+                style={{ color: '#6b7280' }}
+                onClick={() => setProfileEditOpen(false)}>
+                取消
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* ============ Delete Confirmation Dialog ============ */}
+      <AnimatePresence>
+        {deleteConfirm.open && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-[250] flex items-center justify-center px-8"
+            style={{ background: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(8px)' }}
+            onClick={() => setDeleteConfirm({ open: false, recordId: '', date: '' })}
+          >
+            <motion.div
+              initial={{ scale: 0.9, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.9, opacity: 0 }}
+              transition={{ type: 'spring', damping: 25, stiffness: 300 }}
+              className="w-full rounded-3xl p-6"
+              style={{ background: '#1a2027', border: '1px solid rgba(255,255,255,0.08)' }}
+              onClick={e => e.stopPropagation()}
+            >
+              <div className="w-14 h-14 rounded-2xl flex items-center justify-center mx-auto mb-4"
+                style={{ background: 'rgba(239,68,68,0.1)' }}>
+                <X size={24} style={{ color: '#ef4444' }} />
+              </div>
+              <p className="text-center text-lg font-medium mb-2">确认删除？</p>
+              <p className="text-center text-sm mb-6" style={{ color: '#a8a29e' }}>
+                删除后将无法恢复此条记录
+              </p>
+              <div className="flex gap-3">
+                <button className="flex-1 py-3 rounded-xl text-sm font-medium transition-all active:scale-95"
+                  style={{ background: '#232b35', border: '1px solid rgba(255,255,255,0.08)', color: '#f0ece4' }}
+                  onClick={() => setDeleteConfirm({ open: false, recordId: '', date: '' })}>
+                  取消
+                </button>
+                <button className="flex-1 py-3 rounded-xl text-sm font-medium transition-all active:scale-95"
+                  style={{ background: 'rgba(239,68,68,0.15)', color: '#ef4444', border: '1px solid rgba(239,68,68,0.2)' }}
+                  onClick={() => deleteRecord(deleteConfirm.recordId)}>
+                  删除
+                </button>
+              </div>
             </motion.div>
           </motion.div>
         )}
