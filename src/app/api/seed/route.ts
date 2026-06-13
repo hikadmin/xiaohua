@@ -1,13 +1,14 @@
 import { db } from '@/lib/db'
 import { NextResponse } from 'next/server'
+import { success, serverError } from '@/lib/api/response'
 
-// POST /api/seed - Seed initial data with current dates
+// POST /api/seed - 初始化种子数据
 export async function POST() {
   try {
     const today = new Date()
     const todayStr = today.toISOString().split('T')[0]
 
-    // Create default user profile if none exists
+    // 创建默认用户资料
     let profile = await db.userProfile.findFirst()
     if (!profile) {
       profile = await db.userProfile.create({
@@ -20,7 +21,7 @@ export async function POST() {
       })
     }
 
-    // Create a recent period (started a few days ago)
+    // 创建近期经期
     const periodStart = new Date(today)
     periodStart.setDate(today.getDate() - 2)
     const periodStartStr = periodStart.toISOString().split('T')[0]
@@ -34,14 +35,11 @@ export async function POST() {
     })
     if (!existingPeriod) {
       await db.period.create({
-        data: {
-          startDate: periodStartStr,
-          endDate: periodEndStr,
-        },
+        data: { startDate: periodStartStr, endDate: periodEndStr },
       })
     }
 
-    // Create a previous period (28 days before current)
+    // 创建上一个周期
     const prevStart = new Date(periodStart)
     prevStart.setDate(periodStart.getDate() - 28)
     const prevStartStr = prevStart.toISOString().split('T')[0]
@@ -55,14 +53,11 @@ export async function POST() {
     })
     if (!existingPrevPeriod) {
       await db.period.create({
-        data: {
-          startDate: prevStartStr,
-          endDate: prevEndStr,
-        },
+        data: { startDate: prevStartStr, endDate: prevEndStr },
       })
     }
 
-    // Create one more period before that
+    // 创建更早的周期
     const prevPrevStart = new Date(prevStart)
     prevPrevStart.setDate(prevStart.getDate() - 27)
     const prevPrevStartStr = prevPrevStart.toISOString().split('T')[0]
@@ -76,14 +71,11 @@ export async function POST() {
     })
     if (!existingPrevPrevPeriod) {
       await db.period.create({
-        data: {
-          startDate: prevPrevStartStr,
-          endDate: prevPrevEndStr,
-        },
+        data: { startDate: prevPrevStartStr, endDate: prevPrevEndStr },
       })
     }
 
-    // Create sample daily records with Chinese symptoms
+    // 创建示例每日记录
     const day1 = new Date(periodStart)
     const day1Str = day1.toISOString().split('T')[0]
 
@@ -117,7 +109,7 @@ export async function POST() {
       }
     }
 
-    // Create default settings
+    // 创建默认设置
     const defaultSettings = [
       { key: 'period_reminder', value: 'true' },
       { key: 'record_reminder', value: 'true' },
@@ -135,20 +127,14 @@ export async function POST() {
       }
     }
 
-    return NextResponse.json({
-      message: 'Seed data created successfully',
-      data: {
-        profile: 'Created default profile',
-        periods: 'Created sample period records',
-        records: 'Created sample daily records',
-        settings: 'Created default settings',
-      },
-    })
+    return success({
+      profile: '默认资料已创建',
+      periods: '示例经期已创建',
+      records: '示例记录已创建',
+      settings: '默认设置已创建',
+    }, '种子数据初始化成功')
   } catch (error) {
     console.error('Failed to seed data:', error)
-    return NextResponse.json(
-      { error: 'Failed to seed data' },
-      { status: 500 }
-    )
+    return serverError('初始化种子数据失败')
   }
 }

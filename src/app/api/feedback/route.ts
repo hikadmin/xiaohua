@@ -1,50 +1,53 @@
 import { db } from '@/lib/db'
-import { NextRequest, NextResponse } from 'next/server'
+import { NextRequest } from 'next/server'
+import { success, created, badRequest, serverError, parseRequestBody, validateRequired, validateStringLength } from '@/lib/api/response'
 
-// GET /api/feedback - Get all feedback
+// GET /api/feedback - 获取所有反馈
 export async function GET() {
   try {
     const feedbacks = await db.feedback.findMany({
       orderBy: { createdAt: 'desc' },
     })
-    return NextResponse.json(feedbacks)
+    return success(feedbacks)
   } catch (error) {
     console.error('Failed to fetch feedback:', error)
-    return NextResponse.json(
-      { error: 'Failed to fetch feedback' },
-      { status: 500 }
-    )
+    return serverError('获取反馈列表失败')
   }
 }
 
-// POST /api/feedback - Submit new feedback
+// POST /api/feedback - 提交新反馈
 export async function POST(request: NextRequest) {
   try {
-    const body = await request.json()
-    const { category, content, contact } = body
+    const { data, error } = await parseRequestBody(request)
+    if (error) return error
 
-    if (!content || !content.trim()) {
-      return NextResponse.json(
-        { error: '反馈内容不能为空' },
-        { status: 400 }
-      )
+    // 参数校验
+    const requiredError = validateRequired(data, ['content'])
+    if (requiredError) return badRequest(requiredError)
+
+    const contentError = validateStringLength((data.content as string).trim(), 500, 'content')
+    if (contentError) return badRequest(contentError)
+
+    if (data.contact) {
+      const contactError = validateStringLength(data.contact as string, 100, 'contact')
+      if (contactError) return badRequest(contactError)
     }
+
+    const validCategories = ['功能建议', '问题反馈', '体验优化', '其他']
+    const category = validCategories.includes(data.category as string) ? data.category : '其他'
 
     const feedback = await db.feedback.create({
       data: {
-        category: category || '其他',
-        content: content.trim(),
-        contact: contact || '',
+        category: category as string,
+        content: (data.content as string).trim(),
+        contact: (data.contact as string)?.trim() || '',
         status: 'pending',
       },
     })
 
-    return NextResponse.json(feedback, { status: 201 })
+    return created(feedback, '反馈提交成功，感谢您的意见！')
   } catch (error) {
     console.error('Failed to create feedback:', error)
-    return NextResponse.json(
-      { error: 'Failed to create feedback' },
-      { status: 500 }
-    )
+    return serverError('提交反馈失败')
   }
 }

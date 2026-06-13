@@ -1,0 +1,774 @@
+     1→     1→'use client';
+     2→     2→
+     3→     3→import React, { useState, useEffect, useCallback, useMemo } from 'react';
+     4→     4→import { motion, AnimatePresence } from 'framer-motion';
+     5→     5→import { Home, Calendar, FileText, User, Plus } from 'lucide-react';
+     6→     6→import { useToast } from '@/hooks/use-toast';
+     7→     7→import {
+     8→     8→  type Period, type DailyRecord, type UserProfile, type Setting, type TabPage,
+     9→     9→  type CycleInfo, type CycleStats, type CalendarDay, type PeriodInfoResult,
+    10→    10→  PHASE_INFO, FLOW_LABELS, MOOD_LABELS, formatDateStr, parseDate, daysBetween, addDays,
+    11→    11→} from '@/components/luna/shared';
+    12→    12→import HomeTab from '@/components/luna/HomeTab';
+    13→    13→import CalendarTab from '@/components/luna/CalendarTab';
+    14→    14→import LogTab from '@/components/luna/LogTab';
+    15→    15→import ProfileTab from '@/components/luna/ProfileTab';
+    16→    16→import ActionSheet from '@/components/luna/ActionSheet';
+    17→    17→import SymptomSheet from '@/components/luna/SymptomSheet';
+    18→    18→import ProfileEditSheet from '@/components/luna/ProfileEditSheet';
+    19→    19→import DeleteConfirmDialog from '@/components/luna/DeleteConfirmDialog';
+    20→    20→import FeedbackSheet from '@/components/luna/FeedbackSheet';
+    21→    21→
+    22→    22→// ============ Main Component ============
+    23→    23→export default function LunaApp() {
+    24→    24→  const [activeTab, setActiveTab] = useState<TabPage>('home');
+    25→    25→  const [periods, setPeriods] = useState<Period[]>([]);
+    26→    26→  const [records, setRecords] = useState<DailyRecord[]>([]);
+    27→    27→  const [profile, setProfile] = useState<UserProfile | null>(null);
+    28→    28→  const [settings, setSettings] = useState<Setting[]>([]);
+    29→    29→  const [isLoaded, setIsLoaded] = useState(false);
+    30→    30→  const [ringAnimated, setRingAnimated] = useState(false);
+    31→    31→
+    32→    32→  // Calendar state
+    33→    33→  const today = new Date();
+    34→    34→  const [calYear, setCalYear] = useState(today.getFullYear());
+    35→    35→  const [calMonth, setCalMonth] = useState(today.getMonth() + 1);
+    36→    36→
+    37→    37→  // Action sheet state
+    38→    38→  const [actionSheet, setActionSheet] = useState<{
+    39→    39→    open: boolean;
+    40→    40→    dateStr: string;
+    41→    41→    day: number;
+    42→    42→  }>({ open: false, dateStr: '', day: 0 });
+    43→    43→
+    44→    44→  // Symptom sheet state
+    45→    45→  const [symptomSheetOpen, setSymptomSheetOpen] = useState(false);
+    46→    46→  const [newSymptom, setNewSymptom] = useState('');
+    47→    47→
+    48→    48→  // Log state
+    49→    49→  const [logTab, setLogTab] = useState<'record' | 'history'>('record');
+    50→    50→  const [currentFlow, setCurrentFlow] = useState(2);
+    51→    51→  const [currentMood, setCurrentMood] = useState(2);
+    52→    52→  const [selectedSymptoms, setSelectedSymptoms] = useState<string[]>([]);
+    53→    53→  const [customSymptoms, setCustomSymptoms] = useState<string[]>([]);
+    54→    54→  const [noteText, setNoteText] = useState('');
+    55→    55→
+    56→    56→  // Profile editing state
+    57→    57→  const [profileEditOpen, setProfileEditOpen] = useState(false);
+    58→    58→  const [editName, setEditName] = useState('');
+    59→    59→  const [editCycleLength, setEditCycleLength] = useState(28);
+    60→    60→  const [editPeriodLength, setEditPeriodLength] = useState(5);
+    61→    61→
+    62→    62→  // Delete confirmation state
+    63→    63→  const [deleteConfirm, setDeleteConfirm] = useState<{ open: boolean; recordId: string; date: string }>({ open: false, recordId: '', date: '' });
+    64→    64→
+    65→    65→  // Feedback state
+    66→    66→  const [feedbackOpen, setFeedbackOpen] = useState(false);
+    67→    67→  const [feedbackCategory, setFeedbackCategory] = useState('功能建议');
+    68→    68→  const [feedbackContent, setFeedbackContent] = useState('');
+    69→    69→  const [feedbackContact, setFeedbackContact] = useState('');
+    70→    70→  const [feedbackSubmitting, setFeedbackSubmitting] = useState(false);
+    71→    71→
+    72→    72→  // Avatar edit state
+    73→    73→  const [editAvatar, setEditAvatar] = useState('');
+    74→    74→  const fileInputRef = React.useRef<HTMLInputElement>(null);
+    75→    75→
+    76→    76→  // Daily tip state
+    77→    77→  const [dailyTipIndex, setDailyTipIndex] = useState(() => {
+    78→    78→    const t = new Date();
+    79→    79→    return (t.getFullYear() * 366 + t.getMonth() * 31 + t.getDate()) % 5;
+    80→    80→  });
+    81→    81→
+    82→    82→  const { toast } = useToast();
+    83→    83→
+    84→    84→  // ============ Data Fetching ============
+    85→    85→  const fetchPeriods = useCallback(async () => {
+    86→    86→    try {
+    87→    87→      const res = await fetch('/api/periods');
+    88→    88→      if (res.ok) setPeriods(await res.json());
+    89→    89→    } catch {}
+    90→    90→  }, []);
+    91→    91→
+    92→    92→  const fetchRecords = useCallback(async () => {
+    93→    93→    try {
+    94→    94→      const res = await fetch('/api/records');
+    95→    95→      if (res.ok) setRecords(await res.json());
+    96→    96→    } catch {}
+    97→    97→  }, []);
+    98→    98→
+    99→    99→  const fetchProfile = useCallback(async () => {
+   100→   100→    try {
+   101→   101→      const res = await fetch('/api/profile');
+   102→   102→      if (res.ok) setProfile(await res.json());
+   103→   103→    } catch {}
+   104→   104→  }, []);
+   105→   105→
+   106→   106→  const fetchSettings = useCallback(async () => {
+   107→   107→    try {
+   108→   108→      const res = await fetch('/api/settings');
+   109→   109→      if (res.ok) setSettings(await res.json());
+   110→   110→    } catch {}
+   111→   111→  }, []);
+   112→   112→
+   113→   113→  const seedData = useCallback(async () => {
+   114→   114→    try {
+   115→   115→      await fetch('/api/seed', { method: 'POST' });
+   116→   116→    } catch {}
+   117→   117→  }, []);
+   118→   118→
+   119→   119→  useEffect(() => {
+   120→   120→    const init = async () => {
+   121→   121→      await seedData();
+   122→   122→      await Promise.all([fetchPeriods(), fetchRecords(), fetchProfile(), fetchSettings()]);
+   123→   123→      setIsLoaded(true);
+   124→   124→      setTimeout(() => setRingAnimated(true), 300);
+   125→   125→    };
+   126→   126→    init();
+   127→   127→  }, [seedData, fetchPeriods, fetchRecords, fetchProfile, fetchSettings]);
+   128→   128→
+   129→   129→  // ============ Period Logic ============
+   130→   130→  function getPeriodInfo(dateStr: string): PeriodInfoResult {
+   131→   131→    let isPeriod = false;
+   132→   132→    let isStart = false;
+   133→   133→    let isEnd = false;
+   134→   134→    let isActive = false;
+   135→   135→
+   136→   136→    for (const period of periods) {
+   137→   137→      if (period.startDate && !period.endDate) {
+   138→   138→        if (dateStr === period.startDate) {
+   139→   139→          isPeriod = true; isStart = true; isEnd = true; isActive = true;
+   140→   140→          break;
+   141→   141→        }
+   142→   142→        const startD = parseDate(period.startDate);
+   143→   143→        const checkD = parseDate(dateStr);
+   144→   144→        if (checkD > startD && checkD <= new Date()) {
+   145→   145→          isPeriod = true;
+   146→   146→          if (dateStr === period.startDate) isStart = true;
+   147→   147→          isActive = true;
+   148→   148→          break;
+   149→   149→        }
+   150→   150→      } else if (period.startDate && period.endDate) {
+   151→   151→        if (dateStr >= period.startDate && dateStr <= period.endDate) {
+   152→   152→          isPeriod = true;
+   153→   153→          if (dateStr === period.startDate) isStart = true;
+   154→   154→          if (dateStr === period.endDate) isEnd = true;
+   155→   155→          break;
+   156→   156→        }
+   157→   157→      }
+   158→   158→    }
+   159→   159→    return { isPeriod, isStart, isEnd, isActive };
+   160→   160→  }
+   161→   161→
+   162→   162→  function hasActivePeriod(): Period | null {
+   163→   163→    return periods.find(p => p.startDate && !p.endDate) || null;
+   164→   164→  }
+   165→   165→
+   166→   166→  function getCycleInfo(): CycleInfo {
+   167→   167→    const cycleLength = profile?.cycleLength || 28;
+   168→   168→    const periodLength = profile?.periodLength || 5;
+   169→   169→    const sortedPeriods = [...periods].sort((a, b) => b.startDate.localeCompare(a.startDate));
+   170→   170→    const lastPeriod = sortedPeriods[0];
+   171→   171→
+   172→   172→    if (!lastPeriod) {
+   173→   173→      return {
+   174→   174→        phase: 'follicular', phaseDay: 1, daysUntilNext: cycleLength,
+   175→   175→        cycleLength, periodLength, nextPeriodDate: null, lastPeriodStart: null,
+   176→   176→      };
+   177→   177→    }
+   178→   178→
+   179→   179→    const lastStart = parseDate(lastPeriod.startDate);
+   180→   180→    const now = new Date();
+   181→   181→    now.setHours(0, 0, 0, 0);
+   182→   182→    const daysSinceStart = daysBetween(lastStart, now);
+   183→   183→
+   184→   184→    if (daysSinceStart < 0) {
+   185→   185→      return {
+   186→   186→        phase: 'follicular', phaseDay: 1, daysUntilNext: cycleLength,
+   187→   187→        cycleLength, periodLength, nextPeriodDate: null, lastPeriodStart: lastPeriod.startDate,
+   188→   188→      };
+   189→   189→    }
+   190→   190→
+   191→   191→    const dayInCycle = (daysSinceStart % cycleLength) + 1;
+   192→   192→    const nextPeriodDate = addDays(lastStart, cycleLength);
+   193→   193→    const daysUntilNext = Math.max(0, daysBetween(now, nextPeriodDate));
+   194→   194→
+   195→   195→    let phase: string;
+   196→   196→    if (dayInCycle <= periodLength) {
+   197→   197→      phase = 'period';
+   198→   198→    } else if (dayInCycle <= 13) {
+   199→   199→      phase = 'follicular';
+   200→   200→    } else if (dayInCycle <= 16) {
+   201→   201→      phase = 'ovulation';
+   202→   202→    } else {
+   203→   203→      phase = 'luteal';
+   204→   204→    }
+   205→   205→
+   206→   206→    return {
+   207→   207→      phase, phaseDay: dayInCycle, daysUntilNext,
+   208→   208→      cycleLength, periodLength, nextPeriodDate, lastPeriodStart: lastPeriod.startDate,
+   209→   209→    };
+   210→   210→  }
+   211→   211→
+   212→   212→  function getPredictedPeriodDays(): string[] {
+   213→   213→    const cycleLength = profile?.cycleLength || 28;
+   214→   214→    const periodLength = profile?.periodLength || 5;
+   215→   215→    const sortedPeriods = [...periods].sort((a, b) => b.startDate.localeCompare(a.startDate));
+   216→   216→    const lastPeriod = sortedPeriods[0];
+   217→   217→    if (!lastPeriod || !lastPeriod.endDate) return [];
+   218→   218→
+   219→   219→    const lastEnd = parseDate(lastPeriod.endDate);
+   220→   220→    const nextStart = addDays(lastEnd, cycleLength - periodLength + 1);
+   221→   221→    const days: string[] = [];
+   222→   222→    for (let i = 0; i < periodLength; i++) {
+   223→   223→      days.push(formatDateStr(addDays(nextStart, i)));
+   224→   224→    }
+   225→   225→    return days;
+   226→   226→  }
+   227→   227→
+   228→   228→  function getFertileDays(): string[] {
+   229→   229→    const cycleLength = profile?.cycleLength || 28;
+   230→   230→    const sortedPeriods = [...periods].sort((a, b) => b.startDate.localeCompare(a.startDate));
+   231→   231→    const lastPeriod = sortedPeriods[0];
+   232→   232→    if (!lastPeriod) return [];
+   233→   233→
+   234→   234→    const lastStart = parseDate(lastPeriod.startDate);
+   235→   235→    const ovulationDay = addDays(lastStart, cycleLength - 14);
+   236→   236→    const days: string[] = [];
+   237→   237→    for (let i = -4; i <= 1; i++) {
+   238→   238→      days.push(formatDateStr(addDays(ovulationDay, i)));
+   239→   239→    }
+   240→   240→    return days;
+   241→   241→  }
+   242→   242→
+   243→   243→  // ============ API Actions ============
+   244→   244→  async function startPeriod(dateStr: string) {
+   245→   245→    await fetch('/api/periods', {
+   246→   246→      method: 'POST',
+   247→   247→      headers: { 'Content-Type': 'application/json' },
+   248→   248→      body: JSON.stringify({ startDate: dateStr }),
+   249→   249→    });
+   250→   250→    setActionSheet({ open: false, dateStr: '', day: 0 });
+   251→   251→    await fetchPeriods();
+   252→   252→    toast({ description: '已记录经期开始 💖' });
+   253→   253→  }
+   254→   254→
+   255→   255→  async function endPeriod(dateStr: string) {
+   256→   256→    const active = hasActivePeriod();
+   257→   257→    if (!active) return;
+   258→   258→    if (dateStr < active.startDate) {
+   259→   259→      toast({ description: '结束日期不能早于开始日期' });
+   260→   260→      return;
+   261→   261→    }
+   262→   262→    await fetch(`/api/periods/${active.id}`, {
+   263→   263→      method: 'PUT',
+   264→   264→      headers: { 'Content-Type': 'application/json' },
+   265→   265→      body: JSON.stringify({ endDate: dateStr }),
+   266→   266→    });
+   267→   267→    setActionSheet({ open: false, dateStr: '', day: 0 });
+   268→   268→    await fetchPeriods();
+   269→   269→    toast({ description: '经期已结束，记录完成 ✅' });
+   270→   270→  }
+   271→   271→
+   272→   272→  async function updateStart(dateStr: string) {
+   273→   273→    const active = hasActivePeriod();
+   274→   274→    if (!active) return;
+   275→   275→    await fetch(`/api/periods/${active.id}`, {
+   276→   276→      method: 'PUT',
+   277→   277→      headers: { 'Content-Type': 'application/json' },
+   278→   278→      body: JSON.stringify({ startDate: dateStr }),
+   279→   279→    });
+   280→   280→    setActionSheet({ open: false, dateStr: '', day: 0 });
+   281→   281→    await fetchPeriods();
+   282→   282→    toast({ description: '开始日期已更新' });
+   283→   283→  }
+   284→   284→
+   285→   285→  async function cancelActivePeriod() {
+   286→   286→    const active = hasActivePeriod();
+   287→   287→    if (!active) return;
+   288→   288→    await fetch(`/api/periods/${active.id}`, { method: 'DELETE' });
+   289→   289→    setActionSheet({ open: false, dateStr: '', day: 0 });
+   290→   290→    await fetchPeriods();
+   291→   291→    toast({ description: '已取消当前记录' });
+   292→   292→  }
+   293→   293→
+   294→   294→  async function extendPeriod(dateStr: string) {
+   295→   295→    const sortedPeriods = [...periods].sort((a, b) => b.startDate.localeCompare(a.startDate));
+   296→   296→    const lastPeriod = sortedPeriods[0];
+   297→   297→    if (!lastPeriod) return;
+   298→   298→    await fetch(`/api/periods/${lastPeriod.id}`, {
+   299→   299→      method: 'PUT',
+   300→   300→      headers: { 'Content-Type': 'application/json' },
+   301→   301→      body: JSON.stringify({ endDate: dateStr }),
+   302→   302→    });
+   303→   303→    setActionSheet({ open: false, dateStr: '', day: 0 });
+   304→   304→    await fetchPeriods();
+   305→   305→    toast({ description: '经期已延长' });
+   306→   306→  }
+   307→   307→
+   308→   308→  async function saveRecord() {
+   309→   309→    const todayStr = formatDateStr(new Date());
+   310→   310→    await fetch('/api/records', {
+   311→   311→      method: 'POST',
+   312→   312→      headers: { 'Content-Type': 'application/json' },
+   313→   313→      body: JSON.stringify({
+   314→   314→        date: todayStr,
+   315→   315→        flow: currentFlow,
+   316→   316→        mood: currentMood,
+   317→   317→        symptoms: selectedSymptoms,
+   318→   318→        note: noteText,
+   319→   319→      }),
+   320→   320→    });
+   321→   321→    await fetchRecords();
+   322→   322→    setNoteText('');
+   323→   323→    toast({ description: '记录已保存 ✨' });
+   324→   324→  }
+   325→   325→
+   326→   326→  async function toggleSetting(key: string, currentValue: string) {
+   327→   327→    const newValue = currentValue === 'true' ? 'false' : 'true';
+   328→   328→    await fetch('/api/settings', {
+   329→   329→      method: 'PUT',
+   330→   330→      headers: { 'Content-Type': 'application/json' },
+   331→   331→      body: JSON.stringify({ key, value: newValue }),
+   332→   332→    });
+   333→   333→    await fetchSettings();
+   334→   334→  }
+   335→   335→
+   336→   336→  async function saveProfile() {
+   337→   337→    await fetch('/api/profile', {
+   338→   338→      method: 'PUT',
+   339→   339→      headers: { 'Content-Type': 'application/json' },
+   340→   340→      body: JSON.stringify({
+   341→   341→        name: editName,
+   342→   342→        avatar: editAvatar,
+   343→   343→        cycleLength: editCycleLength,
+   344→   344→        periodLength: editPeriodLength,
+   345→   345→      }),
+   346→   346→    });
+   347→   347→    await fetchProfile();
+   348→   348→    setProfileEditOpen(false);
+   349→   349→    toast({ description: '个人资料已更新 ✅' });
+   350→   350→  }
+   351→   351→
+   352→   352→  async function submitFeedback() {
+   353→   353→    if (!feedbackContent.trim()) {
+   354→   354→      toast({ description: '请输入反馈内容' });
+   355→   355→      return;
+   356→   356→    }
+   357→   357→    setFeedbackSubmitting(true);
+   358→   358→    try {
+   359→   359→      const res = await fetch('/api/feedback', {
+   360→   360→        method: 'POST',
+   361→   361→        headers: { 'Content-Type': 'application/json' },
+   362→   362→        body: JSON.stringify({
+   363→   363→          category: feedbackCategory,
+   364→   364→          content: feedbackContent.trim(),
+   365→   365→          contact: feedbackContact.trim(),
+   366→   366→        }),
+   367→   367→      });
+   368→   368→      if (res.ok) {
+   369→   369→        setFeedbackOpen(false);
+   370→   370→        setFeedbackContent('');
+   371→   371→        setFeedbackContact('');
+   372→   372→        setFeedbackCategory('功能建议');
+   373→   373→        toast({ description: '感谢您的反馈！我们会认真处理 💖' });
+   374→   374→      } else {
+   375→   375→        toast({ description: '提交失败，请稍后重试' });
+   376→   376→      }
+   377→   377→    } catch {
+   378→   378→      toast({ description: '提交失败，请稍后重试' });
+   379→   379→    } finally {
+   380→   380→      setFeedbackSubmitting(false);
+   381→   381→    }
+   382→   382→  }
+   383→   383→
+   384→   384→  function handleAvatarUpload(e: React.ChangeEvent<HTMLInputElement>) {
+   385→   385→    const file = e.target.files?.[0];
+   386→   386→    if (!file) return;
+   387→   387→    if (file.size > 2 * 1024 * 1024) {
+   388→   388→      toast({ description: '图片大小不能超过2MB' });
+   389→   389→      return;
+   390→   390→    }
+   391→   391→    const reader = new FileReader();
+   392→   392→    reader.onload = (ev) => {
+   393→   393→      const result = ev.target?.result as string;
+   394→   394→      setEditAvatar(result);
+   395→   395→    };
+   396→   396→    reader.readAsDataURL(file);
+   397→   397→  }
+   398→   398→
+   399→   399→  async function deleteRecord(id: string) {
+   400→   400→    const d = deleteConfirm.date;
+   401→   401→    await fetch(`/api/records/${d}`, { method: 'DELETE' });
+   402→   402→    setDeleteConfirm({ open: false, recordId: '', date: '' });
+   403→   403→    await fetchRecords();
+   404→   404→    toast({ description: '记录已删除' });
+   405→   405→  }
+   406→   406→
+   407→   407→  function exportCSV() {
+   408→   408→    const headers = ['日期', '流量', '情绪', '症状', '备注'];
+   409→   409→    const rows = records.map(r => {
+   410→   410→      const symptoms = JSON.parse(r.symptoms || '[]');
+   411→   411→      return [
+   412→   412→        r.date,
+   413→   413→        FLOW_LABELS[r.flow] || '',
+   414→   414→        MOOD_LABELS[r.mood] || '',
+   415→   415→        symptoms.join(';'),
+   416→   416→        `"${(r.note || '').replace(/"/g, '""')}"`,
+   417→   417→      ];
+   418→   418→    });
+   419→   419→    const csv = [headers.join(','), ...rows.map(r => r.join(','))].join('\n');
+   420→   420→    const BOM = '\uFEFF';
+   421→   421→    const blob = new Blob([BOM + csv], { type: 'text/csv;charset=utf-8;' });
+   422→   422→    const url = URL.createObjectURL(blob);
+   423→   423→    const a = document.createElement('a');
+   424→   424→    a.href = url;
+   425→   425→    a.download = `luna_records_${formatDateStr(new Date())}.csv`;
+   426→   426→    a.click();
+   427→   427→    URL.revokeObjectURL(url);
+   428→   428→    toast({ description: '数据导出成功 📁' });
+   429→   429→  }
+   430→   430→
+   431→   431→  // ============ Calendar Generation ============
+   432→   432→  function generateCalendarDays(): CalendarDay[] {
+   433→   433→    const firstDay = new Date(calYear, calMonth - 1, 1);
+   434→   434→    const lastDay = new Date(calYear, calMonth, 0);
+   435→   435→    const startDayOfWeek = firstDay.getDay();
+   436→   436→    const totalDays = lastDay.getDate();
+   437→   437→    const todayStr = formatDateStr(new Date());
+   438→   438→    const predictedDays = getPredictedPeriodDays();
+   439→   439→    const fertileDays = getFertileDays();
+   440→   440→
+   441→   441→    const days: CalendarDay[] = [];
+   442→   442→
+   443→   443→    for (let i = 0; i < startDayOfWeek; i++) {
+   444→   444→      days.push({
+   445→   445→        day: 0, dateStr: '', isToday: false, isOtherMonth: true,
+   446→   446→        periodInfo: { isPeriod: false, isStart: false, isEnd: false, isActive: false },
+   447→   447→        isPredicted: false, isFertile: false,
+   448→   448→      });
+   449→   449→    }
+   450→   450→
+   451→   451→    for (let day = 1; day <= totalDays; day++) {
+   452→   452→      const dateStr = `${calYear}-${String(calMonth).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+   453→   453→      const isToday = dateStr === todayStr;
+   454→   454→      const periodInfo = getPeriodInfo(dateStr);
+   455→   455→      const isPredicted = predictedDays.includes(dateStr) && !periodInfo.isPeriod;
+   456→   456→      const isFertile = fertileDays.includes(dateStr) && !periodInfo.isPeriod && !isPredicted;
+   457→   457→
+   458→   458→      days.push({ day, dateStr, isToday, isOtherMonth: false, periodInfo, isPredicted, isFertile });
+   459→   459→    }
+   460→   460→
+   461→   461→    return days;
+   462→   462→  }
+   463→   463→
+   464→   464→  // ============ Cycle Statistics ============
+   465→   465→  const cycleStats: CycleStats = useMemo(() => {
+   466→   466→    const sortedPeriods = [...periods].sort((a, b) => a.startDate.localeCompare(b.startDate));
+   467→   467→    const cycleLengths: number[] = [];
+   468→   468→    const periodLengths: number[] = [];
+   469→   469→
+   470→   470→    for (let i = 1; i < sortedPeriods.length; i++) {
+   471→   471→      if (sortedPeriods[i].endDate) {
+   472→   472→        const cycleLen = daysBetween(parseDate(sortedPeriods[i - 1].startDate), parseDate(sortedPeriods[i].startDate));
+   473→   473→        if (cycleLen > 15 && cycleLen < 50) cycleLengths.push(cycleLen);
+   474→   474→      }
+   475→   475→      if (sortedPeriods[i].endDate) {
+   476→   476→        const periodLen = daysBetween(parseDate(sortedPeriods[i].startDate), parseDate(sortedPeriods[i].endDate!)) + 1;
+   477→   477→        if (periodLen > 0 && periodLen < 15) periodLengths.push(periodLen);
+   478→   478→      }
+   479→   479→    }
+   480→   480→
+   481→   481→    const avgCycle = cycleLengths.length > 0
+   482→   482→      ? Math.round(cycleLengths.reduce((a, b) => a + b, 0) / cycleLengths.length)
+   483→   483→      : (profile?.cycleLength || 28);
+   484→   484→    const avgPeriod = periodLengths.length > 0
+   485→   485→      ? Math.round(periodLengths.reduce((a, b) => a + b, 0) / periodLengths.length)
+   486→   486→      : (profile?.periodLength || 5);
+   487→   487→
+   488→   488→    return {
+   489→   489→      avgCycle,
+   490→   490→      avgPeriod,
+   491→   491→      totalCycles: sortedPeriods.length,
+   492→   492→      cycleLengths,
+   493→   493→      periodLengths,
+   494→   494→    };
+   495→   495→  }, [periods, profile]);
+   496→   496→
+   497→   497→  // ============ Render Helpers ============
+   498→   498→  const cycleInfo = getCycleInfo();
+   499→   499→  const phaseData = PHASE_INFO[cycleInfo.phase] || PHASE_INFO.follicular;
+   500→   500→  const isCurrentMonth = calYear === today.getFullYear() && calMonth === today.getMonth() + 1;
+   501→   501→  const calendarDays = generateCalendarDays();
+   502→   502→
+   503→   503→  // ============ RENDER ============
+   504→   504→  return (
+   505→   505→    <div className="min-h-screen bg-[#0f1419] text-[#f0ece4] flex flex-col overflow-hidden relative">
+   506→   506→      {/* Animated Background Blobs */}
+   507→   507→      <div className="fixed inset-0 overflow-hidden pointer-events-none z-0">
+   508→   508→        <div className="absolute rounded-full opacity-30 blur-[80px]"
+   509→   509→          style={{
+   510→   510→            width: 300, height: 300,
+   511→   511→            background: `linear-gradient(135deg, ${phaseData.color}40, transparent)`,
+   512→   512→            top: -80, right: -80,
+   513→   513→            animation: 'blob-float 20s ease-in-out infinite',
+   514→   514→            transition: 'background 1s ease',
+   515→   515→          }} />
+   516→   516→        <div className="absolute rounded-full opacity-25 blur-[60px]"
+   517→   517→          style={{
+   518→   518→            width: 250, height: 250,
+   519→   519→            background: 'linear-gradient(135deg, #81b29a, transparent)',
+   520→   520→            bottom: 200, left: -80,
+   521→   521→            animation: 'blob-float 20s ease-in-out infinite',
+   522→   522→            animationDelay: '-7s',
+   523→   523→          }} />
+   524→   524→        <div className="absolute rounded-full opacity-20 blur-[50px]"
+   525→   525→          style={{
+   526→   526→            width: 180, height: 180,
+   527→   527→            background: 'linear-gradient(135deg, #d4a574, transparent)',
+   528→   528→            bottom: -40, right: -40,
+   529→   529→            animation: 'blob-float 20s ease-in-out infinite',
+   530→   530→            animationDelay: '-14s',
+   531→   531→          }} />
+   532→   532→      </div>
+   533→   533→
+   534→   534→      {/* Main Content Area */}
+   535→   535→      <main className="flex-1 relative z-10 overflow-y-auto overflow-x-hidden safe-top" style={{ paddingBottom: 90 }}>
+   536→   536→        <AnimatePresence mode="wait">
+   537→   537→          {activeTab === 'home' && (
+   538→   538→            <HomeTab
+   539→   539→              today={today}
+   540→   540→              cycleInfo={cycleInfo}
+   541→   541→              cycleStats={cycleStats}
+   542→   542→              records={records}
+   543→   543→              dailyTipIndex={dailyTipIndex}
+   544→   544→              setDailyTipIndex={setDailyTipIndex}
+   545→   545→              setActiveTab={setActiveTab}
+   546→   546→              setLogTab={setLogTab}
+   547→   547→              ringAnimated={ringAnimated}
+   548→   548→            />
+   549→   549→          )}
+   550→   550→
+   551→   551→          {activeTab === 'calendar' && (
+   552→   552→            <CalendarTab
+   553→   553→              calYear={calYear}
+   554→   554→              calMonth={calMonth}
+   555→   555→              setCalYear={setCalYear}
+   556→   556→              setCalMonth={setCalMonth}
+   557→   557→              isCurrentMonth={isCurrentMonth}
+   558→   558→              today={today}
+   559→   559→              calendarDays={calendarDays}
+   560→   560→              periods={periods}
+   561→   561→              setActionSheet={setActionSheet}
+   562→   562→            />
+   563→   563→          )}
+   564→   564→
+   565→   565→          {activeTab === 'log' && (
+   566→   566→            <LogTab
+   567→   567→              today={today}
+   568→   568→              logTab={logTab}
+   569→   569→              setLogTab={setLogTab}
+   570→   570→              currentFlow={currentFlow}
+   571→   571→              setCurrentFlow={setCurrentFlow}
+   572→   572→              currentMood={currentMood}
+   573→   573→              setCurrentMood={setCurrentMood}
+   574→   574→              selectedSymptoms={selectedSymptoms}
+   575→   575→              setSelectedSymptoms={setSelectedSymptoms}
+   576→   576→              customSymptoms={customSymptoms}
+   577→   577→              noteText={noteText}
+   578→   578→              setNoteText={setNoteText}
+   579→   579→              records={records}
+   580→   580→              saveRecord={saveRecord}
+   581→   581→              setSymptomSheetOpen={setSymptomSheetOpen}
+   582→   582→              setDeleteConfirm={setDeleteConfirm}
+   583→   583→              cycleInfo={cycleInfo}
+   584→   584→            />
+   585→   585→          )}
+   586→   586→
+   587→   587→          {activeTab === 'profile' && (
+   588→   588→            <ProfileTab
+   589→   589→              profile={profile}
+   590→   590→              records={records}
+   591→   591→              periods={periods}
+   592→   592→              cycleStats={cycleStats}
+   593→   593→              settings={settings}
+   594→   594→              cycleInfo={cycleInfo}
+   595→   595→              setProfileEditOpen={setProfileEditOpen}
+   596→   596→              setEditName={setEditName}
+   597→   597→              setEditAvatar={setEditAvatar}
+   598→   598→              setEditCycleLength={setEditCycleLength}
+   599→   599→              setEditPeriodLength={setEditPeriodLength}
+   600→   600→              toggleSetting={toggleSetting}
+   601→   601→              exportCSV={exportCSV}
+   602→   602→              setFeedbackOpen={setFeedbackOpen}
+   603→   603→              toast={toast}
+   604→   604→            />
+   605→   605→          )}
+   606→   606→        </AnimatePresence>
+   607→   607→      </main>
+   608→   608→
+   609→   609→      {/* ============ Bottom Navigation ============ */}
+   610→   610→      <nav className="fixed bottom-0 left-0 right-0 z-50 safe-bottom"
+   611→   611→        style={{ background: 'linear-gradient(to top, #0f1419 80%, transparent)' }}>
+   612→   612→        <div className="flex justify-around items-center pb-5 pt-2">
+   613→   613→          {[
+   614→   614→            { page: 'home' as TabPage, icon: Home, label: '首页' },
+   615→   615→            { page: 'calendar' as TabPage, icon: Calendar, label: '日历' },
+   616→   616→          ].map(item => (
+   617→   617→            <button
+   618→   618→              key={item.page}
+   619→   619→              className="flex flex-col items-center gap-1 px-4 py-2 rounded-2xl transition-all"
+   620→   620→              style={{ background: activeTab === item.page ? 'rgba(255,255,255,0.05)' : 'transparent' }}
+   621→   621→              onClick={() => setActiveTab(item.page)}
+   622→   622→            >
+   623→   623→              <item.icon size={22} style={{ color: activeTab === item.page ? '#e07a5f' : '#6b7280' }} />
+   624→   624→              <span className="text-[11px] font-medium" style={{ color: activeTab === item.page ? '#e07a5f' : '#6b7280' }}>
+   625→   625→                {item.label}
+   626→   626→              </span>
+   627→   627→            </button>
+   628→   628→          ))}
+   629→   629→
+   630→   630→          {/* FAB Button */}
+   631→   631→          <motion.button
+   632→   632→            className="w-14 h-14 rounded-full flex items-center justify-center -mt-5"
+   633→   633→            style={{
+   634→   634→              background: 'linear-gradient(135deg, #e07a5f, #d4a574)',
+   635→   635→              boxShadow: '0 8px 24px rgba(224,122,95,0.35)',
+   636→   636→            }}
+   637→   637→            whileTap={{ scale: 0.9 }}
+   638→   638→            whileHover={{ scale: 1.05 }}
+   639→   639→            onClick={() => {
+   640→   640→              const todayStr = formatDateStr(new Date());
+   641→   641→              setActionSheet({ open: true, dateStr: todayStr, day: new Date().getDate() });
+   642→   642→            }}
+   643→   643→          >
+   644→   644→            <Plus size={26} style={{ color: '#0f1419', strokeWidth: 2.5 }} />
+   645→   645→          </motion.button>
+   646→   646→
+   647→   647→          {[
+   648→   648→            { page: 'log' as TabPage, icon: FileText, label: '记录' },
+   649→   649→            { page: 'profile' as TabPage, icon: User, label: '我的' },
+   650→   650→          ].map(item => (
+   651→   651→            <button
+   652→   652→              key={item.page}
+   653→   653→              className="flex flex-col items-center gap-1 px-4 py-2 rounded-2xl transition-all"
+   654→   654→              style={{ background: activeTab === item.page ? 'rgba(255,255,255,0.05)' : 'transparent' }}
+   655→   655→              onClick={() => setActiveTab(item.page)}
+   656→   656→            >
+   657→   657→              <item.icon size={22} style={{ color: activeTab === item.page ? '#e07a5f' : '#6b7280' }} />
+   658→   658→              <span className="text-[11px] font-medium" style={{ color: activeTab === item.page ? '#e07a5f' : '#6b7280' }}>
+   659→   659→                {item.label}
+   660→   660→              </span>
+   661→   661→            </button>
+   662→   662→          ))}
+   663→   663→        </div>
+   664→   664→      </nav>
+   665→   665→
+   666→   666→      {/* ============ Action Sheet ============ */}
+   667→   667→      <ActionSheet
+   668→   668→        open={actionSheet.open}
+   669→   669→        dateStr={actionSheet.dateStr}
+   670→   670→        day={actionSheet.day}
+   671→   671→        calMonth={calMonth}
+   672→   672→        setActionSheet={setActionSheet}
+   673→   673→        periods={periods}
+   674→   674→        hasActivePeriod={hasActivePeriod}
+   675→   675→        getPeriodInfo={getPeriodInfo}
+   676→   676→        startPeriod={startPeriod}
+   677→   677→        endPeriod={endPeriod}
+   678→   678→        updateStart={updateStart}
+   679→   679→        cancelActivePeriod={cancelActivePeriod}
+   680→   680→        extendPeriod={extendPeriod}
+   681→   681→        fetchPeriods={fetchPeriods}
+   682→   682→        toast={toast}
+   683→   683→      />
+   684→   684→
+   685→   685→      {/* ============ Add Symptom Sheet ============ */}
+   686→   686→      <SymptomSheet
+   687→   687→        open={symptomSheetOpen}
+   688→   688→        newSymptom={newSymptom}
+   689→   689→        setNewSymptom={setNewSymptom}
+   690→   690→        setSymptomSheetOpen={setSymptomSheetOpen}
+   691→   691→        setCustomSymptoms={setCustomSymptoms}
+   692→   692→        toast={toast}
+   693→   693→      />
+   694→   694→
+   695→   695→      {/* ============ Loading Overlay ============ */}
+   696→   696→      <AnimatePresence>
+   697→   697→        {!isLoaded && (
+   698→   698→          <motion.div
+   699→   699→            initial={{ opacity: 1 }}
+   700→   700→            exit={{ opacity: 0 }}
+   701→   701→            transition={{ duration: 0.5 }}
+   702→   702→            className="fixed inset-0 z-[300] flex items-center justify-center"
+   703→   703→            style={{ background: '#0f1419' }}
+   704→   704→          >
+   705→   705→            <motion.div
+   706→   706→              className="text-center"
+   707→   707→              initial={{ scale: 0.8, opacity: 0 }}
+   708→   708→              animate={{ scale: 1, opacity: 1 }}
+   709→   709→              transition={{ duration: 0.5 }}
+   710→   710→            >
+   711→   711→              <motion.div
+   712→   712→                className="w-20 h-20 rounded-full mx-auto mb-4 flex items-center justify-center"
+   713→   713→                style={{ background: 'linear-gradient(135deg, #e07a5f, #81b29a)' }}
+   714→   714→                animate={{ scale: [1, 1.05, 1] }}
+   715→   715→                transition={{ duration: 2, repeat: Infinity, ease: 'easeInOut' }}
+   716→   716→              >
+   717→   717→                <span className="text-3xl font-light" style={{ fontFamily: 'Georgia, serif', color: '#0f1419' }}>L</span>
+   718→   718→              </motion.div>
+   719→   719→              <p className="text-xl font-light" style={{ fontFamily: 'Georgia, serif' }}>Luna</p>
+   720→   720→              <p className="text-sm mt-1" style={{ color: '#6b7280' }}>经期追踪</p>
+   721→   721→              <motion.div
+   722→   722→                className="w-16 h-1 rounded-full mx-auto mt-4"
+   723→   723→                style={{ background: 'linear-gradient(90deg, #e07a5f, #81b29a)' }}
+   724→   724→                animate={{ scaleX: [0.5, 1, 0.5] }}
+   725→   725→                transition={{ duration: 1.5, repeat: Infinity, ease: 'easeInOut' }}
+   726→   726→              />
+   727→   727→            </motion.div>
+   728→   728→          </motion.div>
+   729→   729→        )}
+   730→   730→      </AnimatePresence>
+   731→   731→
+   732→   732→      {/* ============ Profile Edit Sheet ============ */}
+   733→   733→      <ProfileEditSheet
+   734→   734→        open={profileEditOpen}
+   735→   735→        editName={editName}
+   736→   736→        setEditName={setEditName}
+   737→   737→        editAvatar={editAvatar}
+   738→   738→        setEditAvatar={setEditAvatar}
+   739→   739→        editCycleLength={editCycleLength}
+   740→   740→        setEditCycleLength={setEditCycleLength}
+   741→   741→        editPeriodLength={editPeriodLength}
+   742→   742→        setEditPeriodLength={setEditPeriodLength}
+   743→   743→        setProfileEditOpen={setProfileEditOpen}
+   744→   744→        saveProfile={saveProfile}
+   745→   745→        handleAvatarUpload={handleAvatarUpload}
+   746→   746→        fileInputRef={fileInputRef}
+   747→   747→      />
+   748→   748→
+   749→   749→      {/* ============ Delete Confirmation Dialog ============ */}
+   750→   750→      <DeleteConfirmDialog
+   751→   751→        open={deleteConfirm.open}
+   752→   752→        recordId={deleteConfirm.recordId}
+   753→   753→        date={deleteConfirm.date}
+   754→   754→        setDeleteConfirm={setDeleteConfirm}
+   755→   755→        deleteRecord={deleteRecord}
+   756→   756→      />
+   757→   757→
+   758→   758→      {/* ============ Feedback Sheet ============ */}
+   759→   759→      <FeedbackSheet
+   760→   760→        open={feedbackOpen}
+   761→   761→        feedbackCategory={feedbackCategory}
+   762→   762→        setFeedbackCategory={setFeedbackCategory}
+   763→   763→        feedbackContent={feedbackContent}
+   764→   764→        setFeedbackContent={setFeedbackContent}
+   765→   765→        feedbackContact={feedbackContact}
+   766→   766→        setFeedbackContact={setFeedbackContact}
+   767→   767→        feedbackSubmitting={feedbackSubmitting}
+   768→   768→        setFeedbackOpen={setFeedbackOpen}
+   769→   769→        submitFeedback={submitFeedback}
+   770→   770→      />
+   771→   771→    </div>
+   772→   772→  );
+   773→   773→}
+   774→   774→

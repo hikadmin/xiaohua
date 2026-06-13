@@ -82,3 +82,58 @@ Split the monolithic page.tsx into smaller, focused component files to reduce Ne
 | **Total** | **2650** |
 
 The total line count increased slightly due to interface definitions, prop declarations, and import statements in each file, but this is the expected trade-off for component extraction. The critical win is that each file is independently compilable by Next.js, drastically reducing peak memory usage during compilation.
+
+---
+Task ID: 5
+Agent: Main
+Task: 前后端接口分离 — 统一API格式、封装服务层、完善接口校验
+
+Work Log:
+- 分析现有前后端交互方式：page.tsx 直接使用 raw fetch() 调用 /api/* 接口，无统一响应格式、无参数校验、无错误处理
+- 创建统一API响应格式 (`src/lib/api/response.ts`)：success/created/ok/badRequest/notFound/serverError/conflict + 参数校验工具
+- 创建共享API类型定义 (`src/lib/api/types.ts`)：所有请求/响应的 TypeScript 接口，前后端共用
+- 创建后端业务逻辑服务层 (`src/lib/api/cycle-service.ts`)：从前端迁移周期计算、统计、预测、日历生成等逻辑到后端
+- 重构全部6个已有API路由文件，统一使用新响应格式和参数校验
+- 新增4个API端点：
+  - GET /api/stats — 周期统计数据（含周期规律性判断、连续记录天数）
+  - GET /api/dashboard — 首页仪表盘聚合数据
+  - GET /api/calendar?year=&month= — 日历月数据（含经期标记、预测、易孕期）
+  - GET /api/export — 数据导出（含CSV格式化）
+- 新增记录编辑接口：PUT /api/records/[date] — 按日期更新记录
+- 新增设置批量更新接口：POST /api/settings — 批量更新设置项
+- 创建前端API服务层 (`src/services/api.ts`)：封装所有API调用，提供类型安全接口，统一错误处理
+- 重构 page.tsx：所有 fetch() 调用替换为 API 服务层方法，所有 API 操作增加 try/catch + ApiError 处理
+- 数据导出改为通过后端API获取CSV内容
+
+Stage Summary:
+- 全部16个API端点已实现统一响应格式 { success, data, error, message, timestamp }
+- 所有API均有参数校验（必填字段、日期格式、数值范围、字符串长度）
+- 前端通过 src/services/api.ts 服务层统一调用后端，类型安全
+- 后端业务逻辑层 src/lib/api/cycle-service.ts 可被API路由和未来服务复用
+- lint 通过，dev server 运行正常，所有API经curl验证返回正确
+- 新增功能：周期规律性智能判断、连续记录天数统计、记录编辑API、数据导出API
+
+API 接口清单：
+| 接口 | 方法 | 说明 |
+|------|------|------|
+| /api/periods | GET | 获取所有经期记录 |
+| /api/periods | POST | 创建经期记录 |
+| /api/periods/[id] | PUT | 更新经期记录 |
+| /api/periods/[id] | DELETE | 删除经期记录 |
+| /api/records | GET | 获取所有每日记录 |
+| /api/records | POST | 创建/更新记录(Upsert) |
+| /api/records/[date] | GET | 获取指定日期记录 |
+| /api/records/[date] | PUT | 更新指定日期记录(编辑) |
+| /api/records/[date] | DELETE | 删除指定日期记录 |
+| /api/profile | GET | 获取用户资料 |
+| /api/profile | PUT | 更新用户资料 |
+| /api/settings | GET | 获取所有设置 |
+| /api/settings | PUT | 更新单个设置 |
+| /api/settings | POST | 批量更新设置 |
+| /api/feedback | GET | 获取所有反馈 |
+| /api/feedback | POST | 提交反馈 |
+| /api/stats | GET | 周期统计数据 |
+| /api/dashboard | GET | 首页仪表盘数据 |
+| /api/calendar | GET | 日历月数据 |
+| /api/export | GET | 数据导出 |
+| /api/seed | POST | 初始化种子数据 |

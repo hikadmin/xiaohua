@@ -1,52 +1,67 @@
 import { db } from '@/lib/db'
-import { NextRequest, NextResponse } from 'next/server'
+import { NextRequest } from 'next/server'
+import { success, ok, badRequest, serverError, parseRequestBody, validateRequired } from '@/lib/api/response'
 
-// GET /api/settings - Get all settings
+// GET /api/settings - 获取所有设置项
 export async function GET() {
   try {
     const settings = await db.setting.findMany()
-    return NextResponse.json(settings)
+    return success(settings)
   } catch (error) {
     console.error('Failed to fetch settings:', error)
-    return NextResponse.json(
-      { error: 'Failed to fetch settings' },
-      { status: 500 }
-    )
+    return serverError('获取设置失败')
   }
 }
 
-// PUT /api/settings - Update a setting (upsert by key)
+// PUT /api/settings - 更新单个设置项（Upsert by key）
 export async function PUT(request: NextRequest) {
   try {
-    const body = await request.json()
-    const { key, value } = body
+    const { data, error } = await parseRequestBody(request)
+    if (error) return error
 
-    if (!key) {
-      return NextResponse.json(
-        { error: 'key is required' },
-        { status: 400 }
-      )
-    }
-
-    if (value === undefined) {
-      return NextResponse.json(
-        { error: 'value is required' },
-        { status: 400 }
-      )
-    }
+    // 单个设置更新
+    const requiredError = validateRequired(data, ['key', 'value'])
+    if (requiredError) return badRequest(requiredError)
 
     const setting = await db.setting.upsert({
-      where: { key },
-      update: { value },
-      create: { key, value },
+      where: { key: data.key as string },
+      update: { value: data.value as string },
+      create: { key: data.key as string, value: data.value as string },
     })
 
-    return NextResponse.json(setting)
+    return success(setting, '设置更新成功')
   } catch (error) {
     console.error('Failed to update setting:', error)
-    return NextResponse.json(
-      { error: 'Failed to update setting' },
-      { status: 500 }
-    )
+    return serverError('更新设置失败')
+  }
+}
+
+// POST /api/settings - 批量更新设置项
+export async function POST(request: NextRequest) {
+  try {
+    const { data, error } = await parseRequestBody(request)
+    if (error) return error
+
+    if (!data.settings || !Array.isArray(data.settings)) {
+      return badRequest('settings 必须是数组')
+    }
+
+    const results = []
+    for (const item of data.settings as Array<{ key: string; value: string }>) {
+      if (!item.key || item.value === undefined) {
+        return badRequest(`设置项缺少 key 或 value: ${JSON.stringify(item)}`)
+      }
+      const setting = await db.setting.upsert({
+        where: { key: item.key },
+        update: { value: item.value },
+        create: { key: item.key, value: item.value },
+      })
+      results.push(setting)
+    }
+
+    return ok(`成功更新 ${results.length} 项设置`)
+  } catch (error) {
+    console.error('Failed to batch update settings:', error)
+    return serverError('批量更新设置失败')
   }
 }

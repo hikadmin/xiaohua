@@ -18,6 +18,10 @@ import SymptomSheet from '@/components/luna/SymptomSheet';
 import ProfileEditSheet from '@/components/luna/ProfileEditSheet';
 import DeleteConfirmDialog from '@/components/luna/DeleteConfirmDialog';
 import FeedbackSheet from '@/components/luna/FeedbackSheet';
+import {
+  periodsApi, recordsApi, profileApi, settingsApi, feedbackApi, seedApi, exportApi,
+  ApiError,
+} from '@/services/api';
 
 // ============ Main Component ============
 export default function LunaApp() {
@@ -81,39 +85,49 @@ export default function LunaApp() {
 
   const { toast } = useToast();
 
-  // ============ Data Fetching ============
+  // ============ Data Fetching (通过 API 服务层) ============
   const fetchPeriods = useCallback(async () => {
     try {
-      const res = await fetch('/api/periods');
-      if (res.ok) setPeriods(await res.json());
-    } catch {}
-  }, []);
+      const data = await periodsApi.getAll();
+      setPeriods(data);
+    } catch (error) {
+      if (error instanceof ApiError) toast({ description: error.message });
+    }
+  }, [toast]);
 
   const fetchRecords = useCallback(async () => {
     try {
-      const res = await fetch('/api/records');
-      if (res.ok) setRecords(await res.json());
-    } catch {}
-  }, []);
+      const data = await recordsApi.getAll();
+      setRecords(data);
+    } catch (error) {
+      if (error instanceof ApiError) toast({ description: error.message });
+    }
+  }, [toast]);
 
   const fetchProfile = useCallback(async () => {
     try {
-      const res = await fetch('/api/profile');
-      if (res.ok) setProfile(await res.json());
-    } catch {}
-  }, []);
+      const data = await profileApi.get();
+      setProfile(data);
+    } catch (error) {
+      if (error instanceof ApiError) toast({ description: error.message });
+    }
+  }, [toast]);
 
   const fetchSettings = useCallback(async () => {
     try {
-      const res = await fetch('/api/settings');
-      if (res.ok) setSettings(await res.json());
-    } catch {}
-  }, []);
+      const data = await settingsApi.getAll();
+      setSettings(data);
+    } catch (error) {
+      if (error instanceof ApiError) toast({ description: error.message });
+    }
+  }, [toast]);
 
   const seedData = useCallback(async () => {
     try {
-      await fetch('/api/seed', { method: 'POST' });
-    } catch {}
+      await seedApi.create();
+    } catch {
+      // seed 失败静默处理
+    }
   }, []);
 
   useEffect(() => {
@@ -126,7 +140,7 @@ export default function LunaApp() {
     init();
   }, [seedData, fetchPeriods, fetchRecords, fetchProfile, fetchSettings]);
 
-  // ============ Period Logic ============
+  // ============ Period Logic (前端仍需用于日历渲染) ============
   function getPeriodInfo(dateStr: string): PeriodInfoResult {
     let isPeriod = false;
     let isStart = false;
@@ -137,7 +151,7 @@ export default function LunaApp() {
       if (period.startDate && !period.endDate) {
         if (dateStr === period.startDate) {
           isPeriod = true; isStart = true; isEnd = true; isActive = true;
-          break;
+          break
         }
         const startD = parseDate(period.startDate);
         const checkD = parseDate(dateStr);
@@ -145,14 +159,14 @@ export default function LunaApp() {
           isPeriod = true;
           if (dateStr === period.startDate) isStart = true;
           isActive = true;
-          break;
+          break
         }
       } else if (period.startDate && period.endDate) {
         if (dateStr >= period.startDate && dateStr <= period.endDate) {
           isPeriod = true;
           if (dateStr === period.startDate) isStart = true;
           if (dateStr === period.endDate) isEnd = true;
-          break;
+          break
         }
       }
     }
@@ -240,16 +254,16 @@ export default function LunaApp() {
     return days;
   }
 
-  // ============ API Actions ============
+  // ============ API Actions (通过 API 服务层) ============
   async function startPeriod(dateStr: string) {
-    await fetch('/api/periods', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ startDate: dateStr }),
-    });
-    setActionSheet({ open: false, dateStr: '', day: 0 });
-    await fetchPeriods();
-    toast({ description: '已记录经期开始 💖' });
+    try {
+      await periodsApi.create({ startDate: dateStr });
+      setActionSheet({ open: false, dateStr: '', day: 0 });
+      await fetchPeriods();
+      toast({ description: '已记录经期开始 💖' });
+    } catch (error) {
+      if (error instanceof ApiError) toast({ description: error.message });
+    }
   }
 
   async function endPeriod(dateStr: string) {
@@ -259,94 +273,98 @@ export default function LunaApp() {
       toast({ description: '结束日期不能早于开始日期' });
       return;
     }
-    await fetch(`/api/periods/${active.id}`, {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ endDate: dateStr }),
-    });
-    setActionSheet({ open: false, dateStr: '', day: 0 });
-    await fetchPeriods();
-    toast({ description: '经期已结束，记录完成 ✅' });
+    try {
+      await periodsApi.update(active.id, { endDate: dateStr });
+      setActionSheet({ open: false, dateStr: '', day: 0 });
+      await fetchPeriods();
+      toast({ description: '经期已结束，记录完成 ✅' });
+    } catch (error) {
+      if (error instanceof ApiError) toast({ description: error.message });
+    }
   }
 
   async function updateStart(dateStr: string) {
     const active = hasActivePeriod();
     if (!active) return;
-    await fetch(`/api/periods/${active.id}`, {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ startDate: dateStr }),
-    });
-    setActionSheet({ open: false, dateStr: '', day: 0 });
-    await fetchPeriods();
-    toast({ description: '开始日期已更新' });
+    try {
+      await periodsApi.update(active.id, { startDate: dateStr });
+      setActionSheet({ open: false, dateStr: '', day: 0 });
+      await fetchPeriods();
+      toast({ description: '开始日期已更新' });
+    } catch (error) {
+      if (error instanceof ApiError) toast({ description: error.message });
+    }
   }
 
   async function cancelActivePeriod() {
     const active = hasActivePeriod();
     if (!active) return;
-    await fetch(`/api/periods/${active.id}`, { method: 'DELETE' });
-    setActionSheet({ open: false, dateStr: '', day: 0 });
-    await fetchPeriods();
-    toast({ description: '已取消当前记录' });
+    try {
+      await periodsApi.delete(active.id);
+      setActionSheet({ open: false, dateStr: '', day: 0 });
+      await fetchPeriods();
+      toast({ description: '已取消当前记录' });
+    } catch (error) {
+      if (error instanceof ApiError) toast({ description: error.message });
+    }
   }
 
   async function extendPeriod(dateStr: string) {
     const sortedPeriods = [...periods].sort((a, b) => b.startDate.localeCompare(a.startDate));
     const lastPeriod = sortedPeriods[0];
     if (!lastPeriod) return;
-    await fetch(`/api/periods/${lastPeriod.id}`, {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ endDate: dateStr }),
-    });
-    setActionSheet({ open: false, dateStr: '', day: 0 });
-    await fetchPeriods();
-    toast({ description: '经期已延长' });
+    try {
+      await periodsApi.update(lastPeriod.id, { endDate: dateStr });
+      setActionSheet({ open: false, dateStr: '', day: 0 });
+      await fetchPeriods();
+      toast({ description: '经期已延长' });
+    } catch (error) {
+      if (error instanceof ApiError) toast({ description: error.message });
+    }
   }
 
   async function saveRecord() {
     const todayStr = formatDateStr(new Date());
-    await fetch('/api/records', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
+    try {
+      await recordsApi.upsert({
         date: todayStr,
         flow: currentFlow,
         mood: currentMood,
         symptoms: selectedSymptoms,
         note: noteText,
-      }),
-    });
-    await fetchRecords();
-    setNoteText('');
-    toast({ description: '记录已保存 ✨' });
+      });
+      await fetchRecords();
+      setNoteText('');
+      toast({ description: '记录已保存 ✨' });
+    } catch (error) {
+      if (error instanceof ApiError) toast({ description: error.message });
+    }
   }
 
   async function toggleSetting(key: string, currentValue: string) {
     const newValue = currentValue === 'true' ? 'false' : 'true';
-    await fetch('/api/settings', {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ key, value: newValue }),
-    });
-    await fetchSettings();
+    try {
+      await settingsApi.update({ key, value: newValue });
+      await fetchSettings();
+    } catch (error) {
+      if (error instanceof ApiError) toast({ description: error.message });
+    }
   }
 
   async function saveProfile() {
-    await fetch('/api/profile', {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
+    try {
+      await profileApi.update({
         name: editName,
         avatar: editAvatar,
         cycleLength: editCycleLength,
         periodLength: editPeriodLength,
-      }),
-    });
-    await fetchProfile();
-    setProfileEditOpen(false);
-    toast({ description: '个人资料已更新 ✅' });
+      });
+      await fetchProfile();
+      setProfileEditOpen(false);
+      toast({ description: '个人资料已更新 ✅' });
+    } catch (error) {
+      if (error instanceof ApiError) toast({ description: error.message });
+    }
   }
 
   async function submitFeedback() {
@@ -356,26 +374,22 @@ export default function LunaApp() {
     }
     setFeedbackSubmitting(true);
     try {
-      const res = await fetch('/api/feedback', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          category: feedbackCategory,
-          content: feedbackContent.trim(),
-          contact: feedbackContact.trim(),
-        }),
+      await feedbackApi.create({
+        category: feedbackCategory,
+        content: feedbackContent.trim(),
+        contact: feedbackContact.trim(),
       });
-      if (res.ok) {
-        setFeedbackOpen(false);
-        setFeedbackContent('');
-        setFeedbackContact('');
-        setFeedbackCategory('功能建议');
-        toast({ description: '感谢您的反馈！我们会认真处理 💖' });
+      setFeedbackOpen(false);
+      setFeedbackContent('');
+      setFeedbackContact('');
+      setFeedbackCategory('功能建议');
+      toast({ description: '感谢您的反馈！我们会认真处理 💖' });
+    } catch (error) {
+      if (error instanceof ApiError) {
+        toast({ description: error.message });
       } else {
         toast({ description: '提交失败，请稍后重试' });
       }
-    } catch {
-      toast({ description: '提交失败，请稍后重试' });
     } finally {
       setFeedbackSubmitting(false);
     }
@@ -398,34 +412,31 @@ export default function LunaApp() {
 
   async function deleteRecord(id: string) {
     const d = deleteConfirm.date;
-    await fetch(`/api/records/${d}`, { method: 'DELETE' });
-    setDeleteConfirm({ open: false, recordId: '', date: '' });
-    await fetchRecords();
-    toast({ description: '记录已删除' });
+    try {
+      await recordsApi.deleteByDate(d);
+      setDeleteConfirm({ open: false, recordId: '', date: '' });
+      await fetchRecords();
+      toast({ description: '记录已删除' });
+    } catch (error) {
+      if (error instanceof ApiError) toast({ description: error.message });
+    }
   }
 
-  function exportCSV() {
-    const headers = ['日期', '流量', '情绪', '症状', '备注'];
-    const rows = records.map(r => {
-      const symptoms = JSON.parse(r.symptoms || '[]');
-      return [
-        r.date,
-        FLOW_LABELS[r.flow] || '',
-        MOOD_LABELS[r.mood] || '',
-        symptoms.join(';'),
-        `"${(r.note || '').replace(/"/g, '""')}"`,
-      ];
-    });
-    const csv = [headers.join(','), ...rows.map(r => r.join(','))].join('\n');
-    const BOM = '\uFEFF';
-    const blob = new Blob([BOM + csv], { type: 'text/csv;charset=utf-8;' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `luna_records_${formatDateStr(new Date())}.csv`;
-    a.click();
-    URL.revokeObjectURL(url);
-    toast({ description: '数据导出成功 📁' });
+  async function exportCSV() {
+    try {
+      const data = await exportApi.getData();
+      const BOM = '\uFEFF';
+      const blob = new Blob([BOM + data.csvContent], { type: 'text/csv;charset=utf-8;' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `luna_records_${formatDateStr(new Date())}.csv`;
+      a.click();
+      URL.revokeObjectURL(url);
+      toast({ description: '数据导出成功 📁' });
+    } catch (error) {
+      if (error instanceof ApiError) toast({ description: error.message });
+    }
   }
 
   // ============ Calendar Generation ============
