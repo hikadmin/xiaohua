@@ -1,0 +1,502 @@
+   501→   501→   501→    const lastDay = new Date(calYear, calMonth, 0);
+   502→   502→   502→    const startDayOfWeek = firstDay.getDay();
+   503→   503→   503→    const totalDays = lastDay.getDate();
+   504→   504→   504→    const todayStr = formatDateStr(new Date());
+   505→   505→   505→    const predictedDays = getPredictedPeriodDays();
+   506→   506→   506→    const fertileDays = getFertileDays();
+   507→   507→   507→
+   508→   508→   508→    const days: Array<{
+   509→   509→   509→      day: number;
+   510→   510→   510→      dateStr: string;
+   511→   511→   511→      isToday: boolean;
+   512→   512→   512→      isOtherMonth: boolean;
+   513→   513→   513→      periodInfo: ReturnType<typeof getPeriodInfo>;
+   514→   514→   514→      isPredicted: boolean;
+   515→   515→   515→      isFertile: boolean;
+   516→   516→   516→    }> = [];
+   517→   517→   517→
+   518→   518→   518→    for (let i = 0; i < startDayOfWeek; i++) {
+   519→   519→   519→      days.push({
+   520→   520→   520→        day: 0, dateStr: '', isToday: false, isOtherMonth: true,
+   521→   521→   521→        periodInfo: { isPeriod: false, isStart: false, isEnd: false, isActive: false },
+   522→   522→   522→        isPredicted: false, isFertile: false,
+   523→   523→   523→      });
+   524→   524→   524→    }
+   525→   525→   525→
+   526→   526→   526→    for (let day = 1; day <= totalDays; day++) {
+   527→   527→   527→      const dateStr = `${calYear}-${String(calMonth).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+   528→   528→   528→      const isToday = dateStr === todayStr;
+   529→   529→   529→      const periodInfo = getPeriodInfo(dateStr);
+   530→   530→   530→      const isPredicted = predictedDays.includes(dateStr) && !periodInfo.isPeriod;
+   531→   531→   531→      const isFertile = fertileDays.includes(dateStr) && !periodInfo.isPeriod && !isPredicted;
+   532→   532→   532→
+   533→   533→   533→      days.push({ day, dateStr, isToday, isOtherMonth: false, periodInfo, isPredicted, isFertile });
+   534→   534→   534→    }
+   535→   535→   535→
+   536→   536→   536→    return days;
+   537→   537→   537→  }
+   538→   538→   538→
+   539→   539→   539→  // ============ Cycle Statistics ============
+   540→   540→   540→  const cycleStats = useMemo(() => {
+   541→   541→   541→    const sortedPeriods = [...periods].sort((a, b) => a.startDate.localeCompare(b.startDate));
+   542→   542→   542→    const cycleLengths: number[] = [];
+   543→   543→   543→    const periodLengths: number[] = [];
+   544→   544→   544→
+   545→   545→   545→    for (let i = 1; i < sortedPeriods.length; i++) {
+   546→   546→   546→      if (sortedPeriods[i].endDate) {
+   547→   547→   547→        const cycleLen = daysBetween(parseDate(sortedPeriods[i - 1].startDate), parseDate(sortedPeriods[i].startDate));
+   548→   548→   548→        if (cycleLen > 15 && cycleLen < 50) cycleLengths.push(cycleLen);
+   549→   549→   549→      }
+   550→   550→   550→      if (sortedPeriods[i].endDate) {
+   551→   551→   551→        const periodLen = daysBetween(parseDate(sortedPeriods[i].startDate), parseDate(sortedPeriods[i].endDate!)) + 1;
+   552→   552→   552→        if (periodLen > 0 && periodLen < 15) periodLengths.push(periodLen);
+   553→   553→   553→      }
+   554→   554→   554→    }
+   555→   555→   555→
+   556→   556→   556→    const avgCycle = cycleLengths.length > 0
+   557→   557→   557→      ? Math.round(cycleLengths.reduce((a, b) => a + b, 0) / cycleLengths.length)
+   558→   558→   558→      : (profile?.cycleLength || 28);
+   559→   559→   559→    const avgPeriod = periodLengths.length > 0
+   560→   560→   560→      ? Math.round(periodLengths.reduce((a, b) => a + b, 0) / periodLengths.length)
+   561→   561→   561→      : (profile?.periodLength || 5);
+   562→   562→   562→
+   563→   563→   563→    return {
+   564→   564→   564→      avgCycle,
+   565→   565→   565→      avgPeriod,
+   566→   566→   566→      totalCycles: sortedPeriods.length,
+   567→   567→   567→      cycleLengths,
+   568→   568→   568→      periodLengths,
+   569→   569→   569→    };
+   570→   570→   570→  }, [periods, profile]);
+   571→   571→   571→
+   572→   572→   572→  // ============ Render Helpers ============
+   573→   573→   573→  const cycleInfo = getCycleInfo();
+   574→   574→   574→  const phaseData = PHASE_INFO[cycleInfo.phase] || PHASE_INFO.follicular;
+   575→   575→   575→  const allSymptoms = [...DEFAULT_SYMPTOMS, ...customSymptoms];
+   576→   576→   576→  const isCurrentMonth = calYear === today.getFullYear() && calMonth === today.getMonth() + 1;
+   577→   577→   577→
+   578→   578→   578→  // ============ RENDER ============
+   579→   579→   579→  return (
+   580→   580→   580→    <div className="min-h-screen bg-[#0f1419] text-[#f0ece4] flex flex-col overflow-hidden relative">
+   581→   581→   581→      {/* Animated Background Blobs */}
+   582→   582→   582→      <div className="fixed inset-0 overflow-hidden pointer-events-none z-0">
+   583→   583→   583→        <div className="absolute rounded-full opacity-30 blur-[80px]"
+   584→   584→   584→          style={{
+   585→   585→   585→            width: 300, height: 300,
+   586→   586→   586→            background: `linear-gradient(135deg, ${phaseData.color}40, transparent)`,
+   587→   587→   587→            top: -80, right: -80,
+   588→   588→   588→            animation: 'blob-float 20s ease-in-out infinite',
+   589→   589→   589→            transition: 'background 1s ease',
+   590→   590→   590→          }} />
+   591→   591→   591→        <div className="absolute rounded-full opacity-25 blur-[60px]"
+   592→   592→   592→          style={{
+   593→   593→   593→            width: 250, height: 250,
+   594→   594→   594→            background: 'linear-gradient(135deg, #81b29a, transparent)',
+   595→   595→   595→            bottom: 200, left: -80,
+   596→   596→   596→            animation: 'blob-float 20s ease-in-out infinite',
+   597→   597→   597→            animationDelay: '-7s',
+   598→   598→   598→          }} />
+   599→   599→   599→        <div className="absolute rounded-full opacity-20 blur-[50px]"
+   600→   600→   600→          style={{
+   601→   601→   601→            width: 180, height: 180,
+   602→   602→   602→            background: 'linear-gradient(135deg, #d4a574, transparent)',
+   603→   603→   603→            bottom: -40, right: -40,
+   604→   604→   604→            animation: 'blob-float 20s ease-in-out infinite',
+   605→   605→   605→            animationDelay: '-14s',
+   606→   606→   606→          }} />
+   607→   607→   607→      </div>
+   608→   608→   608→
+   609→   609→   609→      {/* Main Content Area */}
+   610→   610→   610→      <main className="flex-1 relative z-10 overflow-y-auto overflow-x-hidden safe-top" style={{ paddingBottom: 90 }}>
+   611→   611→   611→        <AnimatePresence mode="wait">
+   612→   612→   612→          {/* ============ HOME TAB ============ */}
+   613→   613→   613→          {activeTab === 'home' && (
+   614→   614→   614→            <motion.div
+   615→   615→   615→              key="home"
+   616→   616→   616→              initial={{ opacity: 0, x: 20 }}
+   617→   617→   617→              animate={{ opacity: 1, x: 0 }}
+   618→   618→   618→              exit={{ opacity: 0, x: -20 }}
+   619→   619→   619→              transition={{ duration: 0.3 }}
+   620→   620→   620→              className="px-5 pt-12 pb-6"
+   621→   621→   621→            >
+   622→   622→   622→              {/* Header */}
+   623→   623→   623→              <StaggerIn delay={0.05}>
+   624→   624→   624→                <div className="flex justify-between items-center mb-4">
+   625→   625→   625→                  <div>
+   626→   626→   626→                    <p className="text-sm" style={{ color: '#a8a29e' }}>今天</p>
+   627→   627→   627→                    <p className="text-2xl font-light" style={{ fontFamily: 'Georgia, serif' }}>
+   628→   628→   628→                      {formatDateChinese(today)}
+   629→   629→   629→                    </p>
+   630→   630→   630→                  </div>
+   631→   631→   631→                  <button className="w-10 h-10 rounded-full flex items-center justify-center transition-all hover:scale-105 active:scale-95"
+   632→   632→   632→                    style={{ background: '#232b35', border: '1px solid rgba(255,255,255,0.08)' }}>
+   633→   633→   633→                    <Bell size={18} style={{ color: '#a8a29e' }} />
+   634→   634→   634→                  </button>
+   635→   635→   635→                </div>
+   636→   636→   636→              </StaggerIn>
+   637→   637→   637→
+   638→   638→   638→              {/* Phase Card */}
+   639→   639→   639→              <StaggerIn delay={0.1}>
+   640→   640→   640→                <div className="rounded-[20px] p-5 mb-4 transition-all"
+   641→   641→   641→                  style={{
+   642→   642→   642→                    background: `linear-gradient(135deg, ${phaseData.color}10, #232b35)`,
+   643→   643→   643→                    border: `1px solid ${phaseData.color}30`,
+   644→   644→   644→                  }}>
+   645→   645→   645→                  <div className="flex items-center gap-3 mb-3">
+   646→   646→   646→                    <span className="text-lg">{phaseData.icon}</span>
+   647→   647→   647→                    <div className="w-2.5 h-2.5 rounded-full"
+   648→   648→   648→                      style={{ background: phaseData.color, boxShadow: `0 0 10px ${phaseData.color}80` }} />
+   649→   649→   649→                    <span className="text-sm font-medium" style={{ color: phaseData.color }}>
+   650→   650→   650→                      {phaseData.name} 第{cycleInfo.phaseDay}天
+   651→   651→   651→                    </span>
+   652→   652→   652→                  </div>
+   653→   653→   653→                  <p className="text-lg font-light mb-2">{phaseData.desc}</p>
+   654→   654→   654→                  <p className="text-sm" style={{ color: '#a8a29e' }}>{phaseData.tip}</p>
+   655→   655→   655→                </div>
+   656→   656→   656→              </StaggerIn>
+   657→   657→   657→
+   658→   658→   658→              {/* Cycle Ring */}
+   659→   659→   659→              <StaggerIn delay={0.2}>
+   660→   660→   660→                <div className="flex flex-col items-center my-6">
+   661→   661→   661→                  <div className="relative" style={{ width: 240, height: 240 }}>
+   662→   662→   662→                    <svg width="240" height="240" viewBox="0 0 240 240" style={{ transform: 'rotate(-90deg)' }}>
+   663→   663→   663→                      <defs>
+   664→   664→   664→                        <linearGradient id="ringGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+   665→   665→   665→                          <stop offset="0%" stopColor={phaseData.color} />
+   666→   666→   666→                          <stop offset="50%" stopColor="#d4a574" />
+   667→   667→   667→                          <stop offset="100%" stopColor="#81b29a" />
+   668→   668→   668→                        </linearGradient>
+   669→   669→   669→                      </defs>
+   670→   670→   670→                      {/* Track */}
+   671→   671→   671→                      <circle cx="120" cy="120" r="105" fill="none" stroke="rgba(255,255,255,0.06)" strokeWidth="7" />
+   672→   672→   672→                      {/* Subtle tick marks */}
+   673→   673→   673→                      {RING_TICK_MARKS.map((tick, i) => (
+   674→   674→   674→                        <line key={i} x1={tick.x1} y1={tick.y1} x2={tick.x2} y2={tick.y2}
+   675→   675→   675→                          stroke="rgba(255,255,255,0.08)" strokeWidth="1" />
+   676→   676→   676→                      ))}
+   677→   677→   677→                      {/* Progress */}
+   678→   678→   678→                      <circle
+   679→   679→   679→                        cx="120" cy="120" r="105" fill="none"
+   680→   680→   680→                        stroke="url(#ringGradient)" strokeWidth="7" strokeLinecap="round"
+   681→   681→   681→                        strokeDasharray={2 * Math.PI * 105}
+   682→   682→   682→                        strokeDashoffset={ringAnimated ? 2 * Math.PI * 105 * (1 - (cycleInfo.phaseDay / cycleInfo.cycleLength)) : 2 * Math.PI * 105}
+   683→   683→   683→                        style={{ transition: 'stroke-dashoffset 2s cubic-bezier(0.4, 0, 0.2, 1)' }}
+   684→   684→   684→                      />
+   685→   685→   685→                      {/* Glow */}
+   686→   686→   686→                      <circle
+   687→   687→   687→                        cx="120" cy="120" r="105" fill="none"
+   688→   688→   688→                        stroke="url(#ringGradient)" strokeWidth="14" strokeLinecap="round"
+   689→   689→   689→                        strokeDasharray={2 * Math.PI * 105}
+   690→   690→   690→                        strokeDashoffset={ringAnimated ? 2 * Math.PI * 105 * (1 - (cycleInfo.phaseDay / cycleInfo.cycleLength)) : 2 * Math.PI * 105}
+   691→   691→   691→                        filter="blur(6px)" opacity={0.4}
+   692→   692→   692→                        style={{ transition: 'stroke-dashoffset 2s cubic-bezier(0.4, 0, 0.2, 1)' }}
+   693→   693→   693→                      />
+   694→   694→   694→                    </svg>
+   695→   695→   695→                    {/* Center Content */}
+   696→   696→   696→                    <div className="absolute inset-[25px] rounded-full flex flex-col items-center justify-center">
+   697→   697→   697→                      <p className="text-xs mb-0.5" style={{ color: '#6b7280' }}>下次经期预计</p>
+   698→   698→   698→                      <motion.p
+   699→   699→   699→                        className="text-4xl font-light"
+   700→   700→   700→                        style={{ fontFamily: 'Georgia, serif' }}
+   701→   701→   701→                        key={cycleInfo.daysUntilNext}
+   702→   702→   702→                        initial={{ scale: 0.8, opacity: 0 }}
+   703→   703→   703→                        animate={{ scale: 1, opacity: 1 }}
+   704→   704→   704→                        transition={{ type: 'spring', stiffness: 300, damping: 25 }}
+   705→   705→   705→                      >
+   706→   706→   706→                        {cycleInfo.daysUntilNext}
+   707→   707→   707→                      </motion.p>
+   708→   708→   708→                      <p className="text-sm" style={{ color: '#a8a29e' }}>天后</p>
+   709→   709→   709→                    </div>
+   710→   710→   710→                  </div>
+   711→   711→   711→                </div>
+   712→   712→   712→              </StaggerIn>
+   713→   713→   713→
+   714→   714→   714→              {/* Stats Grid */}
+   715→   715→   715→              <StaggerIn delay={0.3}>
+   716→   716→   716→                <div className="grid grid-cols-2 gap-3">
+   717→   717→   717→                  <div className="rounded-[20px] p-4" style={{ background: '#232b35', border: '1px solid rgba(255,255,255,0.08)' }}>
+   718→   718→   718→                    <div className="flex items-center gap-2 mb-2">
+   719→   719→   719→                      <Activity size={14} style={{ color: '#81b29a' }} />
+   720→   720→   720→                      <p className="text-xs" style={{ color: '#6b7280' }}>周期长度</p>
+   721→   721→   721→                    </div>
+   722→   722→   722→                    <p className="text-2xl font-light" style={{ fontFamily: 'Georgia, serif' }}>
+   723→   723→   723→                      {cycleStats.avgCycle}
+   724→   724→   724→                      <span className="text-sm ml-1" style={{ color: '#a8a29e' }}>天</span>
+   725→   725→   725→                    </p>
+   726→   726→   726→                  </div>
+   727→   727→   727→                  <div className="rounded-[20px] p-4" style={{ background: '#232b35', border: '1px solid rgba(255,255,255,0.08)' }}>
+   728→   728→   728→                    <div className="flex items-center gap-2 mb-2">
+   729→   729→   729→                      <Droplets size={14} style={{ color: '#e07a5f' }} />
+   730→   730→   730→                      <p className="text-xs" style={{ color: '#6b7280' }}>经期长度</p>
+   731→   731→   731→                    </div>
+   732→   732→   732→                    <p className="text-2xl font-light" style={{ fontFamily: 'Georgia, serif' }}>
+   733→   733→   733→                      {cycleStats.avgPeriod}
+   734→   734→   734→                      <span className="text-sm ml-1" style={{ color: '#a8a29e' }}>天</span>
+   735→   735→   735→                    </p>
+   736→   736→   736→                  </div>
+   737→   737→   737→                </div>
+   738→   738→   738→              </StaggerIn>
+   739→   739→   739→
+   740→   740→   740→              {/* Cycle Phase Timeline */}
+   741→   741→   741→              <StaggerIn delay={0.35}>
+   742→   742→   742→                <div className="rounded-[20px] p-5 mt-4" style={{ background: '#232b35', border: '1px solid rgba(255,255,255,0.08)' }}>
+   743→   743→   743→                  <p className="text-sm font-medium mb-4">周期阶段</p>
+   744→   744→   744→                  <div className="flex gap-1 h-3 rounded-full overflow-hidden mb-3">
+   745→   745→   745→                    {/* Period phase */}
+   746→   746→   746→                    <div
+   747→   747→   747→                      className="rounded-l-full transition-all"
+   748→   748→   748→                      style={{
+   749→   749→   749→                        width: `${(cycleInfo.periodLength / cycleInfo.cycleLength) * 100}%`,
+   750→   750→   750→                        background: '#e07a5f',
+   751→   751→   751→                        boxShadow: cycleInfo.phase === 'period' ? '0 0 8px #e07a5f80' : 'none',
+   752→   752→   752→                      }} />
+   753→   753→   753→                    {/* Follicular phase */}
+   754→   754→   754→                    <div
+   755→   755→   755→                      className="transition-all"
+   756→   756→   756→                      style={{
+   757→   757→   757→                        width: `${((13 - cycleInfo.periodLength) / cycleInfo.cycleLength) * 100}%`,
+   758→   758→   758→                        background: cycleInfo.phase === 'follicular' ? '#81b29a' : '#81b29a60',
+   759→   759→   759→                        boxShadow: cycleInfo.phase === 'follicular' ? '0 0 8px #81b29a80' : 'none',
+   760→   760→   760→                      }} />
+   761→   761→   761→                    {/* Ovulation phase */}
+   762→   762→   762→                    <div
+   763→   763→   763→                      className="transition-all"
+   764→   764→   764→                      style={{
+   765→   765→   765→                        width: `${(3 / cycleInfo.cycleLength) * 100}%`,
+   766→   766→   766→                        background: cycleInfo.phase === 'ovulation' ? '#d4a574' : '#d4a57460',
+   767→   767→   767→                        boxShadow: cycleInfo.phase === 'ovulation' ? '0 0 8px #d4a57480' : 'none',
+   768→   768→   768→                      }} />
+   769→   769→   769→                    {/* Luteal phase */}
+   770→   770→   770→                    <div
+   771→   771→   771→                      className="rounded-r-full transition-all"
+   772→   772→   772→                      style={{
+   773→   773→   773→                        width: `${((cycleInfo.cycleLength - 16) / cycleInfo.cycleLength) * 100}%`,
+   774→   774→   774→                        background: cycleInfo.phase === 'luteal' ? '#f2cc8f' : '#f2cc8f60',
+   775→   775→   775→                        boxShadow: cycleInfo.phase === 'luteal' ? '0 0 8px #f2cc8f80' : 'none',
+   776→   776→   776→                      }} />
+   777→   777→   777→                  </div>
+   778→   778→   778→                  <div className="flex justify-between text-xs" style={{ color: '#6b7280' }}>
+   779→   779→   779→                    <span style={{ color: cycleInfo.phase === 'period' ? '#e07a5f' : '#6b7280' }}>经期</span>
+   780→   780→   780→                    <span style={{ color: cycleInfo.phase === 'follicular' ? '#81b29a' : '#6b7280' }}>卵泡期</span>
+   781→   781→   781→                    <span style={{ color: cycleInfo.phase === 'ovulation' ? '#d4a574' : '#6b7280' }}>排卵</span>
+   782→   782→   782→                    <span style={{ color: cycleInfo.phase === 'luteal' ? '#f2cc8f' : '#6b7280' }}>黄体期</span>
+   783→   783→   783→                  </div>
+   784→   784→   784→                </div>
+   785→   785→   785→              </StaggerIn>
+   786→   786→   786→
+   787→   787→   787→              {/* Recent Records */}
+   788→   788→   788→              {records.length > 0 && (
+   789→   789→   789→                <StaggerIn delay={0.4}>
+   790→   790→   790→                  <div className="mt-4 rounded-[20px] p-5" style={{ background: '#232b35', border: '1px solid rgba(255,255,255,0.08)' }}>
+   791→   791→   791→                    <div className="flex justify-between items-center mb-3">
+   792→   792→   792→                      <p className="text-sm font-medium">最近记录</p>
+   793→   793→   793→                      <button className="text-xs px-3 py-1 rounded-full transition-all hover:scale-105"
+   794→   794→   794→                        style={{ background: 'rgba(255,255,255,0.05)', color: '#a8a29e' }}
+   795→   795→   795→                        onClick={() => { setActiveTab('log'); setLogTab('history'); }}>
+   796→   796→   796→                        查看全部
+   797→   797→   797→                      </button>
+   798→   798→   798→                    </div>
+   799→   799→   799→                    {records.slice(0, 3).map(record => {
+   800→   800→   800→                      const d = parseDate(record.date);
+   801→   801→   801→                      const symptoms = JSON.parse(record.symptoms || '[]');
+   802→   802→   802→                      return (
+   803→   803→   803→                        <div key={record.id} className="flex items-center gap-3 py-2.5 border-b last:border-0"
+   804→   804→   804→                          style={{ borderColor: 'rgba(255,255,255,0.04)' }}>
+   805→   805→   805→                          <div className="w-8 h-8 rounded-xl flex items-center justify-center text-sm"
+   806→   806→   806→                            style={{ background: `${phaseData.color}15` }}>
+   807→   807→   807→                            {MOOD_EMOJIS[record.mood] || '📝'}
+   808→   808→   808→                          </div>
+   809→   809→   809→                          <div className="flex-1 min-w-0">
+   810→   810→   810→                            <p className="text-sm font-medium">{d.getMonth() + 1}月{d.getDate()}日</p>
+   811→   811→   811→                            <div className="flex gap-1 mt-0.5 flex-wrap">
+   812→   812→   812→                              {symptoms.slice(0, 2).map((s: string, i: number) => (
+   813→   813→   813→                                <span key={i} className="text-[11px] px-1.5 py-0.5 rounded-md"
+   814→   814→   814→                                  style={{ background: 'rgba(224,122,95,0.1)', color: '#e07a5f' }}>
+   815→   815→   815→                                  {s}
+   816→   816→   816→                                </span>
+   817→   817→   817→                              ))}
+   818→   818→   818→                              {symptoms.length > 2 && (
+   819→   819→   819→                                <span className="text-[11px] px-1.5 py-0.5" style={{ color: '#6b7280' }}>
+   820→   820→   820→                                  +{symptoms.length - 2}
+   821→   821→   821→                                </span>
+   822→   822→   822→                              )}
+   823→   823→   823→                            </div>
+   824→   824→   824→                          </div>
+   825→   825→   825→                          <span className="text-xs flex-shrink-0" style={{ color: '#6b7280' }}>
+   826→   826→   826→                            {FLOW_LABELS[record.flow]}
+   827→   827→   827→                          </span>
+   828→   828→   828→                        </div>
+   829→   829→   829→                      );
+   830→   830→   830→                    })}
+   831→   831→   831→                  </div>
+   832→   832→   832→                </StaggerIn>
+   833→   833→   833→              )}
+   834→   834→   834→
+   835→   835→   835→              {/* Daily Health Tip */}
+   836→   836→   836→              <StaggerIn delay={0.45}>
+   837→   837→   837→                <div className="mt-4 rounded-[20px] p-5 relative overflow-hidden"
+   838→   838→   838→                  style={{
+   839→   839→   839→                    background: `linear-gradient(135deg, ${phaseData.color}15, #232b3580)`,
+   840→   840→   840→                    border: `1px solid ${phaseData.color}20`,
+   841→   841→   841→                    backdropFilter: 'blur(20px)',
+   842→   842→   842→                  }}>
+   843→   843→   843→                  <div className="absolute top-0 right-0 w-24 h-24 rounded-full opacity-10"
+   844→   844→   844→                    style={{ background: phaseData.color, filter: 'blur(30px)', transform: 'translate(30%, -30%)' }} />
+   845→   845→   845→                  <div className="flex items-start gap-3">
+   846→   846→   846→                    <div className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0"
+   847→   847→   847→                      style={{ background: `${phaseData.color}20` }}>
+   848→   848→   848→                      <span className="text-lg">💡</span>
+   849→   849→   849→                    </div>
+   850→   850→   850→                    <div className="flex-1">
+   851→   851→   851→                      <p className="text-sm font-medium mb-1">今日小贴士</p>
+   852→   852→   852→                      <motion.p
+   853→   853→   853→                        className="text-sm leading-relaxed"
+   854→   854→   854→                        style={{ color: '#a8a29e' }}
+   855→   855→   855→                        key={dailyTipIndex}
+   856→   856→   856→                        initial={{ opacity: 0, y: 5 }}
+   857→   857→   857→                        animate={{ opacity: 1, y: 0 }}
+   858→   858→   858→                        transition={{ duration: 0.3 }}
+   859→   859→   859→                      >
+   860→   860→   860→                        {DAILY_TIPS[cycleInfo.phase]?.[dailyTipIndex] || DAILY_TIPS.follicular[0]}
+   861→   861→   861→                      </motion.p>
+   862→   862→   862→                    </div>
+   863→   863→   863→                    <button className="flex-shrink-0 w-8 h-8 rounded-lg flex items-center justify-center transition-all hover:scale-110 active:scale-95"
+   864→   864→   864→                      style={{ background: 'rgba(255,255,255,0.05)' }}
+   865→   865→   865→                      onClick={() => setDailyTipIndex(prev => (prev + 1) % 5)}>
+   866→   866→   866→                      <ArrowRight size={14} style={{ color: '#a8a29e' }} />
+   867→   867→   867→                    </button>
+   868→   868→   868→                  </div>
+   869→   869→   869→                </div>
+   870→   870→   870→              </StaggerIn>
+   871→   871→   871→
+   872→   872→   872→              {/* Cycle Trend Mini Chart */}
+   873→   873→   873→              {cycleStats.cycleLengths.length > 0 && (
+   874→   874→   874→                <StaggerIn delay={0.5}>
+   875→   875→   875→                  <div className="mt-4 rounded-[20px] p-5" style={{ background: '#232b35', border: '1px solid rgba(255,255,255,0.08)' }}>
+   876→   876→   876→                    <div className="flex justify-between items-center mb-4">
+   877→   877→   877→                      <p className="text-sm font-medium">周期趋势</p>
+   878→   878→   878→                      <span className="text-xs" style={{ color: '#6b7280' }}>最近{Math.min(cycleStats.cycleLengths.length, 6)}个周期</span>
+   879→   879→   879→                    </div>
+   880→   880→   880→                    <div className="flex items-end gap-2 h-20">
+   881→   881→   881→                      {cycleStats.cycleLengths.slice(-6).map((len, i) => {
+   882→   882→   882→                        const maxLen = Math.max(...cycleStats.cycleLengths.slice(-6));
+   883→   883→   883→                        const minLen = Math.min(...cycleStats.cycleLengths.slice(-6));
+   884→   884→   884→                        const range = maxLen - minLen || 1;
+   885→   885→   885→                        const height = 20 + ((len - minLen) / range) * 60;
+   886→   886→   886→                        const isLast = i === cycleStats.cycleLengths.slice(-6).length - 1;
+   887→   887→   887→                        return (
+   888→   888→   888→                          <motion.div key={i} className="flex-1 flex flex-col items-center gap-1"
+   889→   889→   889→                            initial={{ height: 0, opacity: 0 }}
+   890→   890→   890→                            animate={{ height: 'auto', opacity: 1 }}
+   891→   891→   891→                            transition={{ delay: 0.1 * i, duration: 0.4 }}>
+   892→   892→   892→                            <span className="text-[10px]" style={{ color: '#6b7280' }}>{len}</span>
+   893→   893→   893→                            <motion.div
+   894→   894→   894→                              className="w-full rounded-t-md"
+   895→   895→   895→                              style={{
+   896→   896→   896→                                height,
+   897→   897→   897→                                background: isLast
+   898→   898→   898→                                  ? 'linear-gradient(to top, #e07a5f, #d4a574)'
+   899→   899→   899→                                  : 'rgba(255,255,255,0.08)',
+   900→   900→   900→                                minHeight: 8,
+   901→   901→   901→                              }}
+   902→   902→   902→                              initial={{ scaleY: 0 }}
+   903→   903→   903→                              animate={{ scaleY: 1 }}
+   904→   904→   904→                              transition={{ delay: 0.15 * i, duration: 0.4 }}
+   905→   905→   905→                            />
+   906→   906→   906→                          </motion.div>
+   907→   907→   907→                        );
+   908→   908→   908→                      })}
+   909→   909→   909→                    </div>
+   910→   910→   910→                    <div className="flex items-center justify-between mt-2 pt-2" style={{ borderTop: '1px solid rgba(255,255,255,0.04)' }}>
+   911→   911→   911→                      <span className="text-[11px]" style={{ color: '#6b7280' }}>平均 {cycleStats.avgCycle} 天</span>
+   912→   912→   912→                      <div className="flex items-center gap-1">
+   913→   913→   913→                        <div className="w-2 h-2 rounded-full" style={{ background: '#e07a5f' }} />
+   914→   914→   914→                        <span className="text-[11px]" style={{ color: '#6b7280' }}>最近</span>
+   915→   915→   915→                      </div>
+   916→   916→   916→                    </div>
+   917→   917→   917→                  </div>
+   918→   918→   918→                </StaggerIn>
+   919→   919→   919→              )}
+   920→   920→   920→            </motion.div>
+   921→   921→   921→          )}
+   922→   922→   922→
+   923→   923→   923→          {/* ============ CALENDAR TAB ============ */}
+   924→   924→   924→          {activeTab === 'calendar' && (
+   925→   925→   925→            <motion.div
+   926→   926→   926→              key="calendar"
+   927→   927→   927→              initial={{ opacity: 0, x: 20 }}
+   928→   928→   928→              animate={{ opacity: 1, x: 0 }}
+   929→   929→   929→              exit={{ opacity: 0, x: -20 }}
+   930→   930→   930→              transition={{ duration: 0.3 }}
+   931→   931→   931→              className="px-5 pt-12 pb-6"
+   932→   932→   932→            >
+   933→   933→   933→              {/* Month Navigation */}
+   934→   934→   934→              <div className="flex justify-between items-center mb-4">
+   935→   935→   935→                <button className="w-10 h-10 rounded-xl flex items-center justify-center transition-all active:scale-90"
+   936→   936→   936→                  style={{ background: '#232b35' }}
+   937→   937→   937→                  onClick={() => {
+   938→   938→   938→                    let m = calMonth - 1; let y = calYear;
+   939→   939→   939→                    if (m < 1) { m = 12; y--; }
+   940→   940→   940→                    setCalMonth(m); setCalYear(y);
+   941→   941→   941→                  }}>
+   942→   942→   942→                  <ChevronLeft size={20} style={{ color: '#a8a29e' }} />
+   943→   943→   943→                </button>
+   944→   944→   944→                <div className="flex items-center gap-3">
+   945→   945→   945→                  <p className="text-xl font-light" style={{ fontFamily: 'Georgia, serif' }}>
+   946→   946→   946→                    {calYear}年{calMonth}月
+   947→   947→   947→                  </p>
+   948→   948→   948→                  {!isCurrentMonth && (
+   949→   949→   949→                    <button className="text-xs px-3 py-1 rounded-full transition-all hover:scale-105"
+   950→   950→   950→                      style={{ background: 'rgba(224,122,95,0.15)', color: '#e07a5f' }}
+   951→   951→   951→                      onClick={() => { setCalYear(today.getFullYear()); setCalMonth(today.getMonth() + 1); }}>
+   952→   952→   952→                      回到今天
+   953→   953→   953→                    </button>
+   954→   954→   954→                  )}
+   955→   955→   955→                </div>
+   956→   956→   956→                <button className="w-10 h-10 rounded-xl flex items-center justify-center transition-all active:scale-90"
+   957→   957→   957→                  style={{ background: '#232b35' }}
+   958→   958→   958→                  onClick={() => {
+   959→   959→   959→                    let m = calMonth + 1; let y = calYear;
+   960→   960→   960→                    if (m > 12) { m = 1; y++; }
+   961→   961→   961→                    setCalMonth(m); setCalYear(y);
+   962→   962→   962→                  }}>
+   963→   963→   963→                  <ChevronRight size={20} style={{ color: '#a8a29e' }} />
+   964→   964→   964→                </button>
+   965→   965→   965→              </div>
+   966→   966→   966→
+   967→   967→   967→              {/* Weekday Headers */}
+   968→   968→   968→              <div className="grid grid-cols-7 gap-1 mb-2">
+   969→   969→   969→                {WEEKDAYS_SHORT.map((d, i) => (
+   970→   970→   970→                  <div key={i} className="text-center text-xs py-2 font-medium" style={{ color: i === 0 || i === 6 ? '#e07a5f80' : '#6b7280' }}>{d}</div>
+   971→   971→   971→                ))}
+   972→   972→   972→              </div>
+   973→   973→   973→
+   974→   974→   974→              {/* Calendar Grid */}
+   975→   975→   975→              <div className="grid grid-cols-7 gap-1 mb-5">
+   976→   976→   976→                {generateCalendarDays().map((day, i) => {
+   977→   977→   977→                  if (day.isOtherMonth) {
+   978→   978→   978→                    return <div key={`empty-${i}`} className="h-10" />;
+   979→   979→   979→                  }
+   980→   980→   980→
+   981→   981→   981→                  let bgStyle: React.CSSProperties = {};
+   982→   982→   982→                  let textColor = '#f0ece4';
+   983→   983→   983→                  let borderRadius = '12px';
+   984→   984→   984→                  let extraClass = '';
+   985→   985→   985→
+   986→   986→   986→                  if (day.periodInfo.isPeriod) {
+   987→   987→   987→                    if (day.periodInfo.isStart && day.periodInfo.isEnd) borderRadius = '20px';
+   988→   988→   988→                    else if (day.periodInfo.isStart) borderRadius = '20px 4px 4px 20px';
+   989→   989→   989→                    else if (day.periodInfo.isEnd) borderRadius = '4px 20px 20px 4px';
+   990→   990→   990→                    else borderRadius = '4px';
+   991→   991→   991→
+   992→   992→   992→                    bgStyle = {
+   993→   993→   993→                      background: '#e07a5f',
+   994→   994→   994→                      color: '#0f1419',
+   995→   995→   995→                      fontWeight: 500,
+   996→   996→   996→                      borderRadius,
+   997→   997→   997→                    };
+   998→   998→   998→                    textColor = '#0f1419';
+   999→   999→   999→
+  1000→  1000→  1000→                    if (day.periodInfo.isActive) {
+
+[showing lines 501-1000 of 2002; use offset=1001 with limit to continue reading]

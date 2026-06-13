@@ -6,7 +6,7 @@ import {
   Home, Calendar, FileText, User, Plus, Bell, ChevronLeft, ChevronRight,
   Droplets, Moon, Sun, Shield, Lock, Eye, Database, Cloud, RotateCcw,
   Download, Globe, Info, MessageSquare, X, ArrowRight, Target,
-  TrendingUp, Activity, Heart, Clock, Crosshair, Check
+  TrendingUp, Activity, Heart, Clock, Crosshair, Check, Camera, Send
 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 
@@ -29,6 +29,7 @@ interface DailyRecord {
 interface UserProfile {
   id: string;
   name: string;
+  avatar: string;
   cycleLength: number;
   periodLength: number;
   lastPeriodStart: string | null;
@@ -49,6 +50,7 @@ const FLOW_LABELS = ['', '点滴', '少量', '中等', '大量'];
 const MOOD_LABELS = ['', '开心', '平静', '低落', '烦躁', '焦虑'];
 const MOOD_EMOJIS = ['', '😊', '😌', '😔', '😤', '😰'];
 const DEFAULT_SYMPTOMS = ['痛经', '腰酸', '头痛', '疲劳', '腹胀', '乳房胀痛'];
+const FEEDBACK_CATEGORIES = ['功能建议', '问题反馈', '体验优化', '其他'];
 
 const PHASE_INFO: Record<string, { name: string; desc: string; tip: string; color: string; icon: string }> = {
   period: { name: '经期', desc: '休养期', tip: '注意保暖休息，避免剧烈运动', color: '#e07a5f', icon: '🩸' },
@@ -185,6 +187,17 @@ export default function LunaApp() {
 
   // Delete confirmation state
   const [deleteConfirm, setDeleteConfirm] = useState<{ open: boolean; recordId: string; date: string }>({ open: false, recordId: '', date: '' });
+
+  // Feedback state
+  const [feedbackOpen, setFeedbackOpen] = useState(false);
+  const [feedbackCategory, setFeedbackCategory] = useState('功能建议');
+  const [feedbackContent, setFeedbackContent] = useState('');
+  const [feedbackContact, setFeedbackContact] = useState('');
+  const [feedbackSubmitting, setFeedbackSubmitting] = useState(false);
+
+  // Avatar edit state
+  const [editAvatar, setEditAvatar] = useState('');
+  const fileInputRef = React.useRef<HTMLInputElement>(null);
 
   // Daily tip state
   const [dailyTipIndex, setDailyTipIndex] = useState(() => {
@@ -454,6 +467,7 @@ export default function LunaApp() {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         name: editName,
+        avatar: editAvatar,
         cycleLength: editCycleLength,
         periodLength: editPeriodLength,
       }),
@@ -461,6 +475,53 @@ export default function LunaApp() {
     await fetchProfile();
     setProfileEditOpen(false);
     toast({ description: '个人资料已更新 ✅' });
+  }
+
+  async function submitFeedback() {
+    if (!feedbackContent.trim()) {
+      toast({ description: '请输入反馈内容' });
+      return;
+    }
+    setFeedbackSubmitting(true);
+    try {
+      const res = await fetch('/api/feedback', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          category: feedbackCategory,
+          content: feedbackContent.trim(),
+          contact: feedbackContact.trim(),
+        }),
+      });
+      if (res.ok) {
+        setFeedbackOpen(false);
+        setFeedbackContent('');
+        setFeedbackContact('');
+        setFeedbackCategory('功能建议');
+        toast({ description: '感谢您的反馈！我们会认真处理 💖' });
+      } else {
+        toast({ description: '提交失败，请稍后重试' });
+      }
+    } catch {
+      toast({ description: '提交失败，请稍后重试' });
+    } finally {
+      setFeedbackSubmitting(false);
+    }
+  }
+
+  function handleAvatarUpload(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (file.size > 2 * 1024 * 1024) {
+      toast({ description: '图片大小不能超过2MB' });
+      return;
+    }
+    const reader = new FileReader();
+    reader.onload = (ev) => {
+      const result = ev.target?.result as string;
+      setEditAvatar(result);
+    };
+    reader.readAsDataURL(file);
   }
 
   async function deleteRecord(id: string) {
@@ -1354,11 +1415,15 @@ export default function LunaApp() {
               {/* User Info */}
               <StaggerIn delay={0.05}>
                 <div className="flex items-center gap-4 mb-6">
-                  <div className="w-16 h-16 rounded-full flex items-center justify-center"
-                    style={{ background: 'linear-gradient(135deg, #e07a5f, #81b29a)' }}>
-                    <span className="text-2xl font-light" style={{ fontFamily: 'Georgia, serif', color: '#0f1419' }}>
-                      {profile?.name?.charAt(0) || 'L'}
-                    </span>
+                  <div className="relative w-16 h-16 rounded-full flex items-center justify-center overflow-hidden"
+                    style={{ background: profile?.avatar ? 'transparent' : 'linear-gradient(135deg, #e07a5f, #81b29a)' }}>
+                    {profile?.avatar ? (
+                      <img src={profile.avatar} alt="头像" className="w-full h-full object-cover" />
+                    ) : (
+                      <span className="text-2xl font-light" style={{ fontFamily: 'Georgia, serif', color: '#0f1419' }}>
+                        {profile?.name?.charAt(0) || 'L'}
+                      </span>
+                    )}
                   </div>
                   <div className="flex-1">
                     <p className="text-xl font-light" style={{ fontFamily: 'Georgia, serif' }}>{profile?.name || 'Luna'}</p>
@@ -1368,6 +1433,7 @@ export default function LunaApp() {
                     style={{ background: '#232b35', border: '1px solid rgba(255,255,255,0.08)' }}
                     onClick={() => {
                       setEditName(profile?.name || 'Luna');
+                      setEditAvatar(profile?.avatar || '');
                       setEditCycleLength(profile?.cycleLength || 28);
                       setEditPeriodLength(profile?.periodLength || 5);
                       setProfileEditOpen(true);
@@ -1538,12 +1604,12 @@ export default function LunaApp() {
                 <div className="rounded-[20px] p-5 mb-4" style={{ background: '#232b35', border: '1px solid rgba(255,255,255,0.08)' }}>
                   <p className="text-sm font-medium mb-3">其他</p>
                   {[
-                    { icon: Globe, label: '语言', desc: '简体中文' },
-                    { icon: Info, label: '关于我们', desc: '版本 1.0.0' },
-                    { icon: MessageSquare, label: '意见反馈', desc: '帮助我们改进' },
+                    { icon: Globe, label: '语言', desc: '简体中文', action: () => toast({ description: '语言设置功能开发中' }) },
+                    { icon: Info, label: '关于我们', desc: '版本 1.0.0', action: () => toast({ description: '关于我们功能开发中' }) },
+                    { icon: MessageSquare, label: '意见反馈', desc: '帮助我们改进', action: () => setFeedbackOpen(true) },
                   ].map((item, i) => (
                     <div key={i} className="flex items-center gap-3.5 py-3.5 cursor-pointer transition-all active:scale-[0.98]"
-                      onClick={() => toast({ description: `${item.label}功能开发中` })}>
+                      onClick={item.action}>
                       <div className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0" style={{ background: '#1a2027' }}>
                         <item.icon size={20} style={{ color: '#a8a29e' }} />
                       </div>
@@ -1834,11 +1900,48 @@ export default function LunaApp() {
               exit={{ y: '100%' }}
               transition={{ type: 'spring', damping: 25, stiffness: 300 }}
               className="absolute bottom-0 left-0 right-0 rounded-t-3xl p-5 pb-8"
-              style={{ background: '#1a2027' }}
+              style={{ background: '#1a2027', maxHeight: '85vh', overflowY: 'auto' }}
               onClick={e => e.stopPropagation()}
             >
               <div className="w-9 h-1 rounded-full mx-auto mb-4 opacity-50" style={{ background: '#6b7280' }} />
               <div className="text-center mb-5"><span className="text-lg font-medium">编辑个人资料</span></div>
+
+              {/* Avatar Upload */}
+              <div className="flex justify-center mb-6">
+                <div className="relative">
+                  <div className="w-24 h-24 rounded-full flex items-center justify-center overflow-hidden"
+                    style={{ background: editAvatar ? 'transparent' : 'linear-gradient(135deg, #e07a5f, #81b29a)', border: '3px solid rgba(255,255,255,0.1)' }}>
+                    {editAvatar ? (
+                      <img src={editAvatar} alt="头像预览" className="w-full h-full object-cover" />
+                    ) : (
+                      <span className="text-4xl font-light" style={{ fontFamily: 'Georgia, serif', color: '#0f1419' }}>
+                        {editName?.charAt(0) || 'L'}
+                      </span>
+                    )}
+                  </div>
+                  <button
+                    className="absolute -bottom-1 -right-1 w-9 h-9 rounded-full flex items-center justify-center shadow-lg transition-all active:scale-90"
+                    style={{ background: 'linear-gradient(135deg, #e07a5f, #d4a574)' }}
+                    onClick={() => fileInputRef.current?.click()}>
+                    <Camera size={16} style={{ color: '#0f1419' }} />
+                  </button>
+                  {editAvatar && (
+                    <button
+                      className="absolute -top-1 -right-1 w-7 h-7 rounded-full flex items-center justify-center shadow-lg transition-all active:scale-90"
+                      style={{ background: 'rgba(239,68,68,0.9)' }}
+                      onClick={() => setEditAvatar('')}>
+                      <X size={12} style={{ color: '#fff' }} />
+                    </button>
+                  )}
+                  <input
+                    ref={fileInputRef}
+                    type="file"
+                    accept="image/*"
+                    className="hidden"
+                    onChange={handleAvatarUpload}
+                  />
+                </div>
+              </div>
 
               {/* Name */}
               <div className="mb-5">
@@ -1960,6 +2063,121 @@ export default function LunaApp() {
                   onClick={() => deleteRecord(deleteConfirm.recordId)}>
                   删除
                 </button>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* ============ Feedback Sheet ============ */}
+      <AnimatePresence>
+        {feedbackOpen && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-[200]"
+            style={{ background: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(8px)' }}
+            onClick={() => { setFeedbackOpen(false); setFeedbackContent(''); setFeedbackContact(''); }}
+          >
+            <motion.div
+              initial={{ y: '100%' }}
+              animate={{ y: 0 }}
+              exit={{ y: '100%' }}
+              transition={{ type: 'spring', damping: 25, stiffness: 300 }}
+              className="absolute bottom-0 left-0 right-0 rounded-t-3xl p-5 pb-8"
+              style={{ background: '#1a2027', maxHeight: '85vh', overflowY: 'auto' }}
+              onClick={e => e.stopPropagation()}
+            >
+              <div className="w-9 h-1 rounded-full mx-auto mb-4 opacity-50" style={{ background: '#6b7280' }} />
+              <div className="text-center mb-5">
+                <div className="w-14 h-14 rounded-2xl flex items-center justify-center mx-auto mb-3"
+                  style={{ background: 'rgba(224,122,95,0.12)', border: '1px solid rgba(224,122,95,0.2)' }}>
+                  <MessageSquare size={24} style={{ color: '#e07a5f' }} />
+                </div>
+                <span className="text-lg font-medium">意见反馈</span>
+                <p className="text-xs mt-1" style={{ color: '#6b7280' }}>您的每一条反馈都是我们进步的动力</p>
+              </div>
+
+              {/* Category Selection */}
+              <div className="mb-5">
+                <label className="text-sm mb-2.5 block" style={{ color: '#a8a29e' }}>反馈类型</label>
+                <div className="flex gap-2 flex-wrap">
+                  {FEEDBACK_CATEGORIES.map(cat => (
+                    <button key={cat}
+                      className="px-4 py-2 rounded-xl text-sm font-medium transition-all active:scale-95"
+                      style={{
+                        background: feedbackCategory === cat ? 'rgba(224,122,95,0.15)' : '#232b35',
+                        color: feedbackCategory === cat ? '#e07a5f' : '#a8a29e',
+                        border: feedbackCategory === cat ? '1px solid rgba(224,122,95,0.3)' : '1px solid rgba(255,255,255,0.06)',
+                      }}
+                      onClick={() => setFeedbackCategory(cat)}>
+                      {cat}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Content */}
+              <div className="mb-5">
+                <label className="text-sm mb-2.5 block" style={{ color: '#a8a29e' }}>反馈内容</label>
+                <textarea
+                  className="w-full rounded-xl p-3 text-sm outline-none transition-all resize-none"
+                  style={{ background: '#232b35', border: '1.5px solid rgba(255,255,255,0.06)', color: '#f0ece4', minHeight: '120px' }}
+                  placeholder="请详细描述您的建议或遇到的问题..."
+                  value={feedbackContent}
+                  onChange={e => setFeedbackContent(e.target.value)}
+                  onFocus={e => e.currentTarget.style.borderColor = '#d4a57440'}
+                  onBlur={e => e.currentTarget.style.borderColor = 'rgba(255,255,255,0.06)'}
+                />
+                <div className="flex justify-end mt-1">
+                  <span className="text-[11px]" style={{ color: feedbackContent.length > 500 ? '#ef4444' : '#6b7280' }}>
+                    {feedbackContent.length}/500
+                  </span>
+                </div>
+              </div>
+
+              {/* Contact */}
+              <div className="mb-6">
+                <label className="text-sm mb-2.5 block" style={{ color: '#a8a29e' }}>联系方式 <span style={{ color: '#6b7280' }}>(选填)</span></label>
+                <input type="text"
+                  className="w-full rounded-xl p-3 text-sm outline-none transition-all"
+                  style={{ background: '#232b35', border: '1.5px solid rgba(255,255,255,0.06)', color: '#f0ece4' }}
+                  placeholder="邮箱或手机号，方便我们联系您"
+                  value={feedbackContact}
+                  onChange={e => setFeedbackContact(e.target.value)}
+                  onFocus={e => e.currentTarget.style.borderColor = '#d4a57440'}
+                  onBlur={e => e.currentTarget.style.borderColor = 'rgba(255,255,255,0.06)'}
+                />
+              </div>
+
+              <motion.button
+                className="w-full py-4 rounded-2xl font-medium text-lg flex items-center justify-center gap-2"
+                style={{
+                  background: feedbackSubmitting ? '#232b35' : 'linear-gradient(135deg, #e07a5f, #d4a574)',
+                  color: feedbackSubmitting ? '#a8a29e' : '#0f1419',
+                }}
+                whileTap={{ scale: 0.97 }}
+                disabled={feedbackSubmitting}
+                onClick={submitFeedback}>
+                {feedbackSubmitting ? (
+                  <motion.div
+                    className="w-5 h-5 border-2 rounded-full"
+                    style={{ borderColor: '#a8a29e', borderTopColor: 'transparent' }}
+                    animate={{ rotate: 360 }}
+                    transition={{ duration: 1, repeat: Infinity, ease: 'linear' }}
+                  />
+                ) : (
+                  <>
+                    <Send size={18} />
+                    <span>提交反馈</span>
+                  </>
+                )}
+              </motion.button>
+              <div className="text-center py-4 cursor-pointer transition-colors"
+                style={{ color: '#6b7280' }}
+                onClick={() => { setFeedbackOpen(false); setFeedbackContent(''); setFeedbackContact(''); }}>
+                取消
               </div>
             </motion.div>
           </motion.div>

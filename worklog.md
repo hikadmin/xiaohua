@@ -96,3 +96,62 @@ Recommended Next Steps:
 - Add cloud sync functionality
 - Improve period prediction algorithm
 - Add water intake / sleep tracking
+
+---
+Task ID: 3
+Agent: Main Agent (User Request)
+Task: Enhance "我的" (Profile) tab with user avatar/name editing and feedback submission
+
+Work Log:
+- Read worklog.md to understand current project state (2 previous cron tasks)
+- Updated Prisma schema to add `avatar` field (String, default "") to UserProfile model
+- Added new `Feedback` model with category, content, contact, status fields
+- Ran `db:push` to sync database schema changes
+- Created `/api/feedback` API route with GET (list all) and POST (submit) endpoints
+- Updated `/api/profile` PUT endpoint to support `avatar` field
+- Added Camera, Send icons to imports in page.tsx
+- Added `avatar` field to UserProfile interface
+- Added FEEDBACK_CATEGORIES constant: 功能建议, 问题反馈, 体验优化, 其他
+- Added feedback state variables: feedbackOpen, feedbackCategory, feedbackContent, feedbackContact, feedbackSubmitting
+- Added avatar editing state: editAvatar, fileInputRef
+- Implemented `handleAvatarUpload` function: reads image file, validates size (2MB limit), converts to base64 data URL
+- Implemented `submitFeedback` function: validates content, posts to API, shows success toast, resets form
+- Updated `saveProfile` to include avatar in API payload
+- Updated Profile tab user info section to display uploaded avatar image or fallback to initial letter
+- Updated profile edit button onClick to include editAvatar state
+- Enhanced Profile Edit Sheet with avatar upload UI: circular avatar preview, camera button to trigger file picker, X button to remove avatar, hidden file input
+- Added max-height with scroll to Profile Edit Sheet for overflow handling
+- Added Feedback Bottom Sheet with: category pill selector, content textarea with character counter (500 limit), optional contact input, submit button with loading spinner animation, cancel button
+- Updated "其他" section items to use individual action handlers instead of generic placeholder toast
+- Replaced "意见反馈" placeholder toast with setFeedbackOpen(true) to open feedback sheet
+- All lint checks passing
+- API tests via curl confirmed: Profile API returns avatar field, Feedback API creates/retrieves feedback, Profile update with name works
+- Agent-browser testing limited by sandbox memory constraints (server crashes when browser opens due to memory pressure)
+- VLM analysis of screenshots confirmed profile tab displays correctly with avatar initials
+
+Stage Summary:
+- Two major features added to Profile tab:
+  1. **User Avatar & Name Editing**: Users can upload custom avatar images via file picker, preview before saving, remove avatar with X button. Name editing already existed, now integrated with avatar in same edit sheet.
+  2. **Feedback Submission**: Full feedback form with category selection (4 types), content textarea with character counter, optional contact field, loading animation during submission, success confirmation.
+- Backend: New Feedback model, /api/feedback route, avatar support in profile API
+- Frontend: Avatar upload UI, feedback bottom sheet, enhanced edit profile sheet
+- All API endpoints tested and verified via curl
+- Clean lint
+
+Unsolved Issues / Risks:
+- Sandbox memory constraints prevent agent-browser and dev server from running simultaneously reliably
+- Database uses SQLite (PostgreSQL-compatible schema, easy migration)
+- Some settings still show "功能开发中" placeholder toasts (cloud sync, restore, theme color, privacy mode, data encryption)
+- No onboarding flow for new users
+- Record editing (modifying existing records) not yet implemented
+- Avatar is stored as base64 data URL in database (could be large for high-res images, consider image compression or file storage for production)
+
+Recommended Next Steps:
+- Add image compression before avatar upload (resize to reasonable dimensions)
+- Implement record editing in history view
+- Add onboarding flow for new users
+- Implement theme color customization
+- Add temperature/basal body temperature tracking
+- Improve period prediction algorithm
+- Add water intake / sleep tracking
+- Implement privacy mode and data encryption features

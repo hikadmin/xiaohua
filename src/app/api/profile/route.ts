@@ -30,7 +30,7 @@ export async function GET() {
 export async function PUT(request: NextRequest) {
   try {
     const body = await request.json()
-    const { name, cycleLength, periodLength, lastPeriodStart } = body
+    const { name, avatar, cycleLength, periodLength, lastPeriodStart } = body
 
     let profile = await db.userProfile.findFirst()
 
@@ -49,6 +49,7 @@ export async function PUT(request: NextRequest) {
         where: { id: profile.id },
         data: {
           ...(name !== undefined && { name }),
+          ...(avatar !== undefined && { avatar }),
           ...(cycleLength !== undefined && { cycleLength }),
           ...(periodLength !== undefined && { periodLength }),
           ...(lastPeriodStart !== undefined && { lastPeriodStart }),

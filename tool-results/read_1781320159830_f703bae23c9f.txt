@@ -1,0 +1,2002 @@
+     1→     1→'use client';
+     2→     2→
+     3→     3→import React, { useState, useEffect, useCallback, useMemo } from 'react';
+     4→     4→import { motion, AnimatePresence } from 'framer-motion';
+     5→     5→import {
+     6→     6→  Home, Calendar, FileText, User, Plus, Bell, ChevronLeft, ChevronRight,
+     7→     7→  Droplets, Moon, Sun, Shield, Lock, Eye, Database, Cloud, RotateCcw,
+     8→     8→  Download, Globe, Info, MessageSquare, X, ArrowRight, Target,
+     9→     9→  TrendingUp, Activity, Heart, Clock, Crosshair, Check
+    10→    10→} from 'lucide-react';
+    11→    11→import { useToast } from '@/hooks/use-toast';
+    12→    12→
+    13→    13→// ============ Types ============
+    14→    14→interface Period {
+    15→    15→  id: string;
+    16→    16→  startDate: string;
+    17→    17→  endDate: string | null;
+    18→    18→}
+    19→    19→
+    20→    20→interface DailyRecord {
+    21→    21→  id: string;
+    22→    22→  date: string;
+    23→    23→  flow: number;
+    24→    24→  mood: number;
+    25→    25→  symptoms: string;
+    26→    26→  note: string;
+    27→    27→}
+    28→    28→
+    29→    29→interface UserProfile {
+    30→    30→  id: string;
+    31→    31→  name: string;
+    32→    32→  cycleLength: number;
+    33→    33→  periodLength: number;
+    34→    34→  lastPeriodStart: string | null;
+    35→    35→}
+    36→    36→
+    37→    37→interface Setting {
+    38→    38→  id: string;
+    39→    39→  key: string;
+    40→    40→  value: string;
+    41→    41→}
+    42→    42→
+    43→    43→type TabPage = 'home' | 'calendar' | 'log' | 'profile';
+    44→    44→
+    45→    45→// ============ Constants ============
+    46→    46→const WEEKDAYS_SHORT = ['日', '一', '二', '三', '四', '五', '六'];
+    47→    47→const WEEKDAYS_FULL = ['周日', '周一', '周二', '周三', '周四', '周五', '周六'];
+    48→    48→const FLOW_LABELS = ['', '点滴', '少量', '中等', '大量'];
+    49→    49→const MOOD_LABELS = ['', '开心', '平静', '低落', '烦躁', '焦虑'];
+    50→    50→const MOOD_EMOJIS = ['', '😊', '😌', '😔', '😤', '😰'];
+    51→    51→const DEFAULT_SYMPTOMS = ['痛经', '腰酸', '头痛', '疲劳', '腹胀', '乳房胀痛'];
+    52→    52→
+    53→    53→const PHASE_INFO: Record<string, { name: string; desc: string; tip: string; color: string; icon: string }> = {
+    54→    54→  period: { name: '经期', desc: '休养期', tip: '注意保暖休息，避免剧烈运动', color: '#e07a5f', icon: '🩸' },
+    55→    55→  follicular: { name: '卵泡期', desc: '能量回升期', tip: '雌激素水平上升，适合进行高强度运动和创造性工作', color: '#81b29a', icon: '🌱' },
+    56→    56→  ovulation: { name: '排卵期', desc: '高峰期', tip: '精力充沛，社交能力和创造力最佳', color: '#d4a574', icon: '✨' },
+    57→    57→  luteal: { name: '黄体期', desc: '平缓期', tip: '注意情绪波动，适合轻度运动和放松', color: '#f2cc8f', icon: '🌙' },
+    58→    58→};
+    59→    59→
+    60→    60→// Precomputed tick marks for cycle ring (avoid hydration mismatch from floating-point)
+    61→    61→const RING_TICK_MARKS = Array.from({ length: 28 }, (_, i) => {
+    62→    62→  const angle = (i / 28) * 360;
+    63→    63→  const rad = (angle * Math.PI) / 180;
+    64→    64→  return {
+    65→    65→    x1: +(120 + 105 * Math.cos(rad)).toFixed(2),
+    66→    66→    y1: +(120 + 105 * Math.sin(rad)).toFixed(2),
+    67→    67→    x2: +(120 + 98 * Math.cos(rad)).toFixed(2),
+    68→    68→    y2: +(120 + 98 * Math.sin(rad)).toFixed(2),
+    69→    69→  };
+    70→    70→});
+    71→    71→
+    72→    72→// Daily health tips by phase
+    73→    73→const DAILY_TIPS: Record<string, string[]> = {
+    74→    74→  period: [
+    75→    75→    '🧣 今天适合穿暖色衣服，给自己温暖的呵护',
+    76→    76→    '🍵 喝一杯红糖姜茶，温暖整个身体',
+    77→    77→    '🛁 温水泡脚15分钟，缓解经期不适',
+    78→    78→    '😴 早睡1小时，让身体充分休息',
+    79→    79→    '🧘 轻柔的冥想呼吸，帮助放松身心',
+    80→    80→  ],
+    81→    81→  follicular: [
+    82→    82→    '🏃 今天精力充沛，适合进行高强度运动',
+    83→    83→    '🎨 创造力高峰期，尝试新的创意活动',
+    84→    84→    '🥗 多吃富含铁质的食物，补充流失营养',
+    85→    85→    '💪 体力和耐力提升，挑战新的运动目标',
+    86→    86→    '📚 学习效率最佳，适合阅读和思考',
+    87→    87→  ],
+    88→    88→  ovulation: [
+    89→    89→    '✨ 社交能力最佳，适合与朋友聚会',
+    90→    90→    '💝 自信魅力高峰，适合重要约会和演讲',
+    91→    91→    '🥑 补充健康脂肪，维持激素平衡',
+    92→    92→    '🎯 注意力集中，处理重要工作',
+    93→    93→    '🌟 魅力四射的一天，展现最好的自己',
+    94→    94→  ],
+    95→    95→  luteal: [
+    96→    96→    '🧘 瑜伽和拉伸运动，缓解身体不适',
+    97→    97→    '🍫 适量吃些黑巧克力，提升心情',
+    98→    98→    '📝 记录情绪变化，更好地了解自己',
+    99→    99→    '🎵 听舒缓的音乐，放松紧张情绪',
+   100→   100→    '🌿 补充镁和维生素B6，稳定情绪',
+   101→   101→  ],
+   102→   102→};
+   103→   103→
+   104→   104→// ============ Utility Functions ============
+   105→   105→function formatDateStr(date: Date): string {
+   106→   106→  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
+   107→   107→}
+   108→   108→
+   109→   109→function formatDateChinese(date: Date): string {
+   110→   110→  return `${date.getMonth() + 1}月${date.getDate()}日 ${WEEKDAYS_FULL[date.getDay()]}`;
+   111→   111→}
+   112→   112→
+   113→   113→function formatShortDate(dateStr: string): string {
+   114→   114→  const parts = dateStr.split('-');
+   115→   115→  return `${parseInt(parts[1])}月${parseInt(parts[2])}日`;
+   116→   116→}
+   117→   117→
+   118→   118→function parseDate(dateStr: string): Date {
+   119→   119→  const parts = dateStr.split('-');
+   120→   120→  return new Date(parseInt(parts[0]), parseInt(parts[1]) - 1, parseInt(parts[2]));
+   121→   121→}
+   122→   122→
+   123→   123→function daysBetween(d1: Date, d2: Date): number {
+   124→   124→  return Math.round((d2.getTime() - d1.getTime()) / (1000 * 60 * 60 * 24));
+   125→   125→}
+   126→   126→
+   127→   127→function addDays(date: Date, days: number): Date {
+   128→   128→  const result = new Date(date);
+   129→   129→  result.setDate(result.getDate() + days);
+   130→   130→  return result;
+   131→   131→}
+   132→   132→
+   133→   133→// ============ Stagger animation wrapper ============
+   134→   134→function StaggerIn({ children, delay = 0 }: { children: React.ReactNode; delay?: number }) {
+   135→   135→  return (
+   136→   136→    <motion.div
+   137→   137→      initial={{ opacity: 0, y: 20 }}
+   138→   138→      animate={{ opacity: 1, y: 0 }}
+   139→   139→      transition={{ duration: 0.5, delay, ease: [0.25, 0.46, 0.45, 0.94] }}
+   140→   140→    >
+   141→   141→      {children}
+   142→   142→    </motion.div>
+   143→   143→  );
+   144→   144→}
+   145→   145→
+   146→   146→// ============ Main Component ============
+   147→   147→export default function LunaApp() {
+   148→   148→  const [activeTab, setActiveTab] = useState<TabPage>('home');
+   149→   149→  const [periods, setPeriods] = useState<Period[]>([]);
+   150→   150→  const [records, setRecords] = useState<DailyRecord[]>([]);
+   151→   151→  const [profile, setProfile] = useState<UserProfile | null>(null);
+   152→   152→  const [settings, setSettings] = useState<Setting[]>([]);
+   153→   153→  const [isLoaded, setIsLoaded] = useState(false);
+   154→   154→  const [ringAnimated, setRingAnimated] = useState(false);
+   155→   155→
+   156→   156→  // Calendar state
+   157→   157→  const today = new Date();
+   158→   158→  const [calYear, setCalYear] = useState(today.getFullYear());
+   159→   159→  const [calMonth, setCalMonth] = useState(today.getMonth() + 1);
+   160→   160→
+   161→   161→  // Action sheet state
+   162→   162→  const [actionSheet, setActionSheet] = useState<{
+   163→   163→    open: boolean;
+   164→   164→    dateStr: string;
+   165→   165→    day: number;
+   166→   166→  }>({ open: false, dateStr: '', day: 0 });
+   167→   167→
+   168→   168→  // Symptom sheet state
+   169→   169→  const [symptomSheetOpen, setSymptomSheetOpen] = useState(false);
+   170→   170→  const [newSymptom, setNewSymptom] = useState('');
+   171→   171→
+   172→   172→  // Log state
+   173→   173→  const [logTab, setLogTab] = useState<'record' | 'history'>('record');
+   174→   174→  const [currentFlow, setCurrentFlow] = useState(2);
+   175→   175→  const [currentMood, setCurrentMood] = useState(2);
+   176→   176→  const [selectedSymptoms, setSelectedSymptoms] = useState<string[]>([]);
+   177→   177→  const [customSymptoms, setCustomSymptoms] = useState<string[]>([]);
+   178→   178→  const [noteText, setNoteText] = useState('');
+   179→   179→
+   180→   180→  // Profile editing state
+   181→   181→  const [profileEditOpen, setProfileEditOpen] = useState(false);
+   182→   182→  const [editName, setEditName] = useState('');
+   183→   183→  const [editCycleLength, setEditCycleLength] = useState(28);
+   184→   184→  const [editPeriodLength, setEditPeriodLength] = useState(5);
+   185→   185→
+   186→   186→  // Delete confirmation state
+   187→   187→  const [deleteConfirm, setDeleteConfirm] = useState<{ open: boolean; recordId: string; date: string }>({ open: false, recordId: '', date: '' });
+   188→   188→
+   189→   189→  // Daily tip state
+   190→   190→  const [dailyTipIndex, setDailyTipIndex] = useState(() => {
+   191→   191→    const t = new Date();
+   192→   192→    return (t.getFullYear() * 366 + t.getMonth() * 31 + t.getDate()) % 5;
+   193→   193→  });
+   194→   194→
+   195→   195→  const { toast } = useToast();
+   196→   196→
+   197→   197→  // ============ Data Fetching ============
+   198→   198→  const fetchPeriods = useCallback(async () => {
+   199→   199→    try {
+   200→   200→      const res = await fetch('/api/periods');
+   201→   201→      if (res.ok) setPeriods(await res.json());
+   202→   202→    } catch {}
+   203→   203→  }, []);
+   204→   204→
+   205→   205→  const fetchRecords = useCallback(async () => {
+   206→   206→    try {
+   207→   207→      const res = await fetch('/api/records');
+   208→   208→      if (res.ok) setRecords(await res.json());
+   209→   209→    } catch {}
+   210→   210→  }, []);
+   211→   211→
+   212→   212→  const fetchProfile = useCallback(async () => {
+   213→   213→    try {
+   214→   214→      const res = await fetch('/api/profile');
+   215→   215→      if (res.ok) setProfile(await res.json());
+   216→   216→    } catch {}
+   217→   217→  }, []);
+   218→   218→
+   219→   219→  const fetchSettings = useCallback(async () => {
+   220→   220→    try {
+   221→   221→      const res = await fetch('/api/settings');
+   222→   222→      if (res.ok) setSettings(await res.json());
+   223→   223→    } catch {}
+   224→   224→  }, []);
+   225→   225→
+   226→   226→  const seedData = useCallback(async () => {
+   227→   227→    try {
+   228→   228→      await fetch('/api/seed', { method: 'POST' });
+   229→   229→    } catch {}
+   230→   230→  }, []);
+   231→   231→
+   232→   232→  useEffect(() => {
+   233→   233→    const init = async () => {
+   234→   234→      await seedData();
+   235→   235→      await Promise.all([fetchPeriods(), fetchRecords(), fetchProfile(), fetchSettings()]);
+   236→   236→      setIsLoaded(true);
+   237→   237→      // Trigger ring animation after load
+   238→   238→      setTimeout(() => setRingAnimated(true), 300);
+   239→   239→    };
+   240→   240→    init();
+   241→   241→  }, [seedData, fetchPeriods, fetchRecords, fetchProfile, fetchSettings]);
+   242→   242→
+   243→   243→  // ============ Period Logic ============
+   244→   244→  function getPeriodInfo(dateStr: string) {
+   245→   245→    let isPeriod = false;
+   246→   246→    let isStart = false;
+   247→   247→    let isEnd = false;
+   248→   248→    let isActive = false;
+   249→   249→
+   250→   250→    for (const period of periods) {
+   251→   251→      if (period.startDate && !period.endDate) {
+   252→   252→        if (dateStr === period.startDate) {
+   253→   253→          isPeriod = true; isStart = true; isEnd = true; isActive = true;
+   254→   254→          break;
+   255→   255→        }
+   256→   256→        // Active period extends from start to today
+   257→   257→        const startD = parseDate(period.startDate);
+   258→   258→        const checkD = parseDate(dateStr);
+   259→   259→        if (checkD > startD && checkD <= new Date()) {
+   260→   260→          isPeriod = true;
+   261→   261→          if (dateStr === period.startDate) isStart = true;
+   262→   262→          isActive = true;
+   263→   263→          break;
+   264→   264→        }
+   265→   265→      } else if (period.startDate && period.endDate) {
+   266→   266→        if (dateStr >= period.startDate && dateStr <= period.endDate) {
+   267→   267→          isPeriod = true;
+   268→   268→          if (dateStr === period.startDate) isStart = true;
+   269→   269→          if (dateStr === period.endDate) isEnd = true;
+   270→   270→          break;
+   271→   271→        }
+   272→   272→      }
+   273→   273→    }
+   274→   274→    return { isPeriod, isStart, isEnd, isActive };
+   275→   275→  }
+   276→   276→
+   277→   277→  function hasActivePeriod(): Period | null {
+   278→   278→    return periods.find(p => p.startDate && !p.endDate) || null;
+   279→   279→  }
+   280→   280→
+   281→   281→  function getCycleInfo() {
+   282→   282→    const cycleLength = profile?.cycleLength || 28;
+   283→   283→    const periodLength = profile?.periodLength || 5;
+   284→   284→    const sortedPeriods = [...periods].sort((a, b) => b.startDate.localeCompare(a.startDate));
+   285→   285→    const lastPeriod = sortedPeriods[0];
+   286→   286→
+   287→   287→    if (!lastPeriod) {
+   288→   288→      return {
+   289→   289→        phase: 'follicular', phaseDay: 1, daysUntilNext: cycleLength,
+   290→   290→        cycleLength, periodLength, nextPeriodDate: null, lastPeriodStart: null,
+   291→   291→      };
+   292→   292→    }
+   293→   293→
+   294→   294→    const lastStart = parseDate(lastPeriod.startDate);
+   295→   295→    const now = new Date();
+   296→   296→    now.setHours(0, 0, 0, 0);
+   297→   297→    const daysSinceStart = daysBetween(lastStart, now);
+   298→   298→
+   299→   299→    if (daysSinceStart < 0) {
+   300→   300→      return {
+   301→   301→        phase: 'follicular', phaseDay: 1, daysUntilNext: cycleLength,
+   302→   302→        cycleLength, periodLength, nextPeriodDate: null, lastPeriodStart: lastPeriod.startDate,
+   303→   303→      };
+   304→   304→    }
+   305→   305→
+   306→   306→    const dayInCycle = (daysSinceStart % cycleLength) + 1;
+   307→   307→    const nextPeriodDate = addDays(lastStart, cycleLength);
+   308→   308→    const daysUntilNext = Math.max(0, daysBetween(now, nextPeriodDate));
+   309→   309→
+   310→   310→    let phase: string;
+   311→   311→    if (dayInCycle <= periodLength) {
+   312→   312→      phase = 'period';
+   313→   313→    } else if (dayInCycle <= 13) {
+   314→   314→      phase = 'follicular';
+   315→   315→    } else if (dayInCycle <= 16) {
+   316→   316→      phase = 'ovulation';
+   317→   317→    } else {
+   318→   318→      phase = 'luteal';
+   319→   319→    }
+   320→   320→
+   321→   321→    return {
+   322→   322→      phase, phaseDay: dayInCycle, daysUntilNext,
+   323→   323→      cycleLength, periodLength, nextPeriodDate, lastPeriodStart: lastPeriod.startDate,
+   324→   324→    };
+   325→   325→  }
+   326→   326→
+   327→   327→  function getPredictedPeriodDays(): string[] {
+   328→   328→    const cycleLength = profile?.cycleLength || 28;
+   329→   329→    const periodLength = profile?.periodLength || 5;
+   330→   330→    const sortedPeriods = [...periods].sort((a, b) => b.startDate.localeCompare(a.startDate));
+   331→   331→    const lastPeriod = sortedPeriods[0];
+   332→   332→    if (!lastPeriod || !lastPeriod.endDate) return [];
+   333→   333→
+   334→   334→    const lastEnd = parseDate(lastPeriod.endDate);
+   335→   335→    const nextStart = addDays(lastEnd, cycleLength - periodLength + 1);
+   336→   336→    const days: string[] = [];
+   337→   337→    for (let i = 0; i < periodLength; i++) {
+   338→   338→      days.push(formatDateStr(addDays(nextStart, i)));
+   339→   339→    }
+   340→   340→    return days;
+   341→   341→  }
+   342→   342→
+   343→   343→  function getFertileDays(): string[] {
+   344→   344→    const cycleLength = profile?.cycleLength || 28;
+   345→   345→    const sortedPeriods = [...periods].sort((a, b) => b.startDate.localeCompare(a.startDate));
+   346→   346→    const lastPeriod = sortedPeriods[0];
+   347→   347→    if (!lastPeriod) return [];
+   348→   348→
+   349→   349→    const lastStart = parseDate(lastPeriod.startDate);
+   350→   350→    const ovulationDay = addDays(lastStart, cycleLength - 14);
+   351→   351→    const days: string[] = [];
+   352→   352→    for (let i = -4; i <= 1; i++) {
+   353→   353→      days.push(formatDateStr(addDays(ovulationDay, i)));
+   354→   354→    }
+   355→   355→    return days;
+   356→   356→  }
+   357→   357→
+   358→   358→  // ============ API Actions ============
+   359→   359→  async function startPeriod(dateStr: string) {
+   360→   360→    await fetch('/api/periods', {
+   361→   361→      method: 'POST',
+   362→   362→      headers: { 'Content-Type': 'application/json' },
+   363→   363→      body: JSON.stringify({ startDate: dateStr }),
+   364→   364→    });
+   365→   365→    setActionSheet({ open: false, dateStr: '', day: 0 });
+   366→   366→    await fetchPeriods();
+   367→   367→    toast({ description: '已记录经期开始 💖' });
+   368→   368→  }
+   369→   369→
+   370→   370→  async function endPeriod(dateStr: string) {
+   371→   371→    const active = hasActivePeriod();
+   372→   372→    if (!active) return;
+   373→   373→    if (dateStr < active.startDate) {
+   374→   374→      toast({ description: '结束日期不能早于开始日期' });
+   375→   375→      return;
+   376→   376→    }
+   377→   377→    await fetch(`/api/periods/${active.id}`, {
+   378→   378→      method: 'PUT',
+   379→   379→      headers: { 'Content-Type': 'application/json' },
+   380→   380→      body: JSON.stringify({ endDate: dateStr }),
+   381→   381→    });
+   382→   382→    setActionSheet({ open: false, dateStr: '', day: 0 });
+   383→   383→    await fetchPeriods();
+   384→   384→    toast({ description: '经期已结束，记录完成 ✅' });
+   385→   385→  }
+   386→   386→
+   387→   387→  async function updateStart(dateStr: string) {
+   388→   388→    const active = hasActivePeriod();
+   389→   389→    if (!active) return;
+   390→   390→    await fetch(`/api/periods/${active.id}`, {
+   391→   391→      method: 'PUT',
+   392→   392→      headers: { 'Content-Type': 'application/json' },
+   393→   393→      body: JSON.stringify({ startDate: dateStr }),
+   394→   394→    });
+   395→   395→    setActionSheet({ open: false, dateStr: '', day: 0 });
+   396→   396→    await fetchPeriods();
+   397→   397→    toast({ description: '开始日期已更新' });
+   398→   398→  }
+   399→   399→
+   400→   400→  async function cancelActivePeriod() {
+   401→   401→    const active = hasActivePeriod();
+   402→   402→    if (!active) return;
+   403→   403→    await fetch(`/api/periods/${active.id}`, { method: 'DELETE' });
+   404→   404→    setActionSheet({ open: false, dateStr: '', day: 0 });
+   405→   405→    await fetchPeriods();
+   406→   406→    toast({ description: '已取消当前记录' });
+   407→   407→  }
+   408→   408→
+   409→   409→  async function extendPeriod(dateStr: string) {
+   410→   410→    const sortedPeriods = [...periods].sort((a, b) => b.startDate.localeCompare(a.startDate));
+   411→   411→    const lastPeriod = sortedPeriods[0];
+   412→   412→    if (!lastPeriod) return;
+   413→   413→    await fetch(`/api/periods/${lastPeriod.id}`, {
+   414→   414→      method: 'PUT',
+   415→   415→      headers: { 'Content-Type': 'application/json' },
+   416→   416→      body: JSON.stringify({ endDate: dateStr }),
+   417→   417→    });
+   418→   418→    setActionSheet({ open: false, dateStr: '', day: 0 });
+   419→   419→    await fetchPeriods();
+   420→   420→    toast({ description: '经期已延长' });
+   421→   421→  }
+   422→   422→
+   423→   423→  async function saveRecord() {
+   424→   424→    const todayStr = formatDateStr(new Date());
+   425→   425→    await fetch('/api/records', {
+   426→   426→      method: 'POST',
+   427→   427→      headers: { 'Content-Type': 'application/json' },
+   428→   428→      body: JSON.stringify({
+   429→   429→        date: todayStr,
+   430→   430→        flow: currentFlow,
+   431→   431→        mood: currentMood,
+   432→   432→        symptoms: selectedSymptoms,
+   433→   433→        note: noteText,
+   434→   434→      }),
+   435→   435→    });
+   436→   436→    await fetchRecords();
+   437→   437→    setNoteText('');
+   438→   438→    toast({ description: '记录已保存 ✨' });
+   439→   439→  }
+   440→   440→
+   441→   441→  async function toggleSetting(key: string, currentValue: string) {
+   442→   442→    const newValue = currentValue === 'true' ? 'false' : 'true';
+   443→   443→    await fetch('/api/settings', {
+   444→   444→      method: 'PUT',
+   445→   445→      headers: { 'Content-Type': 'application/json' },
+   446→   446→      body: JSON.stringify({ key, value: newValue }),
+   447→   447→    });
+   448→   448→    await fetchSettings();
+   449→   449→  }
+   450→   450→
+   451→   451→  async function saveProfile() {
+   452→   452→    await fetch('/api/profile', {
+   453→   453→      method: 'PUT',
+   454→   454→      headers: { 'Content-Type': 'application/json' },
+   455→   455→      body: JSON.stringify({
+   456→   456→        name: editName,
+   457→   457→        cycleLength: editCycleLength,
+   458→   458→        periodLength: editPeriodLength,
+   459→   459→      }),
+   460→   460→    });
+   461→   461→    await fetchProfile();
+   462→   462→    setProfileEditOpen(false);
+   463→   463→    toast({ description: '个人资料已更新 ✅' });
+   464→   464→  }
+   465→   465→
+   466→   466→  async function deleteRecord(id: string) {
+   467→   467→    const d = deleteConfirm.date;
+   468→   468→    await fetch(`/api/records/${d}`, { method: 'DELETE' });
+   469→   469→    setDeleteConfirm({ open: false, recordId: '', date: '' });
+   470→   470→    await fetchRecords();
+   471→   471→    toast({ description: '记录已删除' });
+   472→   472→  }
+   473→   473→
+   474→   474→  function exportCSV() {
+   475→   475→    const headers = ['日期', '流量', '情绪', '症状', '备注'];
+   476→   476→    const rows = records.map(r => {
+   477→   477→      const symptoms = JSON.parse(r.symptoms || '[]');
+   478→   478→      return [
+   479→   479→        r.date,
+   480→   480→        FLOW_LABELS[r.flow] || '',
+   481→   481→        MOOD_LABELS[r.mood] || '',
+   482→   482→        symptoms.join(';'),
+   483→   483→        `"${(r.note || '').replace(/"/g, '""')}"`,
+   484→   484→      ];
+   485→   485→    });
+   486→   486→    const csv = [headers.join(','), ...rows.map(r => r.join(','))].join('\n');
+   487→   487→    const BOM = '\uFEFF';
+   488→   488→    const blob = new Blob([BOM + csv], { type: 'text/csv;charset=utf-8;' });
+   489→   489→    const url = URL.createObjectURL(blob);
+   490→   490→    const a = document.createElement('a');
+   491→   491→    a.href = url;
+   492→   492→    a.download = `luna_records_${formatDateStr(new Date())}.csv`;
+   493→   493→    a.click();
+   494→   494→    URL.revokeObjectURL(url);
+   495→   495→    toast({ description: '数据导出成功 📁' });
+   496→   496→  }
+   497→   497→
+   498→   498→  // ============ Calendar Generation ============
+   499→   499→  function generateCalendarDays() {
+   500→   500→    const firstDay = new Date(calYear, calMonth - 1, 1);
+   501→   501→    const lastDay = new Date(calYear, calMonth, 0);
+   502→   502→    const startDayOfWeek = firstDay.getDay();
+   503→   503→    const totalDays = lastDay.getDate();
+   504→   504→    const todayStr = formatDateStr(new Date());
+   505→   505→    const predictedDays = getPredictedPeriodDays();
+   506→   506→    const fertileDays = getFertileDays();
+   507→   507→
+   508→   508→    const days: Array<{
+   509→   509→      day: number;
+   510→   510→      dateStr: string;
+   511→   511→      isToday: boolean;
+   512→   512→      isOtherMonth: boolean;
+   513→   513→      periodInfo: ReturnType<typeof getPeriodInfo>;
+   514→   514→      isPredicted: boolean;
+   515→   515→      isFertile: boolean;
+   516→   516→    }> = [];
+   517→   517→
+   518→   518→    for (let i = 0; i < startDayOfWeek; i++) {
+   519→   519→      days.push({
+   520→   520→        day: 0, dateStr: '', isToday: false, isOtherMonth: true,
+   521→   521→        periodInfo: { isPeriod: false, isStart: false, isEnd: false, isActive: false },
+   522→   522→        isPredicted: false, isFertile: false,
+   523→   523→      });
+   524→   524→    }
+   525→   525→
+   526→   526→    for (let day = 1; day <= totalDays; day++) {
+   527→   527→      const dateStr = `${calYear}-${String(calMonth).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+   528→   528→      const isToday = dateStr === todayStr;
+   529→   529→      const periodInfo = getPeriodInfo(dateStr);
+   530→   530→      const isPredicted = predictedDays.includes(dateStr) && !periodInfo.isPeriod;
+   531→   531→      const isFertile = fertileDays.includes(dateStr) && !periodInfo.isPeriod && !isPredicted;
+   532→   532→
+   533→   533→      days.push({ day, dateStr, isToday, isOtherMonth: false, periodInfo, isPredicted, isFertile });
+   534→   534→    }
+   535→   535→
+   536→   536→    return days;
+   537→   537→  }
+   538→   538→
+   539→   539→  // ============ Cycle Statistics ============
+   540→   540→  const cycleStats = useMemo(() => {
+   541→   541→    const sortedPeriods = [...periods].sort((a, b) => a.startDate.localeCompare(b.startDate));
+   542→   542→    const cycleLengths: number[] = [];
+   543→   543→    const periodLengths: number[] = [];
+   544→   544→
+   545→   545→    for (let i = 1; i < sortedPeriods.length; i++) {
+   546→   546→      if (sortedPeriods[i].endDate) {
+   547→   547→        const cycleLen = daysBetween(parseDate(sortedPeriods[i - 1].startDate), parseDate(sortedPeriods[i].startDate));
+   548→   548→        if (cycleLen > 15 && cycleLen < 50) cycleLengths.push(cycleLen);
+   549→   549→      }
+   550→   550→      if (sortedPeriods[i].endDate) {
+   551→   551→        const periodLen = daysBetween(parseDate(sortedPeriods[i].startDate), parseDate(sortedPeriods[i].endDate!)) + 1;
+   552→   552→        if (periodLen > 0 && periodLen < 15) periodLengths.push(periodLen);
+   553→   553→      }
+   554→   554→    }
+   555→   555→
+   556→   556→    const avgCycle = cycleLengths.length > 0
+   557→   557→      ? Math.round(cycleLengths.reduce((a, b) => a + b, 0) / cycleLengths.length)
+   558→   558→      : (profile?.cycleLength || 28);
+   559→   559→    const avgPeriod = periodLengths.length > 0
+   560→   560→      ? Math.round(periodLengths.reduce((a, b) => a + b, 0) / periodLengths.length)
+   561→   561→      : (profile?.periodLength || 5);
+   562→   562→
+   563→   563→    return {
+   564→   564→      avgCycle,
+   565→   565→      avgPeriod,
+   566→   566→      totalCycles: sortedPeriods.length,
+   567→   567→      cycleLengths,
+   568→   568→      periodLengths,
+   569→   569→    };
+   570→   570→  }, [periods, profile]);
+   571→   571→
+   572→   572→  // ============ Render Helpers ============
+   573→   573→  const cycleInfo = getCycleInfo();
+   574→   574→  const phaseData = PHASE_INFO[cycleInfo.phase] || PHASE_INFO.follicular;
+   575→   575→  const allSymptoms = [...DEFAULT_SYMPTOMS, ...customSymptoms];
+   576→   576→  const isCurrentMonth = calYear === today.getFullYear() && calMonth === today.getMonth() + 1;
+   577→   577→
+   578→   578→  // ============ RENDER ============
+   579→   579→  return (
+   580→   580→    <div className="min-h-screen bg-[#0f1419] text-[#f0ece4] flex flex-col overflow-hidden relative">
+   581→   581→      {/* Animated Background Blobs */}
+   582→   582→      <div className="fixed inset-0 overflow-hidden pointer-events-none z-0">
+   583→   583→        <div className="absolute rounded-full opacity-30 blur-[80px]"
+   584→   584→          style={{
+   585→   585→            width: 300, height: 300,
+   586→   586→            background: `linear-gradient(135deg, ${phaseData.color}40, transparent)`,
+   587→   587→            top: -80, right: -80,
+   588→   588→            animation: 'blob-float 20s ease-in-out infinite',
+   589→   589→            transition: 'background 1s ease',
+   590→   590→          }} />
+   591→   591→        <div className="absolute rounded-full opacity-25 blur-[60px]"
+   592→   592→          style={{
+   593→   593→            width: 250, height: 250,
+   594→   594→            background: 'linear-gradient(135deg, #81b29a, transparent)',
+   595→   595→            bottom: 200, left: -80,
+   596→   596→            animation: 'blob-float 20s ease-in-out infinite',
+   597→   597→            animationDelay: '-7s',
+   598→   598→          }} />
+   599→   599→        <div className="absolute rounded-full opacity-20 blur-[50px]"
+   600→   600→          style={{
+   601→   601→            width: 180, height: 180,
+   602→   602→            background: 'linear-gradient(135deg, #d4a574, transparent)',
+   603→   603→            bottom: -40, right: -40,
+   604→   604→            animation: 'blob-float 20s ease-in-out infinite',
+   605→   605→            animationDelay: '-14s',
+   606→   606→          }} />
+   607→   607→      </div>
+   608→   608→
+   609→   609→      {/* Main Content Area */}
+   610→   610→      <main className="flex-1 relative z-10 overflow-y-auto overflow-x-hidden safe-top" style={{ paddingBottom: 90 }}>
+   611→   611→        <AnimatePresence mode="wait">
+   612→   612→          {/* ============ HOME TAB ============ */}
+   613→   613→          {activeTab === 'home' && (
+   614→   614→            <motion.div
+   615→   615→              key="home"
+   616→   616→              initial={{ opacity: 0, x: 20 }}
+   617→   617→              animate={{ opacity: 1, x: 0 }}
+   618→   618→              exit={{ opacity: 0, x: -20 }}
+   619→   619→              transition={{ duration: 0.3 }}
+   620→   620→              className="px-5 pt-12 pb-6"
+   621→   621→            >
+   622→   622→              {/* Header */}
+   623→   623→              <StaggerIn delay={0.05}>
+   624→   624→                <div className="flex justify-between items-center mb-4">
+   625→   625→                  <div>
+   626→   626→                    <p className="text-sm" style={{ color: '#a8a29e' }}>今天</p>
+   627→   627→                    <p className="text-2xl font-light" style={{ fontFamily: 'Georgia, serif' }}>
+   628→   628→                      {formatDateChinese(today)}
+   629→   629→                    </p>
+   630→   630→                  </div>
+   631→   631→                  <button className="w-10 h-10 rounded-full flex items-center justify-center transition-all hover:scale-105 active:scale-95"
+   632→   632→                    style={{ background: '#232b35', border: '1px solid rgba(255,255,255,0.08)' }}>
+   633→   633→                    <Bell size={18} style={{ color: '#a8a29e' }} />
+   634→   634→                  </button>
+   635→   635→                </div>
+   636→   636→              </StaggerIn>
+   637→   637→
+   638→   638→              {/* Phase Card */}
+   639→   639→              <StaggerIn delay={0.1}>
+   640→   640→                <div className="rounded-[20px] p-5 mb-4 transition-all"
+   641→   641→                  style={{
+   642→   642→                    background: `linear-gradient(135deg, ${phaseData.color}10, #232b35)`,
+   643→   643→                    border: `1px solid ${phaseData.color}30`,
+   644→   644→                  }}>
+   645→   645→                  <div className="flex items-center gap-3 mb-3">
+   646→   646→                    <span className="text-lg">{phaseData.icon}</span>
+   647→   647→                    <div className="w-2.5 h-2.5 rounded-full"
+   648→   648→                      style={{ background: phaseData.color, boxShadow: `0 0 10px ${phaseData.color}80` }} />
+   649→   649→                    <span className="text-sm font-medium" style={{ color: phaseData.color }}>
+   650→   650→                      {phaseData.name} 第{cycleInfo.phaseDay}天
+   651→   651→                    </span>
+   652→   652→                  </div>
+   653→   653→                  <p className="text-lg font-light mb-2">{phaseData.desc}</p>
+   654→   654→                  <p className="text-sm" style={{ color: '#a8a29e' }}>{phaseData.tip}</p>
+   655→   655→                </div>
+   656→   656→              </StaggerIn>
+   657→   657→
+   658→   658→              {/* Cycle Ring */}
+   659→   659→              <StaggerIn delay={0.2}>
+   660→   660→                <div className="flex flex-col items-center my-6">
+   661→   661→                  <div className="relative" style={{ width: 240, height: 240 }}>
+   662→   662→                    <svg width="240" height="240" viewBox="0 0 240 240" style={{ transform: 'rotate(-90deg)' }}>
+   663→   663→                      <defs>
+   664→   664→                        <linearGradient id="ringGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+   665→   665→                          <stop offset="0%" stopColor={phaseData.color} />
+   666→   666→                          <stop offset="50%" stopColor="#d4a574" />
+   667→   667→                          <stop offset="100%" stopColor="#81b29a" />
+   668→   668→                        </linearGradient>
+   669→   669→                      </defs>
+   670→   670→                      {/* Track */}
+   671→   671→                      <circle cx="120" cy="120" r="105" fill="none" stroke="rgba(255,255,255,0.06)" strokeWidth="7" />
+   672→   672→                      {/* Subtle tick marks */}
+   673→   673→                      {RING_TICK_MARKS.map((tick, i) => (
+   674→   674→                        <line key={i} x1={tick.x1} y1={tick.y1} x2={tick.x2} y2={tick.y2}
+   675→   675→                          stroke="rgba(255,255,255,0.08)" strokeWidth="1" />
+   676→   676→                      ))}
+   677→   677→                      {/* Progress */}
+   678→   678→                      <circle
+   679→   679→                        cx="120" cy="120" r="105" fill="none"
+   680→   680→                        stroke="url(#ringGradient)" strokeWidth="7" strokeLinecap="round"
+   681→   681→                        strokeDasharray={2 * Math.PI * 105}
+   682→   682→                        strokeDashoffset={ringAnimated ? 2 * Math.PI * 105 * (1 - (cycleInfo.phaseDay / cycleInfo.cycleLength)) : 2 * Math.PI * 105}
+   683→   683→                        style={{ transition: 'stroke-dashoffset 2s cubic-bezier(0.4, 0, 0.2, 1)' }}
+   684→   684→                      />
+   685→   685→                      {/* Glow */}
+   686→   686→                      <circle
+   687→   687→                        cx="120" cy="120" r="105" fill="none"
+   688→   688→                        stroke="url(#ringGradient)" strokeWidth="14" strokeLinecap="round"
+   689→   689→                        strokeDasharray={2 * Math.PI * 105}
+   690→   690→                        strokeDashoffset={ringAnimated ? 2 * Math.PI * 105 * (1 - (cycleInfo.phaseDay / cycleInfo.cycleLength)) : 2 * Math.PI * 105}
+   691→   691→                        filter="blur(6px)" opacity={0.4}
+   692→   692→                        style={{ transition: 'stroke-dashoffset 2s cubic-bezier(0.4, 0, 0.2, 1)' }}
+   693→   693→                      />
+   694→   694→                    </svg>
+   695→   695→                    {/* Center Content */}
+   696→   696→                    <div className="absolute inset-[25px] rounded-full flex flex-col items-center justify-center">
+   697→   697→                      <p className="text-xs mb-0.5" style={{ color: '#6b7280' }}>下次经期预计</p>
+   698→   698→                      <motion.p
+   699→   699→                        className="text-4xl font-light"
+   700→   700→                        style={{ fontFamily: 'Georgia, serif' }}
+   701→   701→                        key={cycleInfo.daysUntilNext}
+   702→   702→                        initial={{ scale: 0.8, opacity: 0 }}
+   703→   703→                        animate={{ scale: 1, opacity: 1 }}
+   704→   704→                        transition={{ type: 'spring', stiffness: 300, damping: 25 }}
+   705→   705→                      >
+   706→   706→                        {cycleInfo.daysUntilNext}
+   707→   707→                      </motion.p>
+   708→   708→                      <p className="text-sm" style={{ color: '#a8a29e' }}>天后</p>
+   709→   709→                    </div>
+   710→   710→                  </div>
+   711→   711→                </div>
+   712→   712→              </StaggerIn>
+   713→   713→
+   714→   714→              {/* Stats Grid */}
+   715→   715→              <StaggerIn delay={0.3}>
+   716→   716→                <div className="grid grid-cols-2 gap-3">
+   717→   717→                  <div className="rounded-[20px] p-4" style={{ background: '#232b35', border: '1px solid rgba(255,255,255,0.08)' }}>
+   718→   718→                    <div className="flex items-center gap-2 mb-2">
+   719→   719→                      <Activity size={14} style={{ color: '#81b29a' }} />
+   720→   720→                      <p className="text-xs" style={{ color: '#6b7280' }}>周期长度</p>
+   721→   721→                    </div>
+   722→   722→                    <p className="text-2xl font-light" style={{ fontFamily: 'Georgia, serif' }}>
+   723→   723→                      {cycleStats.avgCycle}
+   724→   724→                      <span className="text-sm ml-1" style={{ color: '#a8a29e' }}>天</span>
+   725→   725→                    </p>
+   726→   726→                  </div>
+   727→   727→                  <div className="rounded-[20px] p-4" style={{ background: '#232b35', border: '1px solid rgba(255,255,255,0.08)' }}>
+   728→   728→                    <div className="flex items-center gap-2 mb-2">
+   729→   729→                      <Droplets size={14} style={{ color: '#e07a5f' }} />
+   730→   730→                      <p className="text-xs" style={{ color: '#6b7280' }}>经期长度</p>
+   731→   731→                    </div>
+   732→   732→                    <p className="text-2xl font-light" style={{ fontFamily: 'Georgia, serif' }}>
+   733→   733→                      {cycleStats.avgPeriod}
+   734→   734→                      <span className="text-sm ml-1" style={{ color: '#a8a29e' }}>天</span>
+   735→   735→                    </p>
+   736→   736→                  </div>
+   737→   737→                </div>
+   738→   738→              </StaggerIn>
+   739→   739→
+   740→   740→              {/* Cycle Phase Timeline */}
+   741→   741→              <StaggerIn delay={0.35}>
+   742→   742→                <div className="rounded-[20px] p-5 mt-4" style={{ background: '#232b35', border: '1px solid rgba(255,255,255,0.08)' }}>
+   743→   743→                  <p className="text-sm font-medium mb-4">周期阶段</p>
+   744→   744→                  <div className="flex gap-1 h-3 rounded-full overflow-hidden mb-3">
+   745→   745→                    {/* Period phase */}
+   746→   746→                    <div
+   747→   747→                      className="rounded-l-full transition-all"
+   748→   748→                      style={{
+   749→   749→                        width: `${(cycleInfo.periodLength / cycleInfo.cycleLength) * 100}%`,
+   750→   750→                        background: '#e07a5f',
+   751→   751→                        boxShadow: cycleInfo.phase === 'period' ? '0 0 8px #e07a5f80' : 'none',
+   752→   752→                      }} />
+   753→   753→                    {/* Follicular phase */}
+   754→   754→                    <div
+   755→   755→                      className="transition-all"
+   756→   756→                      style={{
+   757→   757→                        width: `${((13 - cycleInfo.periodLength) / cycleInfo.cycleLength) * 100}%`,
+   758→   758→                        background: cycleInfo.phase === 'follicular' ? '#81b29a' : '#81b29a60',
+   759→   759→                        boxShadow: cycleInfo.phase === 'follicular' ? '0 0 8px #81b29a80' : 'none',
+   760→   760→                      }} />
+   761→   761→                    {/* Ovulation phase */}
+   762→   762→                    <div
+   763→   763→                      className="transition-all"
+   764→   764→                      style={{
+   765→   765→                        width: `${(3 / cycleInfo.cycleLength) * 100}%`,
+   766→   766→                        background: cycleInfo.phase === 'ovulation' ? '#d4a574' : '#d4a57460',
+   767→   767→                        boxShadow: cycleInfo.phase === 'ovulation' ? '0 0 8px #d4a57480' : 'none',
+   768→   768→                      }} />
+   769→   769→                    {/* Luteal phase */}
+   770→   770→                    <div
+   771→   771→                      className="rounded-r-full transition-all"
+   772→   772→                      style={{
+   773→   773→                        width: `${((cycleInfo.cycleLength - 16) / cycleInfo.cycleLength) * 100}%`,
+   774→   774→                        background: cycleInfo.phase === 'luteal' ? '#f2cc8f' : '#f2cc8f60',
+   775→   775→                        boxShadow: cycleInfo.phase === 'luteal' ? '0 0 8px #f2cc8f80' : 'none',
+   776→   776→                      }} />
+   777→   777→                  </div>
+   778→   778→                  <div className="flex justify-between text-xs" style={{ color: '#6b7280' }}>
+   779→   779→                    <span style={{ color: cycleInfo.phase === 'period' ? '#e07a5f' : '#6b7280' }}>经期</span>
+   780→   780→                    <span style={{ color: cycleInfo.phase === 'follicular' ? '#81b29a' : '#6b7280' }}>卵泡期</span>
+   781→   781→                    <span style={{ color: cycleInfo.phase === 'ovulation' ? '#d4a574' : '#6b7280' }}>排卵</span>
+   782→   782→                    <span style={{ color: cycleInfo.phase === 'luteal' ? '#f2cc8f' : '#6b7280' }}>黄体期</span>
+   783→   783→                  </div>
+   784→   784→                </div>
+   785→   785→              </StaggerIn>
+   786→   786→
+   787→   787→              {/* Recent Records */}
+   788→   788→              {records.length > 0 && (
+   789→   789→                <StaggerIn delay={0.4}>
+   790→   790→                  <div className="mt-4 rounded-[20px] p-5" style={{ background: '#232b35', border: '1px solid rgba(255,255,255,0.08)' }}>
+   791→   791→                    <div className="flex justify-between items-center mb-3">
+   792→   792→                      <p className="text-sm font-medium">最近记录</p>
+   793→   793→                      <button className="text-xs px-3 py-1 rounded-full transition-all hover:scale-105"
+   794→   794→                        style={{ background: 'rgba(255,255,255,0.05)', color: '#a8a29e' }}
+   795→   795→                        onClick={() => { setActiveTab('log'); setLogTab('history'); }}>
+   796→   796→                        查看全部
+   797→   797→                      </button>
+   798→   798→                    </div>
+   799→   799→                    {records.slice(0, 3).map(record => {
+   800→   800→                      const d = parseDate(record.date);
+   801→   801→                      const symptoms = JSON.parse(record.symptoms || '[]');
+   802→   802→                      return (
+   803→   803→                        <div key={record.id} className="flex items-center gap-3 py-2.5 border-b last:border-0"
+   804→   804→                          style={{ borderColor: 'rgba(255,255,255,0.04)' }}>
+   805→   805→                          <div className="w-8 h-8 rounded-xl flex items-center justify-center text-sm"
+   806→   806→                            style={{ background: `${phaseData.color}15` }}>
+   807→   807→                            {MOOD_EMOJIS[record.mood] || '📝'}
+   808→   808→                          </div>
+   809→   809→                          <div className="flex-1 min-w-0">
+   810→   810→                            <p className="text-sm font-medium">{d.getMonth() + 1}月{d.getDate()}日</p>
+   811→   811→                            <div className="flex gap-1 mt-0.5 flex-wrap">
+   812→   812→                              {symptoms.slice(0, 2).map((s: string, i: number) => (
+   813→   813→                                <span key={i} className="text-[11px] px-1.5 py-0.5 rounded-md"
+   814→   814→                                  style={{ background: 'rgba(224,122,95,0.1)', color: '#e07a5f' }}>
+   815→   815→                                  {s}
+   816→   816→                                </span>
+   817→   817→                              ))}
+   818→   818→                              {symptoms.length > 2 && (
+   819→   819→                                <span className="text-[11px] px-1.5 py-0.5" style={{ color: '#6b7280' }}>
+   820→   820→                                  +{symptoms.length - 2}
+   821→   821→                                </span>
+   822→   822→                              )}
+   823→   823→                            </div>
+   824→   824→                          </div>
+   825→   825→                          <span className="text-xs flex-shrink-0" style={{ color: '#6b7280' }}>
+   826→   826→                            {FLOW_LABELS[record.flow]}
+   827→   827→                          </span>
+   828→   828→                        </div>
+   829→   829→                      );
+   830→   830→                    })}
+   831→   831→                  </div>
+   832→   832→                </StaggerIn>
+   833→   833→              )}
+   834→   834→
+   835→   835→              {/* Daily Health Tip */}
+   836→   836→              <StaggerIn delay={0.45}>
+   837→   837→                <div className="mt-4 rounded-[20px] p-5 relative overflow-hidden"
+   838→   838→                  style={{
+   839→   839→                    background: `linear-gradient(135deg, ${phaseData.color}15, #232b3580)`,
+   840→   840→                    border: `1px solid ${phaseData.color}20`,
+   841→   841→                    backdropFilter: 'blur(20px)',
+   842→   842→                  }}>
+   843→   843→                  <div className="absolute top-0 right-0 w-24 h-24 rounded-full opacity-10"
+   844→   844→                    style={{ background: phaseData.color, filter: 'blur(30px)', transform: 'translate(30%, -30%)' }} />
+   845→   845→                  <div className="flex items-start gap-3">
+   846→   846→                    <div className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0"
+   847→   847→                      style={{ background: `${phaseData.color}20` }}>
+   848→   848→                      <span className="text-lg">💡</span>
+   849→   849→                    </div>
+   850→   850→                    <div className="flex-1">
+   851→   851→                      <p className="text-sm font-medium mb-1">今日小贴士</p>
+   852→   852→                      <motion.p
+   853→   853→                        className="text-sm leading-relaxed"
+   854→   854→                        style={{ color: '#a8a29e' }}
+   855→   855→                        key={dailyTipIndex}
+   856→   856→                        initial={{ opacity: 0, y: 5 }}
+   857→   857→                        animate={{ opacity: 1, y: 0 }}
+   858→   858→                        transition={{ duration: 0.3 }}
+   859→   859→                      >
+   860→   860→                        {DAILY_TIPS[cycleInfo.phase]?.[dailyTipIndex] || DAILY_TIPS.follicular[0]}
+   861→   861→                      </motion.p>
+   862→   862→                    </div>
+   863→   863→                    <button className="flex-shrink-0 w-8 h-8 rounded-lg flex items-center justify-center transition-all hover:scale-110 active:scale-95"
+   864→   864→                      style={{ background: 'rgba(255,255,255,0.05)' }}
+   865→   865→                      onClick={() => setDailyTipIndex(prev => (prev + 1) % 5)}>
+   866→   866→                      <ArrowRight size={14} style={{ color: '#a8a29e' }} />
+   867→   867→                    </button>
+   868→   868→                  </div>
+   869→   869→                </div>
+   870→   870→              </StaggerIn>
+   871→   871→
+   872→   872→              {/* Cycle Trend Mini Chart */}
+   873→   873→              {cycleStats.cycleLengths.length > 0 && (
+   874→   874→                <StaggerIn delay={0.5}>
+   875→   875→                  <div className="mt-4 rounded-[20px] p-5" style={{ background: '#232b35', border: '1px solid rgba(255,255,255,0.08)' }}>
+   876→   876→                    <div className="flex justify-between items-center mb-4">
+   877→   877→                      <p className="text-sm font-medium">周期趋势</p>
+   878→   878→                      <span className="text-xs" style={{ color: '#6b7280' }}>最近{Math.min(cycleStats.cycleLengths.length, 6)}个周期</span>
+   879→   879→                    </div>
+   880→   880→                    <div className="flex items-end gap-2 h-20">
+   881→   881→                      {cycleStats.cycleLengths.slice(-6).map((len, i) => {
+   882→   882→                        const maxLen = Math.max(...cycleStats.cycleLengths.slice(-6));
+   883→   883→                        const minLen = Math.min(...cycleStats.cycleLengths.slice(-6));
+   884→   884→                        const range = maxLen - minLen || 1;
+   885→   885→                        const height = 20 + ((len - minLen) / range) * 60;
+   886→   886→                        const isLast = i === cycleStats.cycleLengths.slice(-6).length - 1;
+   887→   887→                        return (
+   888→   888→                          <motion.div key={i} className="flex-1 flex flex-col items-center gap-1"
+   889→   889→                            initial={{ height: 0, opacity: 0 }}
+   890→   890→                            animate={{ height: 'auto', opacity: 1 }}
+   891→   891→                            transition={{ delay: 0.1 * i, duration: 0.4 }}>
+   892→   892→                            <span className="text-[10px]" style={{ color: '#6b7280' }}>{len}</span>
+   893→   893→                            <motion.div
+   894→   894→                              className="w-full rounded-t-md"
+   895→   895→                              style={{
+   896→   896→                                height,
+   897→   897→                                background: isLast
+   898→   898→                                  ? 'linear-gradient(to top, #e07a5f, #d4a574)'
+   899→   899→                                  : 'rgba(255,255,255,0.08)',
+   900→   900→                                minHeight: 8,
+   901→   901→                              }}
+   902→   902→                              initial={{ scaleY: 0 }}
+   903→   903→                              animate={{ scaleY: 1 }}
+   904→   904→                              transition={{ delay: 0.15 * i, duration: 0.4 }}
+   905→   905→                            />
+   906→   906→                          </motion.div>
+   907→   907→                        );
+   908→   908→                      })}
+   909→   909→                    </div>
+   910→   910→                    <div className="flex items-center justify-between mt-2 pt-2" style={{ borderTop: '1px solid rgba(255,255,255,0.04)' }}>
+   911→   911→                      <span className="text-[11px]" style={{ color: '#6b7280' }}>平均 {cycleStats.avgCycle} 天</span>
+   912→   912→                      <div className="flex items-center gap-1">
+   913→   913→                        <div className="w-2 h-2 rounded-full" style={{ background: '#e07a5f' }} />
+   914→   914→                        <span className="text-[11px]" style={{ color: '#6b7280' }}>最近</span>
+   915→   915→                      </div>
+   916→   916→                    </div>
+   917→   917→                  </div>
+   918→   918→                </StaggerIn>
+   919→   919→              )}
+   920→   920→            </motion.div>
+   921→   921→          )}
+   922→   922→
+   923→   923→          {/* ============ CALENDAR TAB ============ */}
+   924→   924→          {activeTab === 'calendar' && (
+   925→   925→            <motion.div
+   926→   926→              key="calendar"
+   927→   927→              initial={{ opacity: 0, x: 20 }}
+   928→   928→              animate={{ opacity: 1, x: 0 }}
+   929→   929→              exit={{ opacity: 0, x: -20 }}
+   930→   930→              transition={{ duration: 0.3 }}
+   931→   931→              className="px-5 pt-12 pb-6"
+   932→   932→            >
+   933→   933→              {/* Month Navigation */}
+   934→   934→              <div className="flex justify-between items-center mb-4">
+   935→   935→                <button className="w-10 h-10 rounded-xl flex items-center justify-center transition-all active:scale-90"
+   936→   936→                  style={{ background: '#232b35' }}
+   937→   937→                  onClick={() => {
+   938→   938→                    let m = calMonth - 1; let y = calYear;
+   939→   939→                    if (m < 1) { m = 12; y--; }
+   940→   940→                    setCalMonth(m); setCalYear(y);
+   941→   941→                  }}>
+   942→   942→                  <ChevronLeft size={20} style={{ color: '#a8a29e' }} />
+   943→   943→                </button>
+   944→   944→                <div className="flex items-center gap-3">
+   945→   945→                  <p className="text-xl font-light" style={{ fontFamily: 'Georgia, serif' }}>
+   946→   946→                    {calYear}年{calMonth}月
+   947→   947→                  </p>
+   948→   948→                  {!isCurrentMonth && (
+   949→   949→                    <button className="text-xs px-3 py-1 rounded-full transition-all hover:scale-105"
+   950→   950→                      style={{ background: 'rgba(224,122,95,0.15)', color: '#e07a5f' }}
+   951→   951→                      onClick={() => { setCalYear(today.getFullYear()); setCalMonth(today.getMonth() + 1); }}>
+   952→   952→                      回到今天
+   953→   953→                    </button>
+   954→   954→                  )}
+   955→   955→                </div>
+   956→   956→                <button className="w-10 h-10 rounded-xl flex items-center justify-center transition-all active:scale-90"
+   957→   957→                  style={{ background: '#232b35' }}
+   958→   958→                  onClick={() => {
+   959→   959→                    let m = calMonth + 1; let y = calYear;
+   960→   960→                    if (m > 12) { m = 1; y++; }
+   961→   961→                    setCalMonth(m); setCalYear(y);
+   962→   962→                  }}>
+   963→   963→                  <ChevronRight size={20} style={{ color: '#a8a29e' }} />
+   964→   964→                </button>
+   965→   965→              </div>
+   966→   966→
+   967→   967→              {/* Weekday Headers */}
+   968→   968→              <div className="grid grid-cols-7 gap-1 mb-2">
+   969→   969→                {WEEKDAYS_SHORT.map((d, i) => (
+   970→   970→                  <div key={i} className="text-center text-xs py-2 font-medium" style={{ color: i === 0 || i === 6 ? '#e07a5f80' : '#6b7280' }}>{d}</div>
+   971→   971→                ))}
+   972→   972→              </div>
+   973→   973→
+   974→   974→              {/* Calendar Grid */}
+   975→   975→              <div className="grid grid-cols-7 gap-1 mb-5">
+   976→   976→                {generateCalendarDays().map((day, i) => {
+   977→   977→                  if (day.isOtherMonth) {
+   978→   978→                    return <div key={`empty-${i}`} className="h-10" />;
+   979→   979→                  }
+   980→   980→
+   981→   981→                  let bgStyle: React.CSSProperties = {};
+   982→   982→                  let textColor = '#f0ece4';
+   983→   983→                  let borderRadius = '12px';
+   984→   984→                  let extraClass = '';
+   985→   985→
+   986→   986→                  if (day.periodInfo.isPeriod) {
+   987→   987→                    if (day.periodInfo.isStart && day.periodInfo.isEnd) borderRadius = '20px';
+   988→   988→                    else if (day.periodInfo.isStart) borderRadius = '20px 4px 4px 20px';
+   989→   989→                    else if (day.periodInfo.isEnd) borderRadius = '4px 20px 20px 4px';
+   990→   990→                    else borderRadius = '4px';
+   991→   991→
+   992→   992→                    bgStyle = {
+   993→   993→                      background: '#e07a5f',
+   994→   994→                      color: '#0f1419',
+   995→   995→                      fontWeight: 500,
+   996→   996→                      borderRadius,
+   997→   997→                    };
+   998→   998→                    textColor = '#0f1419';
+   999→   999→
+  1000→  1000→                    if (day.periodInfo.isActive) {
+  1001→  1001→                      extraClass = '';
+  1002→  1002→                      bgStyle.animation = 'period-pulse 2s ease-in-out infinite';
+  1003→  1003→                    }
+  1004→  1004→                  } else if (day.isPredicted) {
+  1005→  1005→                    bgStyle = { background: 'rgba(129,178,154,0.15)' };
+  1006→  1006→                    textColor = '#81b29a';
+  1007→  1007→                  } else if (day.isFertile) {
+  1008→  1008→                    bgStyle = { background: 'rgba(212,165,116,0.15)' };
+  1009→  1009→                    textColor = '#d4a574';
+  1010→  1010→                  }
+  1011→  1011→
+  1012→  1012→                  if (day.isToday) {
+  1013→  1013→                    if (day.periodInfo.isPeriod) {
+  1014→  1014→                      bgStyle = {
+  1015→  1015→                        ...bgStyle,
+  1016→  1016→                        background: '#e07a5f',
+  1017→  1017→                        boxShadow: '0 0 0 3px #d4a574',
+  1018→  1018→                        transform: 'scale(1.08)',
+  1019→  1019→                        zIndex: 10,
+  1020→  1020→                        fontWeight: 700,
+  1021→  1021→                      };
+  1022→  1022→                    } else {
+  1023→  1023→                      bgStyle = {
+  1024→  1024→                        ...bgStyle,
+  1025→  1025→                        background: 'linear-gradient(135deg, #d4a574, #f2cc8f)',
+  1026→  1026→                        color: '#0f1419',
+  1027→  1027→                        fontWeight: 700,
+  1028→  1028→                        transform: 'scale(1.08)',
+  1029→  1029→                        zIndex: 10,
+  1030→  1030→                      };
+  1031→  1031→                    }
+  1032→  1032→                    textColor = '#0f1419';
+  1033→  1033→                  }
+  1034→  1034→
+  1035→  1035→                  return (
+  1036→  1036→                    <motion.div
+  1037→  1037→                      key={day.dateStr}
+  1038→  1038→                      className="h-10 flex items-center justify-center cursor-pointer transition-all"
+  1039→  1039→                      style={{
+  1040→  1040→                        borderRadius: '12px',
+  1041→  1041→                        color: textColor,
+  1042→  1042→                        fontSize: 14,
+  1043→  1043→                        ...bgStyle,
+  1044→  1044→                      }}
+  1045→  1045→                      whileTap={{ scale: 0.9 }}
+  1046→  1046→                      onClick={() => setActionSheet({ open: true, dateStr: day.dateStr, day: day.day })}
+  1047→  1047→                    >
+  1048→  1048→                      {day.day}
+  1049→  1049→                    </motion.div>
+  1050→  1050→                  );
+  1051→  1051→                })}
+  1052→  1052→              </div>
+  1053→  1053→
+  1054→  1054→              {/* Legend */}
+  1055→  1055→              <div className="rounded-[20px] p-5" style={{ background: '#232b35', border: '1px solid rgba(255,255,255,0.08)' }}>
+  1056→  1056→                <p className="text-sm font-medium mb-4">日历图例</p>
+  1057→  1057→                <div className="space-y-3">
+  1058→  1058→                  {[
+  1059→  1059→                    { color: '#e07a5f', bg: 'rgba(224,122,95,0.25)', border: '2px solid #e07a5f', label: '经期', desc: '点击日期可记录或取消' },
+  1060→  1060→                    { color: '#81b29a', bg: 'transparent', border: '2px dashed #81b29a', label: '预测经期', desc: '根据周期推算的下次日期' },
+  1061→  1061→                    { color: '#d4a574', bg: 'rgba(212,165,116,0.25)', border: '2px solid #d4a574', label: '易孕期', desc: '排卵期前后，受孕几率较高' },
+  1062→  1062→                  ].map((item, i) => (
+  1063→  1063→                    <div key={i} className="flex items-center gap-3 p-3 rounded-xl transition-all"
+  1064→  1064→                      style={{ background: '#1a2027' }}>
+  1065→  1065→                      <div className="w-8 h-8 rounded-[10px] flex items-center justify-center flex-shrink-0"
+  1066→  1066→                        style={{ background: item.bg, border: item.border }}>
+  1067→  1067→                        <div className="w-2.5 h-2.5 rounded-full" style={{ background: item.color }} />
+  1068→  1068→                      </div>
+  1069→  1069→                      <div className="flex-1">
+  1070→  1070→                        <p className="text-sm font-medium">{item.label}</p>
+  1071→  1071→                        <p className="text-xs" style={{ color: '#6b7280' }}>{item.desc}</p>
+  1072→  1072→                      </div>
+  1073→  1073→                    </div>
+  1074→  1074→                  ))}
+  1075→  1075→                </div>
+  1076→  1076→              </div>
+  1077→  1077→
+  1078→  1078→              {/* Cycle History Summary */}
+  1079→  1079→              {periods.length > 1 && (
+  1080→  1080→                <div className="rounded-[20px] p-5 mt-4" style={{ background: '#232b35', border: '1px solid rgba(255,255,255,0.08)' }}>
+  1081→  1081→                  <p className="text-sm font-medium mb-4">周期历史</p>
+  1082→  1082→                  {[...periods].sort((a, b) => b.startDate.localeCompare(a.startDate)).slice(0, 5).map(period => {
+  1083→  1083→                    const startD = parseDate(period.startDate);
+  1084→  1084→                    const endD = period.endDate ? parseDate(period.endDate) : null;
+  1085→  1085→                    const len = endD ? daysBetween(startD, endD) + 1 : '进行中';
+  1086→  1086→                    return (
+  1087→  1087→                      <div key={period.id} className="flex items-center gap-3 py-2.5 border-b last:border-0"
+  1088→  1088→                        style={{ borderColor: 'rgba(255,255,255,0.04)' }}>
+  1089→  1089→                        <div className="w-8 h-8 rounded-lg flex items-center justify-center"
+  1090→  1090→                          style={{ background: 'rgba(224,122,95,0.15)' }}>
+  1091→  1091→                          <Droplets size={14} style={{ color: '#e07a5f' }} />
+  1092→  1092→                        </div>
+  1093→  1093→                        <div className="flex-1">
+  1094→  1094→                          <p className="text-sm font-medium">{startD.getMonth() + 1}月{startD.getDate()}日 — {endD ? `${endD.getMonth() + 1}月${endD.getDate()}日` : '进行中'}</p>
+  1095→  1095→                        </div>
+  1096→  1096→                        <span className="text-xs px-2 py-1 rounded-md" style={{ background: 'rgba(255,255,255,0.05)', color: '#a8a29e' }}>
+  1097→  1097→                          {typeof len === 'number' ? `${len}天` : len}
+  1098→  1098→                        </span>
+  1099→  1099→                      </div>
+  1100→  1100→                    );
+  1101→  1101→                  })}
+  1102→  1102→                </div>
+  1103→  1103→              )}
+  1104→  1104→            </motion.div>
+  1105→  1105→          )}
+  1106→  1106→
+  1107→  1107→          {/* ============ LOG TAB ============ */}
+  1108→  1108→          {activeTab === 'log' && (
+  1109→  1109→            <motion.div
+  1110→  1110→              key="log"
+  1111→  1111→              initial={{ opacity: 0, x: 20 }}
+  1112→  1112→              animate={{ opacity: 1, x: 0 }}
+  1113→  1113→              exit={{ opacity: 0, x: -20 }}
+  1114→  1114→              transition={{ duration: 0.3 }}
+  1115→  1115→              className="px-5 pt-12 pb-6"
+  1116→  1116→            >
+  1117→  1117→              {/* Header */}
+  1118→  1118→              <div className="text-center mb-4">
+  1119→  1119→                <p className="text-2xl font-light" style={{ fontFamily: 'Georgia, serif' }}>健康记录</p>
+  1120→  1120→                <p className="text-sm mt-1" style={{ color: '#a8a29e' }}>{formatDateChinese(today)}</p>
+  1121→  1121→              </div>
+  1122→  1122→
+  1123→  1123→              {/* Tab Switcher */}
+  1124→  1124→              <div className="flex rounded-[14px] p-1 mb-5" style={{ background: '#1a2027' }}>
+  1125→  1125→                <button
+  1126→  1126→                  className={`flex-1 py-2.5 rounded-[10px] text-center text-sm font-medium transition-all ${logTab === 'record' ? 'text-[#f0ece4]' : 'text-[#6b7280]'}`}
+  1127→  1127→                  style={logTab === 'record' ? { background: '#232b35' } : {}}
+  1128→  1128→                  onClick={() => setLogTab('record')}>
+  1129→  1129→                  记录
+  1130→  1130→                </button>
+  1131→  1131→                <button
+  1132→  1132→                  className={`flex-1 py-2.5 rounded-[10px] text-center text-sm font-medium transition-all ${logTab === 'history' ? 'text-[#f0ece4]' : 'text-[#6b7280]'}`}
+  1133→  1133→                  style={logTab === 'history' ? { background: '#232b35' } : {}}
+  1134→  1134→                  onClick={() => setLogTab('history')}>
+  1135→  1135→                  历史记录
+  1136→  1136→                </button>
+  1137→  1137→              </div>
+  1138→  1138→
+  1139→  1139→              {logTab === 'record' ? (
+  1140→  1140→                <>
+  1141→  1141→                  {/* Flow Section */}
+  1142→  1142→                  <div className="mb-6">
+  1143→  1143→                    <div className="flex items-center gap-2 mb-3">
+  1144→  1144→                      <Droplets size={14} style={{ color: '#e07a5f' }} />
+  1145→  1145→                      <p className="text-sm font-medium">流量</p>
+  1146→  1146→                    </div>
+  1147→  1147→                    <div className="flex gap-3 justify-between">
+  1148→  1148→                      {[1, 2, 3, 4].map(level => (
+  1149→  1149→                        <button
+  1150→  1150→                          key={level}
+  1151→  1151→                          className="flex flex-col items-center gap-2 p-3 rounded-2xl transition-all flex-1"
+  1152→  1152→                          style={{
+  1153→  1153→                            background: currentFlow === level ? 'rgba(224,122,95,0.15)' : '#1a2027',
+  1154→  1154→                            border: currentFlow === level ? '1.5px solid #e07a5f' : '1.5px solid rgba(255,255,255,0.06)',
+  1155→  1155→                          }}
+  1156→  1156→                          onClick={() => setCurrentFlow(level)}>
+  1157→  1157→                          <div className="rounded-full transition-all"
+  1158→  1158→                            style={{
+  1159→  1159→                              width: 14 + level * 4,
+  1160→  1160→                              height: 14 + level * 4,
+  1161→  1161→                              background: currentFlow === level ? '#e07a5f' : '#4b5563',
+  1162→  1162→                              boxShadow: currentFlow === level ? '0 0 12px #e07a5f60' : 'none',
+  1163→  1163→                            }} />
+  1164→  1164→                          <span className="text-xs" style={{ color: currentFlow === level ? '#e07a5f' : '#a8a29e' }}>
+  1165→  1165→                            {FLOW_LABELS[level]}
+  1166→  1166→                          </span>
+  1167→  1167→                        </button>
+  1168→  1168→                      ))}
+  1169→  1169→                    </div>
+  1170→  1170→                  </div>
+  1171→  1171→
+  1172→  1172→                  {/* Symptoms Section */}
+  1173→  1173→                  <div className="mb-6">
+  1174→  1174→                    <div className="flex items-center gap-2 mb-3">
+  1175→  1175→                      <Heart size={14} style={{ color: '#d4a574' }} />
+  1176→  1176→                      <p className="text-sm font-medium">症状</p>
+  1177→  1177→                    </div>
+  1178→  1178→                    <div className="flex flex-wrap gap-2">
+  1179→  1179→                      {allSymptoms.map(symptom => (
+  1180→  1180→                        <button
+  1181→  1181→                          key={symptom}
+  1182→  1182→                          className="inline-flex items-center gap-1.5 px-4 py-2.5 rounded-xl text-sm transition-all"
+  1183→  1183→                          style={{
+  1184→  1184→                            background: selectedSymptoms.includes(symptom) ? 'rgba(224,122,95,0.15)' : '#1a2027',
+  1185→  1185→                            border: selectedSymptoms.includes(symptom) ? '1.5px solid #e07a5f' : '1.5px solid rgba(255,255,255,0.06)',
+  1186→  1186→                            color: selectedSymptoms.includes(symptom) ? '#e07a5f' : '#f0ece4',
+  1187→  1187→                          }}
+  1188→  1188→                          onClick={() => {
+  1189→  1189→                            setSelectedSymptoms(prev =>
+  1190→  1190→                              prev.includes(symptom) ? prev.filter(s => s !== symptom) : [...prev, symptom]
+  1191→  1191→                            );
+  1192→  1192→                          }}>
+  1193→  1193→                          {symptom}
+  1194→  1194→                        </button>
+  1195→  1195→                      ))}
+  1196→  1196→                      <button
+  1197→  1197→                        className="inline-flex items-center gap-1.5 px-4 py-2.5 rounded-xl text-sm transition-all"
+  1198→  1198→                        style={{ background: 'transparent', border: '1.5px dashed rgba(255,255,255,0.1)', color: '#6b7280' }}
+  1199→  1199→                        onClick={() => setSymptomSheetOpen(true)}>
+  1200→  1200→                        <Plus size={14} />
+  1201→  1201→                        自定义
+  1202→  1202→                      </button>
+  1203→  1203→                    </div>
+  1204→  1204→                  </div>
+  1205→  1205→
+  1206→  1206→                  {/* Mood Section */}
+  1207→  1207→                  <div className="mb-6">
+  1208→  1208→                    <div className="flex items-center gap-2 mb-3">
+  1209→  1209→                      <Activity size={14} style={{ color: '#81b29a' }} />
+  1210→  1210→                      <p className="text-sm font-medium">情绪</p>
+  1211→  1211→                    </div>
+  1212→  1212→                    <div className="flex justify-between gap-1.5">
+  1213→  1213→                      {[1, 2, 3, 4, 5].map(mood => (
+  1214→  1214→                        <button
+  1215→  1215→                          key={mood}
+  1216→  1216→                          className="flex flex-col items-center gap-1.5 p-2.5 rounded-xl transition-all flex-1"
+  1217→  1217→                          style={{
+  1218→  1218→                            background: currentMood === mood ? 'rgba(224,122,95,0.15)' : 'transparent',
+  1219→  1219→                            border: currentMood === mood ? '1px solid rgba(224,122,95,0.2)' : '1px solid transparent',
+  1220→  1220→                          }}
+  1221→  1221→                          onClick={() => setCurrentMood(mood)}>
+  1222→  1222→                          <span className="text-xl">{MOOD_EMOJIS[mood]}</span>
+  1223→  1223→                          <span className="text-[11px]" style={{ color: currentMood === mood ? '#e07a5f' : '#6b7280' }}>
+  1224→  1224→                            {MOOD_LABELS[mood]}
+  1225→  1225→                          </span>
+  1226→  1226→                        </button>
+  1227→  1227→                      ))}
+  1228→  1228→                    </div>
+  1229→  1229→                  </div>
+  1230→  1230→
+  1231→  1231→                  {/* Note Section */}
+  1232→  1232→                  <div className="mb-6">
+  1233→  1233→                    <div className="flex items-center gap-2 mb-3">
+  1234→  1234→                      <FileText size={14} style={{ color: '#a8a29e' }} />
+  1235→  1235→                      <p className="text-sm font-medium">备注</p>
+  1236→  1236→                    </div>
+  1237→  1237→                    <textarea
+  1238→  1238→                      className="w-full rounded-xl p-3 text-sm outline-none transition-all"
+  1239→  1239→                      style={{
+  1240→  1240→                        background: '#1a2027',
+  1241→  1241→                        border: '1.5px solid rgba(255,255,255,0.06)',
+  1242→  1242→                        color: '#f0ece4',
+  1243→  1243→                        resize: 'none',
+  1244→  1244→                      }}
+  1245→  1245→                      rows={3}
+  1246→  1246→                      placeholder="记录更多细节..."
+  1247→  1247→                      value={noteText}
+  1248→  1248→                      onChange={e => setNoteText(e.target.value)}
+  1249→  1249→                      onFocus={e => e.currentTarget.style.borderColor = '#d4a57440'}
+  1250→  1250→                      onBlur={e => e.currentTarget.style.borderColor = 'rgba(255,255,255,0.06)'}
+  1251→  1251→                    />
+  1252→  1252→                  </div>
+  1253→  1253→
+  1254→  1254→                  {/* Save Button */}
+  1255→  1255→                  <motion.button
+  1256→  1256→                    className="w-full py-4 rounded-2xl font-medium text-lg"
+  1257→  1257→                    style={{ background: 'linear-gradient(135deg, #e07a5f, #d4a574)', color: '#0f1419' }}
+  1258→  1258→                    whileTap={{ scale: 0.97 }}
+  1259→  1259→                    onClick={saveRecord}
+  1260→  1260→                  >
+  1261→  1261→                    保存记录
+  1262→  1262→                  </motion.button>
+  1263→  1263→                </>
+  1264→  1264→              ) : (
+  1265→  1265→                /* History Section */
+  1266→  1266→                <div className="space-y-3">
+  1267→  1267→                  {records.length === 0 ? (
+  1268→  1268→                    <div className="text-center py-12" style={{ color: '#6b7280' }}>
+  1269→  1269→                      <FileText size={40} className="mx-auto mb-3 opacity-30" />
+  1270→  1270→                      <p>暂无记录</p>
+  1271→  1271→                      <p className="text-xs mt-1">点击「记录」开始记录吧</p>
+  1272→  1272→                    </div>
+  1273→  1273→                  ) : (
+  1274→  1274→                    records.map(record => {
+  1275→  1275→                      const d = parseDate(record.date);
+  1276→  1276→                      const symptoms = JSON.parse(record.symptoms || '[]');
+  1277→  1277→                      const todayStr = formatDateStr(new Date());
+  1278→  1278→                      const isToday = record.date === todayStr;
+  1279→  1279→                      return (
+  1280→  1280→                        <motion.div
+  1281→  1281→                          key={record.id}
+  1282→  1282→                          className="rounded-2xl p-4"
+  1283→  1283→                          style={{
+  1284→  1284→                            background: isToday ? 'rgba(224,122,95,0.08)' : '#232b35',
+  1285→  1285→                            border: isToday ? '1px solid rgba(224,122,95,0.2)' : '1px solid rgba(255,255,255,0.06)',
+  1286→  1286→                          }}
+  1287→  1287→                          initial={{ opacity: 0, y: 10 }}
+  1288→  1288→                          animate={{ opacity: 1, y: 0 }}
+  1289→  1289→                        >
+  1290→  1290→                          <div className="flex justify-between items-center mb-2">
+  1291→  1291→                            <div className="flex items-center gap-2">
+  1292→  1292→                              <span className="font-medium">{d.getMonth() + 1}月{d.getDate()}日</span>
+  1293→  1293→                              {isToday && (
+  1294→  1294→                                <span className="text-[10px] px-2 py-0.5 rounded-full" style={{ background: 'rgba(224,122,95,0.2)', color: '#e07a5f' }}>
+  1295→  1295→                                  今天
+  1296→  1296→                                </span>
+  1297→  1297→                              )}
+  1298→  1298→                            </div>
+  1299→  1299→                            <div className="flex items-center gap-2">
+  1300→  1300→                              <span className="text-xs" style={{ color: '#6b7280' }}>
+  1301→  1301→                                {MOOD_EMOJIS[record.mood]} {MOOD_LABELS[record.mood]}
+  1302→  1302→                              </span>
+  1303→  1303→                              <button className="w-7 h-7 rounded-lg flex items-center justify-center transition-all hover:scale-110 active:scale-90"
+  1304→  1304→                                style={{ background: 'rgba(239,68,68,0.08)' }}
+  1305→  1305→                                onClick={() => setDeleteConfirm({ open: true, recordId: record.id, date: record.date })}>
+  1306→  1306→                                <X size={12} style={{ color: '#ef4444' }} />
+  1307→  1307→                              </button>
+  1308→  1308→                            </div>
+  1309→  1309→                          </div>
+  1310→  1310→                          <div className="flex items-center gap-3 mb-2">
+  1311→  1311→                            <span className="text-xs" style={{ color: '#6b7280' }}>流量:</span>
+  1312→  1312→                            <div className="flex gap-1">
+  1313→  1313→                              {[1, 2, 3, 4].map(l => (
+  1314→  1314→                                <div key={l} className="w-2 rounded-full" style={{
+  1315→  1315→                                  height: 6 + l * 2,
+  1316→  1316→                                  background: l <= record.flow ? '#e07a5f' : 'rgba(255,255,255,0.06)',
+  1317→  1317→                                }} />
+  1318→  1318→                              ))}
+  1319→  1319→                            </div>
+  1320→  1320→                            <span className="text-xs" style={{ color: '#e07a5f' }}>{FLOW_LABELS[record.flow]}</span>
+  1321→  1321→                          </div>
+  1322→  1322→                          {symptoms.length > 0 && (
+  1323→  1323→                            <div className="flex flex-wrap gap-1.5 mb-1">
+  1324→  1324→                              {symptoms.map((s: string, i: number) => (
+  1325→  1325→                                <span key={i} className="text-xs px-2.5 py-1 rounded-lg"
+  1326→  1326→                                  style={{ background: 'rgba(224,122,95,0.1)', color: '#e07a5f' }}>
+  1327→  1327→                                  {s}
+  1328→  1328→                                </span>
+  1329→  1329→                              ))}
+  1330→  1330→                            </div>
+  1331→  1331→                          )}
+  1332→  1332→                          {record.note && (
+  1333→  1333→                            <p className="text-xs mt-2" style={{ color: '#a8a29e' }}>{record.note}</p>
+  1334→  1334→                          )}
+  1335→  1335→                        </motion.div>
+  1336→  1336→                      );
+  1337→  1337→                    })
+  1338→  1338→                  )}
+  1339→  1339→                </div>
+  1340→  1340→              )}
+  1341→  1341→            </motion.div>
+  1342→  1342→          )}
+  1343→  1343→
+  1344→  1344→          {/* ============ PROFILE TAB ============ */}
+  1345→  1345→          {activeTab === 'profile' && (
+  1346→  1346→            <motion.div
+  1347→  1347→              key="profile"
+  1348→  1348→              initial={{ opacity: 0, x: 20 }}
+  1349→  1349→              animate={{ opacity: 1, x: 0 }}
+  1350→  1350→              exit={{ opacity: 0, x: -20 }}
+  1351→  1351→              transition={{ duration: 0.3 }}
+  1352→  1352→              className="px-5 pt-12 pb-6"
+  1353→  1353→            >
+  1354→  1354→              {/* User Info */}
+  1355→  1355→              <StaggerIn delay={0.05}>
+  1356→  1356→                <div className="flex items-center gap-4 mb-6">
+  1357→  1357→                  <div className="w-16 h-16 rounded-full flex items-center justify-center"
+  1358→  1358→                    style={{ background: 'linear-gradient(135deg, #e07a5f, #81b29a)' }}>
+  1359→  1359→                    <span className="text-2xl font-light" style={{ fontFamily: 'Georgia, serif', color: '#0f1419' }}>
+  1360→  1360→                      {profile?.name?.charAt(0) || 'L'}
+  1361→  1361→                    </span>
+  1362→  1362→                  </div>
+  1363→  1363→                  <div className="flex-1">
+  1364→  1364→                    <p className="text-xl font-light" style={{ fontFamily: 'Georgia, serif' }}>{profile?.name || 'Luna'}</p>
+  1365→  1365→                    <p className="text-sm" style={{ color: '#a8a29e' }}>已记录 {records.length} 天 · {cycleStats.totalCycles} 个周期</p>
+  1366→  1366→                  </div>
+  1367→  1367→                  <button className="w-10 h-10 rounded-xl flex items-center justify-center transition-all hover:scale-105 active:scale-95"
+  1368→  1368→                    style={{ background: '#232b35', border: '1px solid rgba(255,255,255,0.08)' }}
+  1369→  1369→                    onClick={() => {
+  1370→  1370→                      setEditName(profile?.name || 'Luna');
+  1371→  1371→                      setEditCycleLength(profile?.cycleLength || 28);
+  1372→  1372→                      setEditPeriodLength(profile?.periodLength || 5);
+  1373→  1373→                      setProfileEditOpen(true);
+  1374→  1374→                    }}>
+  1375→  1375→                    <Target size={16} style={{ color: '#a8a29e' }} />
+  1376→  1376→                  </button>
+  1377→  1377→                </div>
+  1378→  1378→              </StaggerIn>
+  1379→  1379→
+  1380→  1380→              {/* Health Profile */}
+  1381→  1381→              <StaggerIn delay={0.1}>
+  1382→  1382→                <div className="rounded-[20px] p-5 mb-4" style={{ background: '#232b35', border: '1px solid rgba(255,255,255,0.08)' }}>
+  1383→  1383→                  <p className="text-sm font-medium mb-4">健康档案</p>
+  1384→  1384→                  <div className="space-y-4">
+  1385→  1385→                    {[
+  1386→  1386→                      { label: '平均周期', value: `${cycleStats.avgCycle} 天`, icon: <TrendingUp size={16} style={{ color: '#81b29a' }} /> },
+  1387→  1387→                      { label: '平均经期', value: `${cycleStats.avgPeriod} 天`, icon: <Droplets size={16} style={{ color: '#e07a5f' }} /> },
+  1388→  1388→                      { label: '上次经期', value: periods.length > 0 ? formatShortDate([...periods].sort((a, b) => b.startDate.localeCompare(a.startDate))[0].startDate) : '暂无记录', icon: <Calendar size={16} style={{ color: '#d4a574' }} /> },
+  1389→  1389→                      { label: '周期规律', value: '规律', icon: <Check size={16} style={{ color: '#81b29a' }} /> },
+  1390→  1390→                    ].map((item, i) => (
+  1391→  1391→                      <div key={i} className="flex justify-between items-center">
+  1392→  1392→                        <div className="flex items-center gap-2">
+  1393→  1393→                          {item.icon}
+  1394→  1394→                          <span className="text-sm" style={{ color: '#a8a29e' }}>{item.label}</span>
+  1395→  1395→                        </div>
+  1396→  1396→                        <span className="text-sm font-medium">{item.value}</span>
+  1397→  1397→                      </div>
+  1398→  1398→                    ))}
+  1399→  1399→                  </div>
+  1400→  1400→                </div>
+  1401→  1401→              </StaggerIn>
+  1402→  1402→
+  1403→  1403→              {/* Notification Settings */}
+  1404→  1404→              <StaggerIn delay={0.15}>
+  1405→  1405→                <div className="rounded-[20px] p-5 mb-4" style={{ background: '#232b35', border: '1px solid rgba(255,255,255,0.08)' }}>
+  1406→  1406→                  <p className="text-sm font-medium mb-3">提醒设置</p>
+  1407→  1407→                  {[
+  1408→  1408→                    { key: 'period_reminder', icon: Bell, label: '经期提醒', desc: '经期开始前1天提醒' },
+  1409→  1409→                    { key: 'record_reminder', icon: Clock, label: '记录提醒', desc: '每日21:00 提醒记录' },
+  1410→  1410→                    { key: 'ovulation_reminder', icon: Crosshair, label: '排卵期提醒', desc: '易孕期开始时提醒' },
+  1411→  1411→                  ].map(item => {
+  1412→  1412→                    const setting = settings.find(s => s.key === item.key);
+  1413→  1413→                    const isActive = setting?.value === 'true';
+  1414→  1414→                    return (
+  1415→  1415→                      <div key={item.key} className="flex items-center gap-3.5 py-3.5 cursor-pointer transition-all active:scale-[0.98]"
+  1416→  1416→                        onClick={() => toggleSetting(item.key, setting?.value || 'false')}>
+  1417→  1417→                        <div className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0" style={{ background: '#1a2027' }}>
+  1418→  1418→                          <item.icon size={20} style={{ color: '#a8a29e' }} />
+  1419→  1419→                        </div>
+  1420→  1420→                        <div className="flex-1">
+  1421→  1421→                          <p className="text-[15px] font-medium">{item.label}</p>
+  1422→  1422→                          <p className="text-xs" style={{ color: '#6b7280' }}>{item.desc}</p>
+  1423→  1423→                        </div>
+  1424→  1424→                        <div className="w-12 h-7 rounded-full relative cursor-pointer transition-all duration-300"
+  1425→  1425→                          style={{ background: isActive ? '#e07a5f' : '#1a2027' }}>
+  1426→  1426→                          <div className="absolute w-[22px] h-[22px] rounded-full top-[3px] transition-all duration-300"
+  1427→  1427→                            style={{ background: '#f0ece4', left: isActive ? '23px' : '3px' }} />
+  1428→  1428→                        </div>
+  1429→  1429→                      </div>
+  1430→  1430→                    );
+  1431→  1431→                  })}
+  1432→  1432→                </div>
+  1433→  1433→              </StaggerIn>
+  1434→  1434→
+  1435→  1435→              {/* Privacy & Security */}
+  1436→  1436→              <StaggerIn delay={0.2}>
+  1437→  1437→                <div className="rounded-[20px] p-5 mb-4" style={{ background: '#232b35', border: '1px solid rgba(255,255,255,0.08)' }}>
+  1438→  1438→                  <p className="text-sm font-medium mb-3">隐私与安全</p>
+  1439→  1439→                  {[
+  1440→  1440→                    { icon: Shield, label: '应用锁', desc: 'Face ID / 指纹解锁', toggle: true, toggleKey: 'app_lock' },
+  1441→  1441→                    { icon: Eye, label: '隐私模式', desc: '伪装成计算器图标', arrow: true },
+  1442→  1442→                    { icon: Lock, label: '数据加密', desc: '端到端加密存储', arrow: true },
+  1443→  1443→                  ].map((item, i) => {
+  1444→  1444→                    const setting = item.toggleKey ? settings.find(s => s.key === item.toggleKey) : null;
+  1445→  1445→                    const isActive = setting?.value === 'true';
+  1446→  1446→                    return (
+  1447→  1447→                      <div key={i} className="flex items-center gap-3.5 py-3.5 cursor-pointer transition-all active:scale-[0.98]"
+  1448→  1448→                        onClick={() => {
+  1449→  1449→                          if (item.toggleKey) toggleSetting(item.toggleKey, setting?.value || 'false');
+  1450→  1450→                          else toast({ description: `${item.label}功能开发中` });
+  1451→  1451→                        }}>
+  1452→  1452→                        <div className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0" style={{ background: '#1a2027' }}>
+  1453→  1453→                          <item.icon size={20} style={{ color: '#a8a29e' }} />
+  1454→  1454→                        </div>
+  1455→  1455→                        <div className="flex-1">
+  1456→  1456→                          <p className="text-[15px] font-medium">{item.label}</p>
+  1457→  1457→                          <p className="text-xs" style={{ color: '#6b7280' }}>{item.desc}</p>
+  1458→  1458→                        </div>
+  1459→  1459→                        {item.toggle ? (
+  1460→  1460→                          <div className="w-12 h-7 rounded-full relative cursor-pointer transition-all duration-300"
+  1461→  1461→                            style={{ background: isActive ? '#e07a5f' : '#1a2027' }}>
+  1462→  1462→                            <div className="absolute w-[22px] h-[22px] rounded-full top-[3px] transition-all duration-300"
+  1463→  1463→                              style={{ background: '#f0ece4', left: isActive ? '23px' : '3px' }} />
+  1464→  1464→                          </div>
+  1465→  1465→                        ) : (
+  1466→  1466→                          <ChevronRight size={20} style={{ color: '#6b7280' }} />
+  1467→  1467→                        )}
+  1468→  1468→                      </div>
+  1469→  1469→                    );
+  1470→  1470→                  })}
+  1471→  1471→                </div>
+  1472→  1472→              </StaggerIn>
+  1473→  1473→
+  1474→  1474→              {/* Appearance */}
+  1475→  1475→              <StaggerIn delay={0.25}>
+  1476→  1476→                <div className="rounded-[20px] p-5 mb-4" style={{ background: '#232b35', border: '1px solid rgba(255,255,255,0.08)' }}>
+  1477→  1477→                  <p className="text-sm font-medium mb-3">外观主题</p>
+  1478→  1478→                  {[
+  1479→  1479→                    { icon: Moon, label: '深色模式', desc: '保护眼睛，节省电量', toggle: true, toggleKey: 'dark_mode' },
+  1480→  1480→                    { icon: Sun, label: '主题颜色', desc: '自定义界面配色', arrow: true },
+  1481→  1481→                  ].map((item, i) => {
+  1482→  1482→                    const setting = item.toggleKey ? settings.find(s => s.key === item.toggleKey) : null;
+  1483→  1483→                    const isActive = setting?.value === 'true';
+  1484→  1484→                    return (
+  1485→  1485→                      <div key={i} className="flex items-center gap-3.5 py-3.5 cursor-pointer transition-all active:scale-[0.98]"
+  1486→  1486→                        onClick={() => {
+  1487→  1487→                          if (item.toggleKey) toggleSetting(item.toggleKey, setting?.value || 'false');
+  1488→  1488→                          else toast({ description: '主题设置功能开发中' });
+  1489→  1489→                        }}>
+  1490→  1490→                        <div className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0" style={{ background: '#1a2027' }}>
+  1491→  1491→                          <item.icon size={20} style={{ color: '#a8a29e' }} />
+  1492→  1492→                        </div>
+  1493→  1493→                        <div className="flex-1">
+  1494→  1494→                          <p className="text-[15px] font-medium">{item.label}</p>
+  1495→  1495→                          <p className="text-xs" style={{ color: '#6b7280' }}>{item.desc}</p>
+  1496→  1496→                        </div>
+  1497→  1497→                        {item.toggle ? (
+  1498→  1498→                          <div className="w-12 h-7 rounded-full relative cursor-pointer transition-all duration-300"
+  1499→  1499→                            style={{ background: isActive ? '#e07a5f' : '#1a2027' }}>
+  1500→  1500→                            <div className="absolute w-[22px] h-[22px] rounded-full top-[3px] transition-all duration-300"
+  1501→  1501→                              style={{ background: '#f0ece4', left: isActive ? '23px' : '3px' }} />
+  1502→  1502→                          </div>
+  1503→  1503→                        ) : (
+  1504→  1504→                          <ChevronRight size={20} style={{ color: '#6b7280' }} />
+  1505→  1505→                        )}
+  1506→  1506→                      </div>
+  1507→  1507→                    );
+  1508→  1508→                  })}
+  1509→  1509→                </div>
+  1510→  1510→              </StaggerIn>
+  1511→  1511→
+  1512→  1512→              {/* Data Management */}
+  1513→  1513→              <StaggerIn delay={0.3}>
+  1514→  1514→                <div className="rounded-[20px] p-5 mb-4" style={{ background: '#232b35', border: '1px solid rgba(255,255,255,0.08)' }}>
+  1515→  1515→                  <p className="text-sm font-medium mb-3">数据管理</p>
+  1516→  1516→                  {[
+  1517→  1517→                    { icon: Download, label: '导出数据', desc: '导出为 CSV', action: () => exportCSV() },
+  1518→  1518→                    { icon: Cloud, label: '云同步', desc: '连接云端备份', action: () => toast({ description: '云同步功能开发中' }) },
+  1519→  1519→                    { icon: RotateCcw, label: '恢复数据', desc: '从备份恢复', action: () => toast({ description: '恢复数据功能开发中' }) },
+  1520→  1520→                  ].map((item, i) => (
+  1521→  1521→                    <div key={i} className="flex items-center gap-3.5 py-3.5 cursor-pointer transition-all active:scale-[0.98]"
+  1522→  1522→                      onClick={item.action}>
+  1523→  1523→                      <div className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0" style={{ background: '#1a2027' }}>
+  1524→  1524→                        <item.icon size={20} style={{ color: '#a8a29e' }} />
+  1525→  1525→                      </div>
+  1526→  1526→                      <div className="flex-1">
+  1527→  1527→                        <p className="text-[15px] font-medium">{item.label}</p>
+  1528→  1528→                        <p className="text-xs" style={{ color: '#6b7280' }}>{item.desc}</p>
+  1529→  1529→                      </div>
+  1530→  1530→                      <ChevronRight size={20} style={{ color: '#6b7280' }} />
+  1531→  1531→                    </div>
+  1532→  1532→                  ))}
+  1533→  1533→                </div>
+  1534→  1534→              </StaggerIn>
+  1535→  1535→
+  1536→  1536→              {/* Other */}
+  1537→  1537→              <StaggerIn delay={0.35}>
+  1538→  1538→                <div className="rounded-[20px] p-5 mb-4" style={{ background: '#232b35', border: '1px solid rgba(255,255,255,0.08)' }}>
+  1539→  1539→                  <p className="text-sm font-medium mb-3">其他</p>
+  1540→  1540→                  {[
+  1541→  1541→                    { icon: Globe, label: '语言', desc: '简体中文' },
+  1542→  1542→                    { icon: Info, label: '关于我们', desc: '版本 1.0.0' },
+  1543→  1543→                    { icon: MessageSquare, label: '意见反馈', desc: '帮助我们改进' },
+  1544→  1544→                  ].map((item, i) => (
+  1545→  1545→                    <div key={i} className="flex items-center gap-3.5 py-3.5 cursor-pointer transition-all active:scale-[0.98]"
+  1546→  1546→                      onClick={() => toast({ description: `${item.label}功能开发中` })}>
+  1547→  1547→                      <div className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0" style={{ background: '#1a2027' }}>
+  1548→  1548→                        <item.icon size={20} style={{ color: '#a8a29e' }} />
+  1549→  1549→                      </div>
+  1550→  1550→                      <div className="flex-1">
+  1551→  1551→                        <p className="text-[15px] font-medium">{item.label}</p>
+  1552→  1552→                        <p className="text-xs" style={{ color: '#6b7280' }}>{item.desc}</p>
+  1553→  1553→                      </div>
+  1554→  1554→                      <ChevronRight size={20} style={{ color: '#6b7280' }} />
+  1555→  1555→                    </div>
+  1556→  1556→                  ))}
+  1557→  1557→                </div>
+  1558→  1558→              </StaggerIn>
+  1559→  1559→
+  1560→  1560→              {/* Security Note */}
+  1561→  1561→              <div className="mt-4 text-center mb-4">
+  1562→  1562→                <p className="text-xs" style={{ color: '#6b7280' }}>您的数据采用端到端加密存储</p>
+  1563→  1563→                <p className="text-xs mt-1" style={{ color: '#6b7280' }}>仅存储于您的设备与加密云端</p>
+  1564→  1564→              </div>
+  1565→  1565→            </motion.div>
+  1566→  1566→          )}
+  1567→  1567→        </AnimatePresence>
+  1568→  1568→      </main>
+  1569→  1569→
+  1570→  1570→      {/* ============ Bottom Navigation ============ */}
+  1571→  1571→      <nav className="fixed bottom-0 left-0 right-0 z-50 safe-bottom"
+  1572→  1572→        style={{ background: 'linear-gradient(to top, #0f1419 80%, transparent)' }}>
+  1573→  1573→        <div className="flex justify-around items-center pb-5 pt-2">
+  1574→  1574→          {[
+  1575→  1575→            { page: 'home' as TabPage, icon: Home, label: '首页' },
+  1576→  1576→            { page: 'calendar' as TabPage, icon: Calendar, label: '日历' },
+  1577→  1577→          ].map(item => (
+  1578→  1578→            <button
+  1579→  1579→              key={item.page}
+  1580→  1580→              className="flex flex-col items-center gap-1 px-4 py-2 rounded-2xl transition-all"
+  1581→  1581→              style={{ background: activeTab === item.page ? 'rgba(255,255,255,0.05)' : 'transparent' }}
+  1582→  1582→              onClick={() => setActiveTab(item.page)}
+  1583→  1583→            >
+  1584→  1584→              <item.icon size={22} style={{ color: activeTab === item.page ? '#e07a5f' : '#6b7280' }} />
+  1585→  1585→              <span className="text-[11px] font-medium" style={{ color: activeTab === item.page ? '#e07a5f' : '#6b7280' }}>
+  1586→  1586→                {item.label}
+  1587→  1587→              </span>
+  1588→  1588→            </button>
+  1589→  1589→          ))}
+  1590→  1590→
+  1591→  1591→          {/* FAB Button */}
+  1592→  1592→          <motion.button
+  1593→  1593→            className="w-14 h-14 rounded-full flex items-center justify-center -mt-5"
+  1594→  1594→            style={{
+  1595→  1595→              background: 'linear-gradient(135deg, #e07a5f, #d4a574)',
+  1596→  1596→              boxShadow: '0 8px 24px rgba(224,122,95,0.35)',
+  1597→  1597→            }}
+  1598→  1598→            whileTap={{ scale: 0.9 }}
+  1599→  1599→            whileHover={{ scale: 1.05 }}
+  1600→  1600→            onClick={() => {
+  1601→  1601→              const todayStr = formatDateStr(new Date());
+  1602→  1602→              setActionSheet({ open: true, dateStr: todayStr, day: new Date().getDate() });
+  1603→  1603→            }}
+  1604→  1604→          >
+  1605→  1605→            <Plus size={26} style={{ color: '#0f1419', strokeWidth: 2.5 }} />
+  1606→  1606→          </motion.button>
+  1607→  1607→
+  1608→  1608→          {[
+  1609→  1609→            { page: 'log' as TabPage, icon: FileText, label: '记录' },
+  1610→  1610→            { page: 'profile' as TabPage, icon: User, label: '我的' },
+  1611→  1611→          ].map(item => (
+  1612→  1612→            <button
+  1613→  1613→              key={item.page}
+  1614→  1614→              className="flex flex-col items-center gap-1 px-4 py-2 rounded-2xl transition-all"
+  1615→  1615→              style={{ background: activeTab === item.page ? 'rgba(255,255,255,0.05)' : 'transparent' }}
+  1616→  1616→              onClick={() => setActiveTab(item.page)}
+  1617→  1617→            >
+  1618→  1618→              <item.icon size={22} style={{ color: activeTab === item.page ? '#e07a5f' : '#6b7280' }} />
+  1619→  1619→              <span className="text-[11px] font-medium" style={{ color: activeTab === item.page ? '#e07a5f' : '#6b7280' }}>
+  1620→  1620→                {item.label}
+  1621→  1621→              </span>
+  1622→  1622→            </button>
+  1623→  1623→          ))}
+  1624→  1624→        </div>
+  1625→  1625→      </nav>
+  1626→  1626→
+  1627→  1627→      {/* ============ Action Sheet ============ */}
+  1628→  1628→      <AnimatePresence>
+  1629→  1629→        {actionSheet.open && (
+  1630→  1630→          <motion.div
+  1631→  1631→            initial={{ opacity: 0 }}
+  1632→  1632→            animate={{ opacity: 1 }}
+  1633→  1633→            exit={{ opacity: 0 }}
+  1634→  1634→            className="fixed inset-0 z-[200]"
+  1635→  1635→            style={{ background: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(8px)' }}
+  1636→  1636→            onClick={() => setActionSheet({ open: false, dateStr: '', day: 0 })}
+  1637→  1637→          >
+  1638→  1638→            <motion.div
+  1639→  1639→              initial={{ y: '100%' }}
+  1640→  1640→              animate={{ y: 0 }}
+  1641→  1641→              exit={{ y: '100%' }}
+  1642→  1642→              transition={{ type: 'spring', damping: 25, stiffness: 300 }}
+  1643→  1643→              className="absolute bottom-0 left-0 right-0 rounded-t-3xl p-4 pb-8"
+  1644→  1644→              style={{ background: '#1a2027', maxHeight: '80vh', overflowY: 'auto' }}
+  1645→  1645→              onClick={e => e.stopPropagation()}
+  1646→  1646→            >
+  1647→  1647→              <div className="w-9 h-1 rounded-full mx-auto mb-4 opacity-50" style={{ background: '#6b7280' }} />
+  1648→  1648→              <div className="text-center mb-4">
+  1649→  1649→                <span className="text-base font-medium">
+  1650→  1650→                  {calMonth}月{actionSheet.day}日
+  1651→  1651→                </span>
+  1652→  1652→              </div>
+  1653→  1653→              <div className="space-y-2">
+  1654→  1654→                {(() => {
+  1655→  1655→                  const active = hasActivePeriod();
+  1656→  1656→                  const periodInfo = getPeriodInfo(actionSheet.dateStr);
+  1657→  1657→
+  1658→  1658→                  if (active) {
+  1659→  1659→                    if (actionSheet.dateStr === active.startDate) {
+  1660→  1660→                      return (
+  1661→  1661→                        <>
+  1662→  1662→                          <ActionOption variant="sage" icon={<ArrowRight size={22} />} title="经期走了" desc="标记经期在这一天结束" onClick={() => endPeriod(actionSheet.dateStr)} />
+  1663→  1663→                          <ActionOption variant="danger" icon={<X size={22} />} title="取消本次记录" desc="删除当前进行中的经期" onClick={cancelActivePeriod} />
+  1664→  1664→                        </>
+  1665→  1665→                      );
+  1666→  1666→                    } else if (actionSheet.dateStr < active.startDate) {
+  1667→  1667→                      return (
+  1668→  1668→                        <>
+  1669→  1669→                          <ActionOption variant="primary" icon={<ChevronLeft size={22} />} title="修改开始日期" desc="将经期开始提前至此日" onClick={() => updateStart(actionSheet.dateStr)} />
+  1670→  1670→                          <ActionOption variant="danger" icon={<X size={22} />} title="取消本次记录" desc="删除当前进行中的经期" onClick={cancelActivePeriod} />
+  1671→  1671→                        </>
+  1672→  1672→                      );
+  1673→  1673→                    } else {
+  1674→  1674→                      return (
+  1675→  1675→                        <>
+  1676→  1676→                          <ActionOption variant="sage" icon={<ArrowRight size={22} />} title="经期走了" desc="标记经期在这一天结束" onClick={() => endPeriod(actionSheet.dateStr)} />
+  1677→  1677→                          <ActionOption variant="danger" icon={<X size={22} />} title="取消本次记录" desc="删除当前进行中的经期" onClick={cancelActivePeriod} />
+  1678→  1678→                        </>
+  1679→  1679→                      );
+  1680→  1680→                    }
+  1681→  1681→                  } else if (periodInfo.isPeriod) {
+  1682→  1682→                    return (
+  1683→  1683→                      <>
+  1684→  1684→                        <ActionOption variant="primary" icon={<Plus size={22} />} title="延长经期" desc="将经期结束日期延后一天" onClick={() => extendPeriod(actionSheet.dateStr)} />
+  1685→  1685→                        <ActionOption variant="danger" icon={<X size={22} />} title="取消经期记录" desc="删除这一天的经期标记"
+  1686→  1686→                          onClick={async () => {
+  1687→  1687→                            const period = periods.find(p => {
+  1688→  1688→                              if (!p.endDate) return actionSheet.dateStr === p.startDate;
+  1689→  1689→                              return actionSheet.dateStr >= p.startDate && actionSheet.dateStr <= p.endDate;
+  1690→  1690→                            });
+  1691→  1691→                            if (period) {
+  1692→  1692→                              await fetch(`/api/periods/${period.id}`, { method: 'DELETE' });
+  1693→  1693→                              setActionSheet({ open: false, dateStr: '', day: 0 });
+  1694→  1694→                              await fetchPeriods();
+  1695→  1695→                              toast({ description: '已取消该日期的经期记录' });
+  1696→  1696→                            }
+  1697→  1697→                          }} />
+  1698→  1698→                      </>
+  1699→  1699→                    );
+  1700→  1700→                  } else {
+  1701→  1701→                    return (
+  1702→  1702→                      <ActionOption variant="primary" icon={<Plus size={22} />} title="经期来了" desc="标记这一天为经期开始" onClick={() => startPeriod(actionSheet.dateStr)} />
+  1703→  1703→                    );
+  1704→  1704→                  }
+  1705→  1705→                })()}
+  1706→  1706→              </div>
+  1707→  1707→              <div className="text-center py-4 mt-2 cursor-pointer transition-colors"
+  1708→  1708→                style={{ color: '#6b7280' }}
+  1709→  1709→                onClick={() => setActionSheet({ open: false, dateStr: '', day: 0 })}>
+  1710→  1710→                取消
+  1711→  1711→              </div>
+  1712→  1712→            </motion.div>
+  1713→  1713→          </motion.div>
+  1714→  1714→        )}
+  1715→  1715→      </AnimatePresence>
+  1716→  1716→
+  1717→  1717→      {/* ============ Add Symptom Sheet ============ */}
+  1718→  1718→      <AnimatePresence>
+  1719→  1719→        {symptomSheetOpen && (
+  1720→  1720→          <motion.div
+  1721→  1721→            initial={{ opacity: 0 }}
+  1722→  1722→            animate={{ opacity: 1 }}
+  1723→  1723→            exit={{ opacity: 0 }}
+  1724→  1724→            className="fixed inset-0 z-[200]"
+  1725→  1725→            style={{ background: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(8px)' }}
+  1726→  1726→            onClick={() => { setSymptomSheetOpen(false); setNewSymptom(''); }}
+  1727→  1727→          >
+  1728→  1728→            <motion.div
+  1729→  1729→              initial={{ y: '100%' }}
+  1730→  1730→              animate={{ y: 0 }}
+  1731→  1731→              exit={{ y: '100%' }}
+  1732→  1732→              transition={{ type: 'spring', damping: 25, stiffness: 300 }}
+  1733→  1733→              className="absolute bottom-0 left-0 right-0 rounded-t-3xl p-5 pb-8"
+  1734→  1734→              style={{ background: '#1a2027' }}
+  1735→  1735→              onClick={e => e.stopPropagation()}
+  1736→  1736→            >
+  1737→  1737→              <div className="w-9 h-1 rounded-full mx-auto mb-4 opacity-50" style={{ background: '#6b7280' }} />
+  1738→  1738→              <div className="text-center mb-4"><span className="font-medium">添加自定义症状</span></div>
+  1739→  1739→              <div className="mb-4">
+  1740→  1740→                <input type="text"
+  1741→  1741→                  className="w-full rounded-xl p-3 text-sm outline-none transition-all"
+  1742→  1742→                  style={{ background: '#232b35', border: '1.5px solid rgba(255,255,255,0.06)', color: '#f0ece4' }}
+  1743→  1743→                  placeholder="输入症状名称..."
+  1744→  1744→                  value={newSymptom}
+  1745→  1745→                  onChange={e => setNewSymptom(e.target.value)}
+  1746→  1746→                  onFocus={e => e.currentTarget.style.borderColor = '#d4a57440'}
+  1747→  1747→                  onBlur={e => e.currentTarget.style.borderColor = 'rgba(255,255,255,0.06)'}
+  1748→  1748→                  onKeyDown={e => {
+  1749→  1749→                    if (e.key === 'Enter' && newSymptom.trim()) {
+  1750→  1750→                      setCustomSymptoms(prev => [...prev, newSymptom.trim()]);
+  1751→  1751→                      setNewSymptom('');
+  1752→  1752→                      setSymptomSheetOpen(false);
+  1753→  1753→                      toast({ description: '已添加自定义症状' });
+  1754→  1754→                    }
+  1755→  1755→                  }} />
+  1756→  1756→              </div>
+  1757→  1757→              <motion.button
+  1758→  1758→                className="w-full py-4 rounded-2xl font-medium text-lg"
+  1759→  1759→                style={{ background: 'linear-gradient(135deg, #e07a5f, #d4a574)', color: '#0f1419' }}
+  1760→  1760→                whileTap={{ scale: 0.97 }}
+  1761→  1761→                onClick={() => {
+  1762→  1762→                  if (newSymptom.trim()) {
+  1763→  1763→                    setCustomSymptoms(prev => [...prev, newSymptom.trim()]);
+  1764→  1764→                    setNewSymptom('');
+  1765→  1765→                    setSymptomSheetOpen(false);
+  1766→  1766→                    toast({ description: '已添加自定义症状 ✨' });
+  1767→  1767→                  } else {
+  1768→  1768→                    toast({ description: '请输入症状名称' });
+  1769→  1769→                  }
+  1770→  1770→                }}>
+  1771→  1771→                添加
+  1772→  1772→              </motion.button>
+  1773→  1773→              <div className="text-center py-4 cursor-pointer transition-colors"
+  1774→  1774→                style={{ color: '#6b7280' }}
+  1775→  1775→                onClick={() => { setSymptomSheetOpen(false); setNewSymptom(''); }}>
+  1776→  1776→                取消
+  1777→  1777→              </div>
+  1778→  1778→            </motion.div>
+  1779→  1779→          </motion.div>
+  1780→  1780→        )}
+  1781→  1781→      </AnimatePresence>
+  1782→  1782→
+  1783→  1783→      {/* ============ Loading Overlay ============ */}
+  1784→  1784→      <AnimatePresence>
+  1785→  1785→        {!isLoaded && (
+  1786→  1786→          <motion.div
+  1787→  1787→            initial={{ opacity: 1 }}
+  1788→  1788→            exit={{ opacity: 0 }}
+  1789→  1789→            transition={{ duration: 0.5 }}
+  1790→  1790→            className="fixed inset-0 z-[300] flex items-center justify-center"
+  1791→  1791→            style={{ background: '#0f1419' }}
+  1792→  1792→          >
+  1793→  1793→            <motion.div
+  1794→  1794→              className="text-center"
+  1795→  1795→              initial={{ scale: 0.8, opacity: 0 }}
+  1796→  1796→              animate={{ scale: 1, opacity: 1 }}
+  1797→  1797→              transition={{ duration: 0.5 }}
+  1798→  1798→            >
+  1799→  1799→              <motion.div
+  1800→  1800→                className="w-20 h-20 rounded-full mx-auto mb-4 flex items-center justify-center"
+  1801→  1801→                style={{ background: 'linear-gradient(135deg, #e07a5f, #81b29a)' }}
+  1802→  1802→                animate={{ scale: [1, 1.05, 1] }}
+  1803→  1803→                transition={{ duration: 2, repeat: Infinity, ease: 'easeInOut' }}
+  1804→  1804→              >
+  1805→  1805→                <span className="text-3xl font-light" style={{ fontFamily: 'Georgia, serif', color: '#0f1419' }}>L</span>
+  1806→  1806→              </motion.div>
+  1807→  1807→              <p className="text-xl font-light" style={{ fontFamily: 'Georgia, serif' }}>Luna</p>
+  1808→  1808→              <p className="text-sm mt-1" style={{ color: '#6b7280' }}>经期追踪</p>
+  1809→  1809→              <motion.div
+  1810→  1810→                className="w-16 h-1 rounded-full mx-auto mt-4"
+  1811→  1811→                style={{ background: 'linear-gradient(90deg, #e07a5f, #81b29a)' }}
+  1812→  1812→                animate={{ scaleX: [0.5, 1, 0.5] }}
+  1813→  1813→                transition={{ duration: 1.5, repeat: Infinity, ease: 'easeInOut' }}
+  1814→  1814→              />
+  1815→  1815→            </motion.div>
+  1816→  1816→          </motion.div>
+  1817→  1817→        )}
+  1818→  1818→      </AnimatePresence>
+  1819→  1819→
+  1820→  1820→      {/* ============ Profile Edit Sheet ============ */}
+  1821→  1821→      <AnimatePresence>
+  1822→  1822→        {profileEditOpen && (
+  1823→  1823→          <motion.div
+  1824→  1824→            initial={{ opacity: 0 }}
+  1825→  1825→            animate={{ opacity: 1 }}
+  1826→  1826→            exit={{ opacity: 0 }}
+  1827→  1827→            className="fixed inset-0 z-[200]"
+  1828→  1828→            style={{ background: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(8px)' }}
+  1829→  1829→            onClick={() => setProfileEditOpen(false)}
+  1830→  1830→          >
+  1831→  1831→            <motion.div
+  1832→  1832→              initial={{ y: '100%' }}
+  1833→  1833→              animate={{ y: 0 }}
+  1834→  1834→              exit={{ y: '100%' }}
+  1835→  1835→              transition={{ type: 'spring', damping: 25, stiffness: 300 }}
+  1836→  1836→              className="absolute bottom-0 left-0 right-0 rounded-t-3xl p-5 pb-8"
+  1837→  1837→              style={{ background: '#1a2027' }}
+  1838→  1838→              onClick={e => e.stopPropagation()}
+  1839→  1839→            >
+  1840→  1840→              <div className="w-9 h-1 rounded-full mx-auto mb-4 opacity-50" style={{ background: '#6b7280' }} />
+  1841→  1841→              <div className="text-center mb-5"><span className="text-lg font-medium">编辑个人资料</span></div>
+  1842→  1842→
+  1843→  1843→              {/* Name */}
+  1844→  1844→              <div className="mb-5">
+  1845→  1845→                <label className="text-sm mb-2 block" style={{ color: '#a8a29e' }}>昵称</label>
+  1846→  1846→                <input type="text"
+  1847→  1847→                  className="w-full rounded-xl p-3 text-sm outline-none transition-all"
+  1848→  1848→                  style={{ background: '#232b35', border: '1.5px solid rgba(255,255,255,0.06)', color: '#f0ece4' }}
+  1849→  1849→                  placeholder="输入昵称..."
+  1850→  1850→                  value={editName}
+  1851→  1851→                  onChange={e => setEditName(e.target.value)}
+  1852→  1852→                  onFocus={e => e.currentTarget.style.borderColor = '#d4a57440'}
+  1853→  1853→                  onBlur={e => e.currentTarget.style.borderColor = 'rgba(255,255,255,0.06)'}
+  1854→  1854→                />
+  1855→  1855→              </div>
+  1856→  1856→
+  1857→  1857→              {/* Cycle Length */}
+  1858→  1858→              <div className="mb-5">
+  1859→  1859→                <label className="text-sm mb-2 block" style={{ color: '#a8a29e' }}>周期长度</label>
+  1860→  1860→                <div className="flex items-center gap-4">
+  1861→  1861→                  <button className="w-12 h-12 rounded-xl flex items-center justify-center transition-all active:scale-90"
+  1862→  1862→                    style={{ background: '#232b35', border: '1px solid rgba(255,255,255,0.08)' }}
+  1863→  1863→                    onClick={() => setEditCycleLength(prev => Math.max(15, prev - 1))}>
+  1864→  1864→                    <span style={{ color: '#a8a29e', fontSize: 20 }}>-</span>
+  1865→  1865→                  </button>
+  1866→  1866→                  <div className="flex-1 text-center">
+  1867→  1867→                    <span className="text-3xl font-light" style={{ fontFamily: 'Georgia, serif' }}>{editCycleLength}</span>
+  1868→  1868→                    <span className="text-sm ml-1" style={{ color: '#a8a29e' }}>天</span>
+  1869→  1869→                  </div>
+  1870→  1870→                  <button className="w-12 h-12 rounded-xl flex items-center justify-center transition-all active:scale-90"
+  1871→  1871→                    style={{ background: '#232b35', border: '1px solid rgba(255,255,255,0.08)' }}
+  1872→  1872→                    onClick={() => setEditCycleLength(prev => Math.min(45, prev + 1))}>
+  1873→  1873→                    <span style={{ color: '#a8a29e', fontSize: 20 }}>+</span>
+  1874→  1874→                  </button>
+  1875→  1875→                </div>
+  1876→  1876→                <div className="flex justify-between mt-2 px-1">
+  1877→  1877→                  <span className="text-[11px]" style={{ color: '#6b7280' }}>15天</span>
+  1878→  1878→                  <span className="text-[11px]" style={{ color: '#6b7280' }}>45天</span>
+  1879→  1879→                </div>
+  1880→  1880→              </div>
+  1881→  1881→
+  1882→  1882→              {/* Period Length */}
+  1883→  1883→              <div className="mb-6">
+  1884→  1884→                <label className="text-sm mb-2 block" style={{ color: '#a8a29e' }}>经期长度</label>
+  1885→  1885→                <div className="flex items-center gap-4">
+  1886→  1886→                  <button className="w-12 h-12 rounded-xl flex items-center justify-center transition-all active:scale-90"
+  1887→  1887→                    style={{ background: '#232b35', border: '1px solid rgba(255,255,255,0.08)' }}
+  1888→  1888→                    onClick={() => setEditPeriodLength(prev => Math.max(1, prev - 1))}>
+  1889→  1889→                    <span style={{ color: '#a8a29e', fontSize: 20 }}>-</span>
+  1890→  1890→                  </button>
+  1891→  1891→                  <div className="flex-1 text-center">
+  1892→  1892→                    <span className="text-3xl font-light" style={{ fontFamily: 'Georgia, serif' }}>{editPeriodLength}</span>
+  1893→  1893→                    <span className="text-sm ml-1" style={{ color: '#a8a29e' }}>天</span>
+  1894→  1894→                  </div>
+  1895→  1895→                  <button className="w-12 h-12 rounded-xl flex items-center justify-center transition-all active:scale-90"
+  1896→  1896→                    style={{ background: '#232b35', border: '1px solid rgba(255,255,255,0.08)' }}
+  1897→  1897→                    onClick={() => setEditPeriodLength(prev => Math.min(10, prev + 1))}>
+  1898→  1898→                    <span style={{ color: '#a8a29e', fontSize: 20 }}>+</span>
+  1899→  1899→                  </button>
+  1900→  1900→                </div>
+  1901→  1901→                <div className="flex justify-between mt-2 px-1">
+  1902→  1902→                  <span className="text-[11px]" style={{ color: '#6b7280' }}>1天</span>
+  1903→  1903→                  <span className="text-[11px]" style={{ color: '#6b7280' }}>10天</span>
+  1904→  1904→                </div>
+  1905→  1905→              </div>
+  1906→  1906→
+  1907→  1907→              <motion.button
+  1908→  1908→                className="w-full py-4 rounded-2xl font-medium text-lg"
+  1909→  1909→                style={{ background: 'linear-gradient(135deg, #e07a5f, #d4a574)', color: '#0f1419' }}
+  1910→  1910→                whileTap={{ scale: 0.97 }}
+  1911→  1911→                onClick={saveProfile}>
+  1912→  1912→                保存
+  1913→  1913→              </motion.button>
+  1914→  1914→              <div className="text-center py-4 cursor-pointer transition-colors"
+  1915→  1915→                style={{ color: '#6b7280' }}
+  1916→  1916→                onClick={() => setProfileEditOpen(false)}>
+  1917→  1917→                取消
+  1918→  1918→              </div>
+  1919→  1919→            </motion.div>
+  1920→  1920→          </motion.div>
+  1921→  1921→        )}
+  1922→  1922→      </AnimatePresence>
+  1923→  1923→
+  1924→  1924→      {/* ============ Delete Confirmation Dialog ============ */}
+  1925→  1925→      <AnimatePresence>
+  1926→  1926→        {deleteConfirm.open && (
+  1927→  1927→          <motion.div
+  1928→  1928→            initial={{ opacity: 0 }}
+  1929→  1929→            animate={{ opacity: 1 }}
+  1930→  1930→            exit={{ opacity: 0 }}
+  1931→  1931→            className="fixed inset-0 z-[250] flex items-center justify-center px-8"
+  1932→  1932→            style={{ background: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(8px)' }}
+  1933→  1933→            onClick={() => setDeleteConfirm({ open: false, recordId: '', date: '' })}
+  1934→  1934→          >
+  1935→  1935→            <motion.div
+  1936→  1936→              initial={{ scale: 0.9, opacity: 0 }}
+  1937→  1937→              animate={{ scale: 1, opacity: 1 }}
+  1938→  1938→              exit={{ scale: 0.9, opacity: 0 }}
+  1939→  1939→              transition={{ type: 'spring', damping: 25, stiffness: 300 }}
+  1940→  1940→              className="w-full rounded-3xl p-6"
+  1941→  1941→              style={{ background: '#1a2027', border: '1px solid rgba(255,255,255,0.08)' }}
+  1942→  1942→              onClick={e => e.stopPropagation()}
+  1943→  1943→            >
+  1944→  1944→              <div className="w-14 h-14 rounded-2xl flex items-center justify-center mx-auto mb-4"
+  1945→  1945→                style={{ background: 'rgba(239,68,68,0.1)' }}>
+  1946→  1946→                <X size={24} style={{ color: '#ef4444' }} />
+  1947→  1947→              </div>
+  1948→  1948→              <p className="text-center text-lg font-medium mb-2">确认删除？</p>
+  1949→  1949→              <p className="text-center text-sm mb-6" style={{ color: '#a8a29e' }}>
+  1950→  1950→                删除后将无法恢复此条记录
+  1951→  1951→              </p>
+  1952→  1952→              <div className="flex gap-3">
+  1953→  1953→                <button className="flex-1 py-3 rounded-xl text-sm font-medium transition-all active:scale-95"
+  1954→  1954→                  style={{ background: '#232b35', border: '1px solid rgba(255,255,255,0.08)', color: '#f0ece4' }}
+  1955→  1955→                  onClick={() => setDeleteConfirm({ open: false, recordId: '', date: '' })}>
+  1956→  1956→                  取消
+  1957→  1957→                </button>
+  1958→  1958→                <button className="flex-1 py-3 rounded-xl text-sm font-medium transition-all active:scale-95"
+  1959→  1959→                  style={{ background: 'rgba(239,68,68,0.15)', color: '#ef4444', border: '1px solid rgba(239,68,68,0.2)' }}
+  1960→  1960→                  onClick={() => deleteRecord(deleteConfirm.recordId)}>
+  1961→  1961→                  删除
+  1962→  1962→                </button>
+  1963→  1963→              </div>
+  1964→  1964→            </motion.div>
+  1965→  1965→          </motion.div>
+  1966→  1966→        )}
+  1967→  1967→      </AnimatePresence>
+  1968→  1968→    </div>
+  1969→  1969→  );
+  1970→  1970→}
+  1971→  1971→
+  1972→  1972→// ============ Action Option Component ============
+  1973→  1973→function ActionOption({
+  1974→  1974→  variant, icon, title, desc, onClick,
+  1975→  1975→}: {
+  1976→  1976→  variant: 'primary' | 'sage' | 'danger';
+  1977→  1977→  icon: React.ReactNode;
+  1978→  1978→  title: string;
+  1979→  1979→  desc: string;
+  1980→  1980→  onClick: () => void;
+  1981→  1981→}) {
+  1982→  1982→  const colors = {
+  1983→  1983→    primary: { bg: 'rgba(224,122,95,0.12)', border: 'rgba(224,122,95,0.25)', iconBg: 'linear-gradient(135deg, #e07a5f, #d4a574)' },
+  1984→  1984→    sage: { bg: 'rgba(129,178,154,0.12)', border: 'rgba(129,178,154,0.25)', iconBg: 'linear-gradient(135deg, #81b29a, #6b9e85)' },
+  1985→  1985→    danger: { bg: 'rgba(239,68,68,0.08)', border: 'rgba(239,68,68,0.2)', iconBg: 'linear-gradient(135deg, #ef4444, #dc2626)' },
+  1986→  1986→  };
+  1987→  1987→  const c = colors[variant];
+  1988→  1988→
+  1989→  1989→  return (
+  1990→  1990→    <motion.button
+  1991→  1991→      className="flex items-center gap-3.5 p-4 rounded-[14px] transition-all w-full text-left"
+  1992→  1992→      style={{ background: c.bg, border: `1px solid ${c.border}` }}
+  1993→  1993→      whileTap={{ scale: 0.97 }}
+  1994→  1994→      onClick={onClick}
+  1995→  1995→    >
+  1996→  1996→      <div className="w-11 h-11 rounded-xl flex items-center justify-center flex-shrink-0"
+  1997→  1997→        style={{ background: c.iconBg }}>
+  1998→  1998→        <span style={{ color: '#0f1419' }}>{icon}</span>
+  1999→  1999→      </div>
+  2000→  2000→      <div>
+
+[showing lines 1-2000 of 2002; use offset=2001 with limit to continue reading]
