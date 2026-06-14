@@ -55,6 +55,7 @@ interface ActionSheetProps {
   endPeriod: (dateStr: string) => void;
   updateStart: (dateStr: string) => void;
   cancelActivePeriod: () => void;
+  deletePeriod: (periodId: string) => void;
   extendPeriod: (dateStr: string) => void;
   fetchPeriods: () => Promise<void>;
   toast: (opts: { description: string }) => void;
@@ -64,7 +65,7 @@ interface ActionSheetProps {
 export default function ActionSheet({
   open, dateStr, day, calMonth, setActionSheet, periods,
   hasActivePeriod, getPeriodInfo, startPeriod, endPeriod,
-  updateStart, cancelActivePeriod, extendPeriod, fetchPeriods, toast,
+  updateStart, cancelActivePeriod, deletePeriod, extendPeriod, fetchPeriods, toast,
   themeColor,
 }: ActionSheetProps) {
   if (!open) return null;
@@ -123,20 +124,18 @@ export default function ActionSheet({
                   );
                 }
               } else if (periodInfo.isPeriod) {
+                // 找到包含该日期的经期记录，使用 deletePeriod 回调（适配 server/local 双模式）
+                const period = periods.find(p => {
+                  if (!p.endDate) return dateStr === p.startDate;
+                  return dateStr >= p.startDate && dateStr <= p.endDate;
+                });
                 return (
                   <>
                     <ActionOption variant="primary" icon={<Plus size={22} />} title="延长经期" desc="将经期结束日期延后一天" onClick={() => extendPeriod(dateStr)} themeColor={themeColor} />
                     <ActionOption variant="danger" icon={<X size={22} />} title="取消经期记录" desc="删除这一天的经期标记"
-                      onClick={async () => {
-                        const period = periods.find(p => {
-                          if (!p.endDate) return dateStr === p.startDate;
-                          return dateStr >= p.startDate && dateStr <= p.endDate;
-                        });
+                      onClick={() => {
                         if (period) {
-                          await fetch(`/api/periods/${period.id}`, { method: 'DELETE' });
-                          setActionSheet({ open: false, dateStr: '', day: 0 });
-                          await fetchPeriods();
-                          toast({ description: '已取消该日期的经期记录' });
+                          deletePeriod(period.id);
                         }
                       }} />
                   </>

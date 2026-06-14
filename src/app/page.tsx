@@ -363,6 +363,17 @@ export default function LunaApp() {
     }
   }
 
+  async function deletePeriod(periodId: string) {
+    try {
+      await periodsApi.delete(periodId);
+      setActionSheet({ open: false, dateStr: '', day: 0 });
+      await fetchPeriods();
+      toast({ description: '已取消该日期的经期记录' });
+    } catch (error) {
+      if (error instanceof ApiError) toast({ description: error.message });
+    }
+  }
+
   async function extendPeriod(dateStr: string) {
     const sortedPeriods = [...periods].sort((a, b) => b.startDate.localeCompare(a.startDate));
     const lastPeriod = sortedPeriods[0];
@@ -783,6 +794,7 @@ export default function LunaApp() {
         endPeriod={endPeriod}
         updateStart={updateStart}
         cancelActivePeriod={cancelActivePeriod}
+        deletePeriod={deletePeriod}
         extendPeriod={extendPeriod}
         fetchPeriods={fetchPeriods}
         toast={toast}

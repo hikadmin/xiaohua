@@ -1,6 +1,41 @@
 # Work Log — 小桦 Period Tracker
 
 ---
+Task ID: 12
+Agent: Main
+Task: 修复 APK 图标和"取消经期记录"功能
+
+Work Log:
+- 分析用户上传的截图（VLM）：
+  - 截图1：APK安装后图标显示为默认Android绿色机器人图标，不是自定义icon
+  - 截图2：启动页图标也不正确
+- 问题1&2：APK图标不正确
+  - 根因：Capacitor打包需要原生Android资源文件（mipmap/drawable），而非web端的public/icons/
+  - 安装 cordova-res 依赖
+  - 创建 resources/icon.png（1254x1254源图标）和 resources/splash.png（2732x2732启动画面）
+  - 使用 cordova-res 生成Android图标和启动画面资源（31个文件）
+  - 手动生成自适应图标（Adaptive Icon）前景/背景文件：
+    - 5种密度（mdpi~xxxhdpi）的 ic_launcher_foreground.png 和 ic_launcher_background.png
+    - 5个 ic_launcher.xml 配置文件
+  - 更新 build-android.sh 增加 Step 5 图标生成步骤
+- 问题3："取消经期记录"不工作
+  - 根因：ActionSheet.tsx 第136行使用 raw `fetch('/api/periods/${id}')` 绕过了API服务层
+  - 在APK本地模式下，fetch()找不到服务器，所以DELETE请求失败（404或网络错误）
+  - 修复：
+    - 在 page.tsx 新增 `deletePeriod(periodId: string)` 函数，使用 periodsApi.delete()
+    - 将 deletePeriod 作为prop传递给 ActionSheet
+    - ActionSheet 接收 deletePeriod prop，替换原来的 raw fetch() 调用
+    - 现在在server模式和local模式下都能正常工作
+
+Stage Summary:
+- ✅ Android APK 图标：生成原生资源文件（mipmap、drawable、adaptive icon）
+- ✅ 启动画面：生成5种密度的splash资源
+- ✅ "取消经期记录"：修复为使用API服务层，支持server/local双模式
+- ✅ build-android.sh 更新为7步构建流程，增加图标生成步骤
+- ✅ dev log 确认 DELETE 请求返回 200
+- ✅ agent-browser 验证通过
+
+---
 Task ID: 11
 Agent: Main
 Task: 应用品牌更新 + APK本地模式修复

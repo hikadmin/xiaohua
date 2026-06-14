@@ -30,18 +30,18 @@ echo "项目目录: $PROJECT_DIR"
 echo ""
 
 # Step 1: 安装依赖
-echo "📦 [1/6] 安装依赖..."
+echo "📦 [1/7] 安装依赖..."
 cd "$PROJECT_DIR"
 bun install
 
 # Step 2: 构建 Next.js 静态导出
-echo "🏗️  [2/6] 构建 Next.js 静态导出..."
+echo "🏗️  [2/7] 构建 Next.js 静态导出..."
 cd "$PROJECT_DIR"
 OUTPUT_MODE=export bun run build
 echo "✅ 静态文件已导出到 out/"
 
 # Step 3: 初始化 Capacitor (如果还没有)
-echo "📱 [3/6] 配置 Capacitor..."
+echo "📱 [3/7] 配置 Capacitor..."
 cd "$PROJECT_DIR"
 if [ ! -d "android" ]; then
     echo "  初始化 Android 平台..."
@@ -51,12 +51,37 @@ else
 fi
 
 # Step 4: 同步 Web 资源
-echo "🔄 [4/6] 同步 Web 资源到 Android..."
+echo "🔄 [4/7] 同步 Web 资源到 Android..."
 cd "$PROJECT_DIR"
 npx cap sync android
 
-# Step 5: 构建 APK
-echo "🔨 [5/6] 构建 Android APK..."
+# Step 5: 生成 Android 图标和启动画面资源
+echo "🎨 [5/7] 生成 Android 图标和启动画面..."
+cd "$PROJECT_DIR"
+if [ -f "resources/icon.png" ]; then
+    npx cordova-res android --skip-config --copy 2>/dev/null || echo "  ⚠️ cordova-res 执行有警告，继续构建..."
+    # 生成自适应图标前景/背景
+    python3 -c "
+from PIL import Image
+import os
+icon = Image.open('resources/icon.png').convert('RGBA')
+sizes = {'mdpi': 108, 'hdpi': 162, 'xhdpi': 216, 'xxhdpi': 324, 'xxxhdpi': 432}
+res_dir = 'android/app/src/main/res'
+for density, size in sizes.items():
+    fg = Image.new('RGBA', (size, size), (0, 0, 0, 0))
+    r = icon.resize((int(size * 0.6), int(size * 0.6)), Image.LANCZOS)
+    fg.paste(r, ((size - r.width) // 2, (size - r.height) // 2))
+    fg.save(os.path.join(res_dir, f'mipmap-{density}', 'ic_launcher_foreground.png'))
+    bg = Image.new('RGBA', (size, size), (15, 20, 25, 255))
+    bg.save(os.path.join(res_dir, f'mipmap-{density}', 'ic_launcher_background.png'))
+" 2>/dev/null || echo "  ⚠️ 自适应图标生成失败，使用默认图标..."
+    echo "  ✅ Android 图标和启动画面已生成"
+else
+    echo "  ⚠️ 未找到 resources/icon.png，跳过图标生成"
+fi
+
+# Step 6: 构建 APK
+echo "🔨 [6/7] 构建 Android APK..."
 cd "$PROJECT_DIR/android"
 
 if [ "$BUILD_TYPE" = "release" ]; then
@@ -69,7 +94,7 @@ else
     APK_PATH="app/build/outputs/apk/debug/app-debug.apk"
 fi
 
-# Step 6: 输出结果
+# Step 7: 输出结果
 echo ""
 echo "======================================"
 if [ -f "$APK_PATH" ]; then
@@ -86,4 +111,4 @@ echo ""
 echo "💡 后续步骤:"
 echo "  - 安装到设备: adb install $APK_PATH"
 echo "  - 打开 Android Studio: npx cap open android"
-echo "  - 查看日志: adb logcat | grep -i luna"
+echo "  - 查看日志: adb logcat | grep -i 小桦"
