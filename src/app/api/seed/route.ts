@@ -2,139 +2,70 @@ import { db } from '@/lib/db'
 import { NextResponse } from 'next/server'
 import { success, serverError } from '@/lib/api/response'
 
-// POST /api/seed - 初始化种子数据
+const APP_DATA_VERSION = 2
+
+// POST /api/seed - 初始化默认数据（首次安装）
+// 重要：
+// 1. 首次安装只创建默认 profile + settings，不创建任何示例经期/记录
+// 2. 版本更新时绝不清除已有数据，只补充缺失的设置
 export async function POST() {
   try {
-    const today = new Date()
-    const todayStr = today.toISOString().split('T')[0]
+    // 1. 检查是否已有数据
+    const existingProfile = await db.userProfile.findFirst()
+    const existingPeriodCount = await db.period.count()
+    const existingRecordCount = await db.dailyRecord.count()
+    const hasExistingData = existingProfile || existingPeriodCount > 0 || existingRecordCount > 0
 
-    // 创建默认用户资料
-    let profile = await db.userProfile.findFirst()
-    if (!profile) {
-      profile = await db.userProfile.create({
+    // 2. 检查数据版本号
+    const versionSetting = await db.setting.findUnique({ where: { key: 'app_data_version' } })
+    const currentDataVersion = versionSetting ? parseInt(versionSetting.value, 10) : 0
+
+    if (hasExistingData && currentDataVersion >= APP_DATA_VERSION) {
+      return success({ initialized: true, version: currentDataVersion }, '数据已初始化，无需重复操作')
+    }
+
+    // 3. 首次安装：只创建默认 profile（lastPeriodStart 为 null）
+    if (!existingProfile) {
+      await db.userProfile.create({
         data: {
           name: '小桦',
           cycleLength: 28,
           periodLength: 5,
-          lastPeriodStart: todayStr,
+          lastPeriodStart: null,
         },
       })
     }
 
-    // 创建近期经期
-    const periodStart = new Date(today)
-    periodStart.setDate(today.getDate() - 2)
-    const periodStartStr = periodStart.toISOString().split('T')[0]
-
-    const periodEnd = new Date(periodStart)
-    periodEnd.setDate(periodStart.getDate() + 4)
-    const periodEndStr = periodEnd.toISOString().split('T')[0]
-
-    const existingPeriod = await db.period.findFirst({
-      where: { startDate: periodStartStr },
-    })
-    if (!existingPeriod) {
-      await db.period.create({
-        data: { startDate: periodStartStr, endDate: periodEndStr },
-      })
-    }
-
-    // 创建上一个周期
-    const prevStart = new Date(periodStart)
-    prevStart.setDate(periodStart.getDate() - 28)
-    const prevStartStr = prevStart.toISOString().split('T')[0]
-
-    const prevEnd = new Date(prevStart)
-    prevEnd.setDate(prevStart.getDate() + 4)
-    const prevEndStr = prevEnd.toISOString().split('T')[0]
-
-    const existingPrevPeriod = await db.period.findFirst({
-      where: { startDate: prevStartStr },
-    })
-    if (!existingPrevPeriod) {
-      await db.period.create({
-        data: { startDate: prevStartStr, endDate: prevEndStr },
-      })
-    }
-
-    // 创建更早的周期
-    const prevPrevStart = new Date(prevStart)
-    prevPrevStart.setDate(prevStart.getDate() - 27)
-    const prevPrevStartStr = prevPrevStart.toISOString().split('T')[0]
-
-    const prevPrevEnd = new Date(prevPrevStart)
-    prevPrevEnd.setDate(prevPrevStart.getDate() + 5)
-    const prevPrevEndStr = prevPrevEnd.toISOString().split('T')[0]
-
-    const existingPrevPrevPeriod = await db.period.findFirst({
-      where: { startDate: prevPrevStartStr },
-    })
-    if (!existingPrevPrevPeriod) {
-      await db.period.create({
-        data: { startDate: prevPrevStartStr, endDate: prevPrevEndStr },
-      })
-    }
-
-    // 创建示例每日记录
-    const day1 = new Date(periodStart)
-    const day1Str = day1.toISOString().split('T')[0]
-
-    const day2 = new Date(periodStart)
-    day2.setDate(periodStart.getDate() + 1)
-    const day2Str = day2.toISOString().split('T')[0]
-
-    const sampleRecords = [
-      {
-        date: day1Str,
-        flow: 2,
-        mood: 3,
-        symptoms: JSON.stringify(['痛经', '疲劳']),
-        note: '经期第一天，注意保暖',
-      },
-      {
-        date: day2Str,
-        flow: 3,
-        mood: 4,
-        symptoms: JSON.stringify(['腰酸', '头痛']),
-        note: '记得多喝热水',
-      },
-    ]
-
-    for (const record of sampleRecords) {
-      const existingRecord = await db.dailyRecord.findUnique({
-        where: { date: record.date },
-      })
-      if (!existingRecord) {
-        await db.dailyRecord.create({ data: record })
-      }
-    }
-
-    // 创建默认设置
+    // 4. 确保默认 settings 存在（不清除已有设置，只补充缺失的）
     const defaultSettings = [
       { key: 'period_reminder', value: 'true' },
       { key: 'record_reminder', value: 'true' },
       { key: 'ovulation_reminder', value: 'false' },
-      { key: 'app_lock', value: 'true' },
+      { key: 'app_lock', value: 'false' },
       { key: 'dark_mode', value: 'true' },
     ]
 
     for (const setting of defaultSettings) {
-      const existing = await db.setting.findUnique({
-        where: { key: setting.key },
-      })
+      const existing = await db.setting.findUnique({ where: { key: setting.key } })
       if (!existing) {
         await db.setting.create({ data: setting })
       }
     }
 
+    // 5. 记录/更新数据版本号
+    if (versionSetting) {
+      await db.setting.update({ where: { key: 'app_data_version' }, data: { value: String(APP_DATA_VERSION) } })
+    } else {
+      await db.setting.create({ data: { key: 'app_data_version', value: String(APP_DATA_VERSION) } })
+    }
+
     return success({
-      profile: '默认资料已创建',
-      periods: '示例经期已创建',
-      records: '示例记录已创建',
-      settings: '默认设置已创建',
-    }, '种子数据初始化成功')
+      initialized: true,
+      version: APP_DATA_VERSION,
+      isNewInstall: !hasExistingData,
+    }, hasExistingData ? '数据迁移完成' : '首次安装初始化完成')
   } catch (error) {
-    console.error('Failed to seed data:', error)
-    return serverError('初始化种子数据失败')
+    console.error('Failed to initialize data:', error)
+    return serverError('初始化数据失败')
   }
 }

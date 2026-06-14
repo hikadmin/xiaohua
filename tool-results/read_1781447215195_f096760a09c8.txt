@@ -1,0 +1,1015 @@
+     1→'use client';
+     2→
+     3→import React, { useState, useEffect, useCallback, useMemo } from 'react';
+     4→import { motion, AnimatePresence } from 'framer-motion';
+     5→import { Home, Calendar, FileText, User, Plus } from 'lucide-react';
+     6→import { useToast } from '@/hooks/use-toast';
+     7→import {
+     8→  type Period, type DailyRecord, type UserProfile, type Setting, type TabPage,
+     9→  type CycleInfo, type CycleStats, type CalendarDay, type PeriodInfoResult,
+    10→  PHASE_INFO, FLOW_LABELS, MOOD_LABELS, formatDateStr, parseDate, daysBetween, addDays,
+    11→} from '@/components/luna/shared';
+    12→import HomeTab from '@/components/luna/HomeTab';
+    13→import CalendarTab from '@/components/luna/CalendarTab';
+    14→import LogTab from '@/components/luna/LogTab';
+    15→import ProfileTab from '@/components/luna/ProfileTab';
+    16→import ActionSheet from '@/components/luna/ActionSheet';
+    17→import SymptomSheet from '@/components/luna/SymptomSheet';
+    18→import ProfileEditSheet from '@/components/luna/ProfileEditSheet';
+    19→import DeleteConfirmDialog from '@/components/luna/DeleteConfirmDialog';
+    20→import FeedbackSheet from '@/components/luna/FeedbackSheet';
+    21→import ImageCropper from '@/components/luna/ImageCropper';
+    22→import {
+    23→  periodsApi, recordsApi, profileApi, settingsApi, feedbackApi, seedApi, exportApi,
+    24→  ApiError, redetectMode, getApiMode, setApiMode,
+    25→} from '@/services/api';
+    26→import { getWallpaper, getThemeColor, subscribeTheme, applyThemeToDOM, THEME_COLORS, setWallpaper as setWallpaperStore, setThemeColor as setThemeColorStore } from '@/lib/theme-store';
+    27→
+    28→// ============ Main Component ============
+    29→export default function LunaApp() {
+    30→  const [activeTab, setActiveTab] = useState<TabPage>('home');
+    31→  const [periods, setPeriods] = useState<Period[]>([]);
+    32→  const [records, setRecords] = useState<DailyRecord[]>([]);
+    33→  const [profile, setProfile] = useState<UserProfile | null>(null);
+    34→  const [settings, setSettings] = useState<Setting[]>([]);
+    35→  const [isLoaded, setIsLoaded] = useState(false);
+    36→  const [ringAnimated, setRingAnimated] = useState(false);
+    37→
+    38→  // Calendar state
+    39→  const today = new Date();
+    40→  const [calYear, setCalYear] = useState(today.getFullYear());
+    41→  const [calMonth, setCalMonth] = useState(today.getMonth() + 1);
+    42→
+    43→  // Action sheet state
+    44→  const [actionSheet, setActionSheet] = useState<{
+    45→    open: boolean;
+    46→    dateStr: string;
+    47→    day: number;
+    48→  }>({ open: false, dateStr: '', day: 0 });
+    49→
+    50→  // Symptom sheet state
+    51→  const [symptomSheetOpen, setSymptomSheetOpen] = useState(false);
+    52→  const [newSymptom, setNewSymptom] = useState('');
+    53→
+    54→  // Log state
+    55→  const [logTab, setLogTab] = useState<'record' | 'history'>('record');
+    56→  const [currentFlow, setCurrentFlow] = useState(0);
+    57→  const [currentMood, setCurrentMood] = useState(2);
+    58→  const [selectedSymptoms, setSelectedSymptoms] = useState<string[]>([]);
+    59→  const [customSymptoms, setCustomSymptoms] = useState<string[]>([]);
+    60→  const [noteText, setNoteText] = useState('');
+    61→
+    62→  // Profile editing state
+    63→  const [profileEditOpen, setProfileEditOpen] = useState(false);
+    64→  const [editName, setEditName] = useState('');
+    65→  const [editCycleLength, setEditCycleLength] = useState(28);
+    66→  const [editPeriodLength, setEditPeriodLength] = useState(5);
+    67→
+    68→  // Delete confirmation state
+    69→  const [deleteConfirm, setDeleteConfirm] = useState<{ open: boolean; recordId: string; date: string }>({ open: false, recordId: '', date: '' });
+    70→
+    71→  // Feedback state
+    72→  const [feedbackOpen, setFeedbackOpen] = useState(false);
+    73→  const [feedbackCategory, setFeedbackCategory] = useState('功能建议');
+    74→  const [feedbackContent, setFeedbackContent] = useState('');
+    75→  const [feedbackContact, setFeedbackContact] = useState('');
+    76→  const [feedbackSubmitting, setFeedbackSubmitting] = useState(false);
+    77→
+    78→  // Avatar edit state
+    79→  const [editAvatar, setEditAvatar] = useState('');
+    80→  const fileInputRef = React.useRef<HTMLInputElement>(null);
+    81→
+    82→  // Image cropper state
+    83→  const [cropperOpen, setCropperOpen] = useState(false);
+    84→  const [cropperImageSrc, setCropperImageSrc] = useState<string | null>(null);
+    85→  const [cropperMode, setCropperMode] = useState<'avatar' | 'wallpaper'>('avatar');
+    86→
+    87→  // Notification panel state
+    88→  const [notifPanelOpen, setNotifPanelOpen] = useState(false);
+    89→
+    90→  // Global theme state
+    91→  const [wallpaper, setWallpaperState] = useState<string | null>(null);
+    92→  const [themeColor, setThemeColorState] = useState('#e07a5f');
+    93→  const wallpaperInputRef = React.useRef<HTMLInputElement>(null);
+    94→
+    95→  // Daily tip state
+    96→  const [dailyTipIndex, setDailyTipIndex] = useState(() => {
+    97→    const t = new Date();
+    98→    return (t.getFullYear() * 366 + t.getMonth() * 31 + t.getDate()) % 5;
+    99→  });
+   100→
+   101→  const { toast } = useToast();
+   102→
+   103→  // ============ Capacitor / Local Mode Detection ============
+   104→  useEffect(() => {
+   105→    // 在客户端重新检测模式（确保 Capacitor 环境正确检测）
+   106→    const detectedMode = redetectMode();
+   107→    if (detectedMode === 'local') {
+   108→      console.log('[小桦] Running in local mode (IndexedDB)');
+   109→    }
+   110→  }, []);
+   111→
+   112→  // ============ Theme Sync ============
+   113→  useEffect(() => {
+   114→    // Load initial theme values
+   115→    setWallpaperState(getWallpaper());
+   116→    setThemeColorState(getThemeColor());
+   117→    applyThemeToDOM();
+   118→
+   119→    // Subscribe to theme changes from other components
+   120→    const unsub = subscribeTheme(() => {
+   121→      setWallpaperState(getWallpaper());
+   122→      setThemeColorState(getThemeColor());
+   123→      applyThemeToDOM();
+   124→    });
+   125→    return unsub;
+   126→  }, []);
+   127→
+   128→  // ============ Data Fetching (通过 API 服务层) ============
+   129→  const fetchPeriods = useCallback(async () => {
+   130→    try {
+   131→      const data = await periodsApi.getAll();
+   132→      setPeriods(data);
+   133→    } catch (error) {
+   134→      if (error instanceof ApiError) toast({ description: error.message });
+   135→    }
+   136→  }, [toast]);
+   137→
+   138→  const fetchRecords = useCallback(async () => {
+   139→    try {
+   140→      const data = await recordsApi.getAll();
+   141→      setRecords(data);
+   142→    } catch (error) {
+   143→      if (error instanceof ApiError) toast({ description: error.message });
+   144→    }
+   145→  }, [toast]);
+   146→
+   147→  const fetchProfile = useCallback(async () => {
+   148→    try {
+   149→      const data = await profileApi.get();
+   150→      setProfile(data);
+   151→    } catch (error) {
+   152→      if (error instanceof ApiError) toast({ description: error.message });
+   153→    }
+   154→  }, [toast]);
+   155→
+   156→  const fetchSettings = useCallback(async () => {
+   157→    try {
+   158→      const data = await settingsApi.getAll();
+   159→      setSettings(data);
+   160→    } catch (error) {
+   161→      if (error instanceof ApiError) toast({ description: error.message });
+   162→    }
+   163→  }, [toast]);
+   164→
+   165→  const seedData = useCallback(async () => {
+   166→    try {
+   167→      await seedApi.create();
+   168→    } catch {
+   169→      // seed 失败静默处理（可能在 local 模式下首次请求也失败）
+   170→    }
+   171→  }, []);
+   172→
+   173→  useEffect(() => {
+   174→    const init = async () => {
+   175→      // 初始化数据（自动适配 server/local 模式）
+   176→      // 使用重试机制确保 server→local 自动切换后能正确加载数据
+   177→      const maxRetries = 3;
+   178→      for (let attempt = 0; attempt < maxRetries; attempt++) {
+   179→        try {
+   180→          await seedData();
+   181→          await Promise.all([fetchPeriods(), fetchRecords(), fetchProfile(), fetchSettings()]);
+   182→          break; // 成功则跳出循环
+   183→        } catch {
+   184→          // 首次请求失败可能是 server→local 模式切换
+   185→          // 等待一小段时间让模式切换完成，然后重试
+   186→          if (attempt < maxRetries - 1) {
+   187→            await new Promise(r => setTimeout(r, 200));
+   188→          }
+   189→        }
+   190→      }
+   191→      setIsLoaded(true);
+   192→      setTimeout(() => setRingAnimated(true), 300);
+   193→    };
+   194→    init();
+   195→  }, [seedData, fetchPeriods, fetchRecords, fetchProfile, fetchSettings]);
+   196→
+   197→  // ============ Period Logic (前端仍需用于日历渲染) ============
+   198→  function getPeriodInfo(dateStr: string): PeriodInfoResult {
+   199→    let isPeriod = false;
+   200→    let isStart = false;
+   201→    let isEnd = false;
+   202→    let isActive = false;
+   203→
+   204→    for (const period of periods) {
+   205→      if (period.startDate && !period.endDate) {
+   206→        if (dateStr === period.startDate) {
+   207→          isPeriod = true; isStart = true; isEnd = true; isActive = true;
+   208→          break
+   209→        }
+   210→        const startD = parseDate(period.startDate);
+   211→        const checkD = parseDate(dateStr);
+   212→        if (checkD > startD && checkD <= new Date()) {
+   213→          isPeriod = true;
+   214→          if (dateStr === period.startDate) isStart = true;
+   215→          isActive = true;
+   216→          break
+   217→        }
+   218→      } else if (period.startDate && period.endDate) {
+   219→        if (dateStr >= period.startDate && dateStr <= period.endDate) {
+   220→          isPeriod = true;
+   221→          if (dateStr === period.startDate) isStart = true;
+   222→          if (dateStr === period.endDate) isEnd = true;
+   223→          break
+   224→        }
+   225→      }
+   226→    }
+   227→    return { isPeriod, isStart, isEnd, isActive };
+   228→  }
+   229→
+   230→  function hasActivePeriod(): Period | null {
+   231→    return periods.find(p => p.startDate && !p.endDate) || null;
+   232→  }
+   233→
+   234→  function getCycleInfo(): CycleInfo {
+   235→    const cycleLength = profile?.cycleLength || 28;
+   236→    const periodLength = profile?.periodLength || 5;
+   237→    const sortedPeriods = [...periods].sort((a, b) => b.startDate.localeCompare(a.startDate));
+   238→    const lastPeriod = sortedPeriods[0];
+   239→
+   240→    if (!lastPeriod) {
+   241→      return {
+   242→        phase: 'follicular', phaseDay: 1, daysUntilNext: cycleLength,
+   243→        cycleLength, periodLength, nextPeriodDate: null, lastPeriodStart: null,
+   244→      };
+   245→    }
+   246→
+   247→    const lastStart = parseDate(lastPeriod.startDate);
+   248→    const now = new Date();
+   249→    now.setHours(0, 0, 0, 0);
+   250→    const daysSinceStart = daysBetween(lastStart, now);
+   251→
+   252→    if (daysSinceStart < 0) {
+   253→      return {
+   254→        phase: 'follicular', phaseDay: 1, daysUntilNext: cycleLength,
+   255→        cycleLength, periodLength, nextPeriodDate: null, lastPeriodStart: lastPeriod.startDate,
+   256→      };
+   257→    }
+   258→
+   259→    const dayInCycle = (daysSinceStart % cycleLength) + 1;
+   260→    const nextPeriodDate = addDays(lastStart, cycleLength);
+   261→    const daysUntilNext = Math.max(0, daysBetween(now, nextPeriodDate));
+   262→
+   263→    let phase: string;
+   264→    if (dayInCycle <= periodLength) {
+   265→      phase = 'period';
+   266→    } else if (dayInCycle <= 13) {
+   267→      phase = 'follicular';
+   268→    } else if (dayInCycle <= 16) {
+   269→      phase = 'ovulation';
+   270→    } else {
+   271→      phase = 'luteal';
+   272→    }
+   273→
+   274→    return {
+   275→      phase, phaseDay: dayInCycle, daysUntilNext,
+   276→      cycleLength, periodLength, nextPeriodDate, lastPeriodStart: lastPeriod.startDate,
+   277→    };
+   278→  }
+   279→
+   280→  function getPredictedPeriodDays(): string[] {
+   281→    const cycleLength = profile?.cycleLength || 28;
+   282→    const periodLength = profile?.periodLength || 5;
+   283→    const sortedPeriods = [...periods].sort((a, b) => b.startDate.localeCompare(a.startDate));
+   284→    const lastPeriod = sortedPeriods[0];
+   285→    if (!lastPeriod || !lastPeriod.endDate) return [];
+   286→
+   287→    const lastEnd = parseDate(lastPeriod.endDate);
+   288→    const nextStart = addDays(lastEnd, cycleLength - periodLength + 1);
+   289→    const days: string[] = [];
+   290→    for (let i = 0; i < periodLength; i++) {
+   291→      days.push(formatDateStr(addDays(nextStart, i)));
+   292→    }
+   293→    return days;
+   294→  }
+   295→
+   296→  function getFertileDays(): string[] {
+   297→    const cycleLength = profile?.cycleLength || 28;
+   298→    const sortedPeriods = [...periods].sort((a, b) => b.startDate.localeCompare(a.startDate));
+   299→    const lastPeriod = sortedPeriods[0];
+   300→    if (!lastPeriod) return [];
+   301→
+   302→    const lastStart = parseDate(lastPeriod.startDate);
+   303→    const ovulationDay = addDays(lastStart, cycleLength - 14);
+   304→    const days: string[] = [];
+   305→    for (let i = -4; i <= 1; i++) {
+   306→      days.push(formatDateStr(addDays(ovulationDay, i)));
+   307→    }
+   308→    return days;
+   309→  }
+   310→
+   311→  // ============ API Actions (通过 API 服务层) ============
+   312→  async function startPeriod(dateStr: string) {
+   313→    try {
+   314→      await periodsApi.create({ startDate: dateStr });
+   315→      setActionSheet({ open: false, dateStr: '', day: 0 });
+   316→      await fetchPeriods();
+   317→      toast({ description: '已记录经期开始 💖' });
+   318→    } catch (error) {
+   319→      if (error instanceof ApiError) toast({ description: error.message });
+   320→    }
+   321→  }
+   322→
+   323→  async function endPeriod(dateStr: string) {
+   324→    const active = hasActivePeriod();
+   325→    if (!active) return;
+   326→    if (dateStr < active.startDate) {
+   327→      toast({ description: '结束日期不能早于开始日期' });
+   328→      return;
+   329→    }
+   330→    try {
+   331→      await periodsApi.update(active.id, { endDate: dateStr });
+   332→      setActionSheet({ open: false, dateStr: '', day: 0 });
+   333→      await fetchPeriods();
+   334→      toast({ description: '经期已结束，记录完成 ✅' });
+   335→    } catch (error) {
+   336→      if (error instanceof ApiError) toast({ description: error.message });
+   337→    }
+   338→  }
+   339→
+   340→  async function updateStart(dateStr: string) {
+   341→    const active = hasActivePeriod();
+   342→    if (!active) return;
+   343→    try {
+   344→      await periodsApi.update(active.id, { startDate: dateStr });
+   345→      setActionSheet({ open: false, dateStr: '', day: 0 });
+   346→      await fetchPeriods();
+   347→      toast({ description: '开始日期已更新' });
+   348→    } catch (error) {
+   349→      if (error instanceof ApiError) toast({ description: error.message });
+   350→    }
+   351→  }
+   352→
+   353→  async function cancelActivePeriod() {
+   354→    const active = hasActivePeriod();
+   355→    if (!active) return;
+   356→    try {
+   357→      await periodsApi.delete(active.id);
+   358→      setActionSheet({ open: false, dateStr: '', day: 0 });
+   359→      await fetchPeriods();
+   360→      toast({ description: '已取消当前记录' });
+   361→    } catch (error) {
+   362→      if (error instanceof ApiError) toast({ description: error.message });
+   363→    }
+   364→  }
+   365→
+   366→  async function deletePeriod(periodId: string) {
+   367→    try {
+   368→      await periodsApi.delete(periodId);
+   369→      setActionSheet({ open: false, dateStr: '', day: 0 });
+   370→      await fetchPeriods();
+   371→      toast({ description: '已取消该日期的经期记录' });
+   372→    } catch (error) {
+   373→      if (error instanceof ApiError) toast({ description: error.message });
+   374→    }
+   375→  }
+   376→
+   377→  async function extendPeriod(dateStr: string) {
+   378→    const sortedPeriods = [...periods].sort((a, b) => b.startDate.localeCompare(a.startDate));
+   379→    const lastPeriod = sortedPeriods[0];
+   380→    if (!lastPeriod) return;
+   381→    try {
+   382→      await periodsApi.update(lastPeriod.id, { endDate: dateStr });
+   383→      setActionSheet({ open: false, dateStr: '', day: 0 });
+   384→      await fetchPeriods();
+   385→      toast({ description: '经期已延长' });
+   386→    } catch (error) {
+   387→      if (error instanceof ApiError) toast({ description: error.message });
+   388→    }
+   389→  }
+   390→
+   391→  async function saveRecord() {
+   392→    const todayStr = formatDateStr(new Date());
+   393→    try {
+   394→      await recordsApi.upsert({
+   395→        date: todayStr,
+   396→        flow: currentFlow,
+   397→        mood: currentMood,
+   398→        symptoms: selectedSymptoms,
+   399→        note: noteText,
+   400→      });
+   401→      await fetchRecords();
+   402→      setNoteText('');
+   403→      toast({ description: '记录已保存 ✨' });
+   404→    } catch (error) {
+   405→      if (error instanceof ApiError) toast({ description: error.message });
+   406→    }
+   407→  }
+   408→
+   409→  async function toggleSetting(key: string, currentValue: string) {
+   410→    const newValue = currentValue === 'true' ? 'false' : 'true';
+   411→    try {
+   412→      await settingsApi.update({ key, value: newValue });
+   413→      await fetchSettings();
+   414→    } catch (error) {
+   415→      if (error instanceof ApiError) toast({ description: error.message });
+   416→    }
+   417→  }
+   418→
+   419→  async function saveProfile() {
+   420→    try {
+   421→      await profileApi.update({
+   422→        name: editName,
+   423→        avatar: editAvatar,
+   424→        cycleLength: editCycleLength,
+   425→        periodLength: editPeriodLength,
+   426→      });
+   427→      await fetchProfile();
+   428→      setProfileEditOpen(false);
+   429→      toast({ description: '个人资料已更新 ✅' });
+   430→    } catch (error) {
+   431→      if (error instanceof ApiError) toast({ description: error.message });
+   432→    }
+   433→  }
+   434→
+   435→  async function submitFeedback() {
+   436→    if (!feedbackContent.trim()) {
+   437→      toast({ description: '请输入反馈内容' });
+   438→      return;
+   439→    }
+   440→    setFeedbackSubmitting(true);
+   441→    try {
+   442→      await feedbackApi.create({
+   443→        category: feedbackCategory,
+   444→        content: feedbackContent.trim(),
+   445→        contact: feedbackContact.trim(),
+   446→      });
+   447→      setFeedbackOpen(false);
+   448→      setFeedbackContent('');
+   449→      setFeedbackContact('');
+   450→      setFeedbackCategory('功能建议');
+   451→      toast({ description: '感谢您的反馈！我们会认真处理 💖' });
+   452→    } catch (error) {
+   453→      if (error instanceof ApiError) {
+   454→        toast({ description: error.message });
+   455→      } else {
+   456→        toast({ description: '提交失败，请稍后重试' });
+   457→      }
+   458→    } finally {
+   459→      setFeedbackSubmitting(false);
+   460→    }
+   461→  }
+   462→
+   463→  function handleAvatarUpload(e: React.ChangeEvent<HTMLInputElement>) {
+   464→    const file = e.target.files?.[0];
+   465→    if (!file) return;
+   466→    if (file.size > 5 * 1024 * 1024) {
+   467→      toast({ description: '图片大小不能超过5MB' });
+   468→      return;
+   469→    }
+   470→    const reader = new FileReader();
+   471→    reader.onload = (ev) => {
+   472→      const result = ev.target?.result as string;
+   473→      setCropperImageSrc(result);
+   474→      setCropperMode('avatar');
+   475→      setCropperOpen(true);
+   476→    };
+   477→    reader.readAsDataURL(file);
+   478→    e.target.value = '';
+   479→  }
+   480→
+   481→  function handleAvatarCropComplete(croppedDataUrl: string) {
+   482→    setEditAvatar(croppedDataUrl);
+   483→  }
+   484→
+   485→  function handleWallpaperCropComplete(croppedDataUrl: string) {
+   486→    setWallpaperStore(croppedDataUrl);
+   487→    setWallpaperState(croppedDataUrl);
+   488→    toast({ description: '壁纸已设置 🎨' });
+   489→  }
+   490→
+   491→  async function deleteRecord(id: string) {
+   492→    const d = deleteConfirm.date;
+   493→    try {
+   494→      await recordsApi.deleteByDate(d);
+   495→      setDeleteConfirm({ open: false, recordId: '', date: '' });
+   496→      await fetchRecords();
+   497→      toast({ description: '记录已删除' });
+   498→    } catch (error) {
+   499→      if (error instanceof ApiError) toast({ description: error.message });
+   500→    }
+   501→  }
+   502→
+   503→  async function exportCSV() {
+   504→    try {
+   505→      const data = await exportApi.getData();
+   506→      const BOM = '\uFEFF';
+   507→      const blob = new Blob([BOM + data.csvContent], { type: 'text/csv;charset=utf-8;' });
+   508→      const url = URL.createObjectURL(blob);
+   509→      const a = document.createElement('a');
+   510→      a.href = url;
+   511→      a.download = `luna_records_${formatDateStr(new Date())}.csv`;
+   512→      a.click();
+   513→      URL.revokeObjectURL(url);
+   514→      toast({ description: '数据导出成功 📁' });
+   515→    } catch (error) {
+   516→      if (error instanceof ApiError) toast({ description: error.message });
+   517→    }
+   518→  }
+   519→
+   520→  // ============ Calendar Generation ============
+   521→  function generateCalendarDays(): CalendarDay[] {
+   522→    const firstDay = new Date(calYear, calMonth - 1, 1);
+   523→    const lastDay = new Date(calYear, calMonth, 0);
+   524→    const startDayOfWeek = firstDay.getDay();
+   525→    const totalDays = lastDay.getDate();
+   526→    const todayStr = formatDateStr(new Date());
+   527→    const predictedDays = getPredictedPeriodDays();
+   528→    const fertileDays = getFertileDays();
+   529→
+   530→    const days: CalendarDay[] = [];
+   531→
+   532→    for (let i = 0; i < startDayOfWeek; i++) {
+   533→      days.push({
+   534→        day: 0, dateStr: '', isToday: false, isOtherMonth: true,
+   535→        periodInfo: { isPeriod: false, isStart: false, isEnd: false, isActive: false },
+   536→        isPredicted: false, isFertile: false,
+   537→      });
+   538→    }
+   539→
+   540→    for (let day = 1; day <= totalDays; day++) {
+   541→      const dateStr = `${calYear}-${String(calMonth).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+   542→      const isToday = dateStr === todayStr;
+   543→      const periodInfo = getPeriodInfo(dateStr);
+   544→      const isPredicted = predictedDays.includes(dateStr) && !periodInfo.isPeriod;
+   545→      const isFertile = fertileDays.includes(dateStr) && !periodInfo.isPeriod && !isPredicted;
+   546→
+   547→      days.push({ day, dateStr, isToday, isOtherMonth: false, periodInfo, isPredicted, isFertile });
+   548→    }
+   549→
+   550→    return days;
+   551→  }
+   552→
+   553→  // ============ Cycle Statistics ============
+   554→  const cycleStats: CycleStats = useMemo(() => {
+   555→    const sortedPeriods = [...periods].sort((a, b) => a.startDate.localeCompare(b.startDate));
+   556→    const cycleLengths: number[] = [];
+   557→    const periodLengths: number[] = [];
+   558→
+   559→    for (let i = 1; i < sortedPeriods.length; i++) {
+   560→      if (sortedPeriods[i].endDate) {
+   561→        const cycleLen = daysBetween(parseDate(sortedPeriods[i - 1].startDate), parseDate(sortedPeriods[i].startDate));
+   562→        if (cycleLen > 15 && cycleLen < 50) cycleLengths.push(cycleLen);
+   563→      }
+   564→      if (sortedPeriods[i].endDate) {
+   565→        const periodLen = daysBetween(parseDate(sortedPeriods[i].startDate), parseDate(sortedPeriods[i].endDate!)) + 1;
+   566→        if (periodLen > 0 && periodLen < 15) periodLengths.push(periodLen);
+   567→      }
+   568→    }
+   569→
+   570→    const avgCycle = cycleLengths.length > 0
+   571→      ? Math.round(cycleLengths.reduce((a, b) => a + b, 0) / cycleLengths.length)
+   572→      : (profile?.cycleLength || 28);
+   573→    const avgPeriod = periodLengths.length > 0
+   574→      ? Math.round(periodLengths.reduce((a, b) => a + b, 0) / periodLengths.length)
+   575→      : (profile?.periodLength || 5);
+   576→
+   577→    return {
+   578→      avgCycle,
+   579→      avgPeriod,
+   580→      totalCycles: sortedPeriods.length,
+   581→      cycleLengths,
+   582→      periodLengths,
+   583→    };
+   584→  }, [periods, profile]);
+   585→
+   586→  // ============ Render Helpers ============
+   587→  const cycleInfo = getCycleInfo();
+   588→  const phaseData = PHASE_INFO[cycleInfo.phase] || PHASE_INFO.follicular;
+   589→  const isCurrentMonth = calYear === today.getFullYear() && calMonth === today.getMonth() + 1;
+   590→  const calendarDays = generateCalendarDays();
+   591→
+   592→  // ============ RENDER ============
+   593→  return (
+   594→    <div className="min-h-screen text-[#f0ece4] flex flex-col overflow-hidden relative"
+   595→      style={{ background: wallpaper ? 'transparent' : '#0f1419' }}>
+   596→      {/* Wallpaper Layer */}
+   597→      {wallpaper && (
+   598→        <div className="fixed inset-0 z-0">
+   599→          <img src={wallpaper} alt="壁纸" className="w-full h-full object-cover" />
+   600→          <div className="absolute inset-0" style={{ background: 'rgba(15, 20, 25, 0.55)' }} />
+   601→        </div>
+   602→      )}
+   603→      {/* Animated Background Blobs */}
+   604→      <div className="fixed inset-0 overflow-hidden pointer-events-none z-0">
+   605→        <div className="absolute rounded-full opacity-30 blur-[80px]"
+   606→          style={{
+   607→            width: 300, height: 300,
+   608→            background: `linear-gradient(135deg, ${phaseData.color}40, transparent)`,
+   609→            top: -80, right: -80,
+   610→            animation: 'blob-float 20s ease-in-out infinite',
+   611→            transition: 'background 1s ease',
+   612→          }} />
+   613→        <div className="absolute rounded-full opacity-25 blur-[60px]"
+   614→          style={{
+   615→            width: 250, height: 250,
+   616→            background: 'linear-gradient(135deg, #81b29a, transparent)',
+   617→            bottom: 200, left: -80,
+   618→            animation: 'blob-float 20s ease-in-out infinite',
+   619→            animationDelay: '-7s',
+   620→          }} />
+   621→        <div className="absolute rounded-full opacity-20 blur-[50px]"
+   622→          style={{
+   623→            width: 180, height: 180,
+   624→            background: 'linear-gradient(135deg, #d4a574, transparent)',
+   625→            bottom: -40, right: -40,
+   626→            animation: 'blob-float 20s ease-in-out infinite',
+   627→            animationDelay: '-14s',
+   628→          }} />
+   629→      </div>
+   630→
+   631→      {/* Main Content Area */}
+   632→      <main className="flex-1 relative z-10 overflow-y-auto overflow-x-hidden safe-top" style={{ paddingBottom: 90 }}>
+   633→        <AnimatePresence mode="wait">
+   634→          {activeTab === 'home' && (
+   635→            <HomeTab
+   636→              today={today}
+   637→              cycleInfo={cycleInfo}
+   638→              cycleStats={cycleStats}
+   639→              records={records}
+   640→              dailyTipIndex={dailyTipIndex}
+   641→              setDailyTipIndex={setDailyTipIndex}
+   642→              setActiveTab={setActiveTab}
+   643→              setLogTab={setLogTab}
+   644→              ringAnimated={ringAnimated}
+   645→              themeColor={themeColor}
+   646→              onBellClick={() => setNotifPanelOpen(true)}
+   647→            />
+   648→          )}
+   649→
+   650→          {activeTab === 'calendar' && (
+   651→            <CalendarTab
+   652→              calYear={calYear}
+   653→              calMonth={calMonth}
+   654→              setCalYear={setCalYear}
+   655→              setCalMonth={setCalMonth}
+   656→              isCurrentMonth={isCurrentMonth}
+   657→              today={today}
+   658→              calendarDays={calendarDays}
+   659→              periods={periods}
+   660→              setActionSheet={setActionSheet}
+   661→              themeColor={themeColor}
+   662→            />
+   663→          )}
+   664→
+   665→          {activeTab === 'log' && (
+   666→            <LogTab
+   667→              today={today}
+   668→              logTab={logTab}
+   669→              setLogTab={setLogTab}
+   670→              currentFlow={currentFlow}
+   671→              setCurrentFlow={setCurrentFlow}
+   672→              currentMood={currentMood}
+   673→              setCurrentMood={setCurrentMood}
+   674→              selectedSymptoms={selectedSymptoms}
+   675→              setSelectedSymptoms={setSelectedSymptoms}
+   676→              customSymptoms={customSymptoms}
+   677→              noteText={noteText}
+   678→              setNoteText={setNoteText}
+   679→              records={records}
+   680→              saveRecord={saveRecord}
+   681→              setSymptomSheetOpen={setSymptomSheetOpen}
+   682→              setDeleteConfirm={setDeleteConfirm}
+   683→              cycleInfo={cycleInfo}
+   684→              themeColor={themeColor}
+   685→            />
+   686→          )}
+   687→
+   688→          {activeTab === 'profile' && (
+   689→            <ProfileTab
+   690→              profile={profile}
+   691→              records={records}
+   692→              periods={periods}
+   693→              cycleStats={cycleStats}
+   694→              settings={settings}
+   695→              cycleInfo={cycleInfo}
+   696→              setProfileEditOpen={setProfileEditOpen}
+   697→              setEditName={setEditName}
+   698→              setEditAvatar={setEditAvatar}
+   699→              setEditCycleLength={setEditCycleLength}
+   700→              setEditPeriodLength={setEditPeriodLength}
+   701→              toggleSetting={toggleSetting}
+   702→              exportCSV={exportCSV}
+   703→              setFeedbackOpen={setFeedbackOpen}
+   704→              toast={toast}
+   705→              wallpaper={wallpaper}
+   706→              themeColor={themeColor}
+   707→              onWallpaperChange={(url: string | null) => {
+   708→                setWallpaperStore(url);
+   709→                setWallpaperState(url);
+   710→              }}
+   711→              onWallpaperCropRequest={(imageSrc: string) => {
+   712→                setCropperImageSrc(imageSrc);
+   713→                setCropperMode('wallpaper');
+   714→                setCropperOpen(true);
+   715→              }}
+   716→              onThemeColorChange={(color: string) => {
+   717→                setThemeColorStore(color);
+   718→                setThemeColorState(color);
+   719→              }}
+   720→              wallpaperInputRef={wallpaperInputRef}
+   721→            />
+   722→          )}
+   723→        </AnimatePresence>
+   724→      </main>
+   725→
+   726→      {/* ============ Bottom Navigation ============ */}
+   727→      <nav className="fixed bottom-0 left-0 right-0 z-50 safe-bottom"
+   728→        style={{ background: wallpaper ? 'rgba(15, 20, 25, 0.85)' : 'linear-gradient(to top, #0f1419 80%, transparent)', backdropFilter: wallpaper ? 'blur(20px)' : 'none' }}>
+   729→        <div className="flex justify-around items-center pb-5 pt-2">
+   730→          {[
+   731→            { page: 'home' as TabPage, icon: Home, label: '首页' },
+   732→            { page: 'calendar' as TabPage, icon: Calendar, label: '日历' },
+   733→          ].map(item => (
+   734→            <button
+   735→              key={item.page}
+   736→              className="flex flex-col items-center gap-1 px-4 py-2 rounded-2xl transition-all"
+   737→              style={{ background: activeTab === item.page ? 'rgba(255,255,255,0.05)' : 'transparent' }}
+   738→              onClick={() => setActiveTab(item.page)}
+   739→            >
+   740→              <item.icon size={22} style={{ color: activeTab === item.page ? themeColor : '#6b7280' }} />
+   741→              <span className="text-[11px] font-medium" style={{ color: activeTab === item.page ? themeColor : '#6b7280' }}>
+   742→                {item.label}
+   743→              </span>
+   744→            </button>
+   745→          ))}
+   746→
+   747→          {/* FAB Button */}
+   748→          <motion.button
+   749→            className="w-14 h-14 rounded-full flex items-center justify-center -mt-5"
+   750→            style={{
+   751→              background: `linear-gradient(135deg, ${themeColor}, ${themeColor}cc)`,
+   752→              boxShadow: `0 8px 24px ${themeColor}50`,
+   753→            }}
+   754→            whileTap={{ scale: 0.9 }}
+   755→            whileHover={{ scale: 1.05 }}
+   756→            onClick={() => {
+   757→              const todayStr = formatDateStr(new Date());
+   758→              setActionSheet({ open: true, dateStr: todayStr, day: new Date().getDate() });
+   759→            }}
+   760→          >
+   761→            <Plus size={26} style={{ color: '#0f1419', strokeWidth: 2.5 }} />
+   762→          </motion.button>
+   763→
+   764→          {[
+   765→            { page: 'log' as TabPage, icon: FileText, label: '记录' },
+   766→            { page: 'profile' as TabPage, icon: User, label: '我的' },
+   767→          ].map(item => (
+   768→            <button
+   769→              key={item.page}
+   770→              className="flex flex-col items-center gap-1 px-4 py-2 rounded-2xl transition-all"
+   771→              style={{ background: activeTab === item.page ? 'rgba(255,255,255,0.05)' : 'transparent' }}
+   772→              onClick={() => setActiveTab(item.page)}
+   773→            >
+   774→              <item.icon size={22} style={{ color: activeTab === item.page ? themeColor : '#6b7280' }} />
+   775→              <span className="text-[11px] font-medium" style={{ color: activeTab === item.page ? themeColor : '#6b7280' }}>
+   776→                {item.label}
+   777→              </span>
+   778→            </button>
+   779→          ))}
+   780→        </div>
+   781→      </nav>
+   782→
+   783→      {/* ============ Action Sheet ============ */}
+   784→      <ActionSheet
+   785→        open={actionSheet.open}
+   786→        dateStr={actionSheet.dateStr}
+   787→        day={actionSheet.day}
+   788→        calMonth={calMonth}
+   789→        setActionSheet={setActionSheet}
+   790→        periods={periods}
+   791→        hasActivePeriod={hasActivePeriod}
+   792→        getPeriodInfo={getPeriodInfo}
+   793→        startPeriod={startPeriod}
+   794→        endPeriod={endPeriod}
+   795→        updateStart={updateStart}
+   796→        cancelActivePeriod={cancelActivePeriod}
+   797→        deletePeriod={deletePeriod}
+   798→        extendPeriod={extendPeriod}
+   799→        fetchPeriods={fetchPeriods}
+   800→        toast={toast}
+   801→        themeColor={themeColor}
+   802→      />
+   803→
+   804→      {/* ============ Add Symptom Sheet ============ */}
+   805→      <SymptomSheet
+   806→        open={symptomSheetOpen}
+   807→        newSymptom={newSymptom}
+   808→        setNewSymptom={setNewSymptom}
+   809→        setSymptomSheetOpen={setSymptomSheetOpen}
+   810→        setCustomSymptoms={setCustomSymptoms}
+   811→        toast={toast}
+   812→        themeColor={themeColor}
+   813→      />
+   814→
+   815→      {/* ============ Loading Overlay ============ */}
+   816→      <AnimatePresence>
+   817→        {!isLoaded && (
+   818→          <motion.div
+   819→            initial={{ opacity: 1 }}
+   820→            exit={{ opacity: 0 }}
+   821→            transition={{ duration: 0.5 }}
+   822→            className="fixed inset-0 z-[300] flex items-center justify-center"
+   823→            style={{ background: '#0f1419' }}
+   824→          >
+   825→            <motion.div
+   826→              className="text-center"
+   827→              initial={{ scale: 0.8, opacity: 0 }}
+   828→              animate={{ scale: 1, opacity: 1 }}
+   829→              transition={{ duration: 0.5 }}
+   830→            >
+   831→              <motion.div
+   832→                className="w-20 h-20 rounded-full mx-auto mb-4 flex items-center justify-center"
+   833→                style={{ background: `linear-gradient(135deg, ${themeColor}, #81b29a)` }}
+   834→                animate={{ scale: [1, 1.05, 1] }}
+   835→                transition={{ duration: 2, repeat: Infinity, ease: 'easeInOut' }}
+   836→              >
+   837→                <span className="text-3xl font-light" style={{ fontFamily: 'Georgia, serif', color: '#0f1419' }}>桦</span>
+   838→              </motion.div>
+   839→              <p className="text-xl font-light" style={{ fontFamily: 'Georgia, serif' }}>小桦</p>
+   840→              <p className="text-sm mt-1" style={{ color: '#6b7280' }}>经期追踪</p>
+   841→              <motion.div
+   842→                className="w-16 h-1 rounded-full mx-auto mt-4"
+   843→                style={{ background: `linear-gradient(90deg, ${themeColor}, #81b29a)` }}
+   844→                animate={{ scaleX: [0.5, 1, 0.5] }}
+   845→                transition={{ duration: 1.5, repeat: Infinity, ease: 'easeInOut' }}
+   846→              />
+   847→            </motion.div>
+   848→          </motion.div>
+   849→        )}
+   850→      </AnimatePresence>
+   851→
+   852→      {/* ============ Profile Edit Sheet ============ */}
+   853→      <ProfileEditSheet
+   854→        open={profileEditOpen}
+   855→        editName={editName}
+   856→        setEditName={setEditName}
+   857→        editAvatar={editAvatar}
+   858→        setEditAvatar={setEditAvatar}
+   859→        editCycleLength={editCycleLength}
+   860→        setEditCycleLength={setEditCycleLength}
+   861→        editPeriodLength={editPeriodLength}
+   862→        setEditPeriodLength={setEditPeriodLength}
+   863→        setProfileEditOpen={setProfileEditOpen}
+   864→        saveProfile={saveProfile}
+   865→        handleAvatarUpload={handleAvatarUpload}
+   866→        fileInputRef={fileInputRef}
+   867→        themeColor={themeColor}
+   868→      />
+   869→
+   870→      {/* ============ Delete Confirmation Dialog ============ */}
+   871→      <DeleteConfirmDialog
+   872→        open={deleteConfirm.open}
+   873→        recordId={deleteConfirm.recordId}
+   874→        date={deleteConfirm.date}
+   875→        setDeleteConfirm={setDeleteConfirm}
+   876→        deleteRecord={deleteRecord}
+   877→      />
+   878→
+   879→      {/* ============ Feedback Sheet ============ */}
+   880→      <FeedbackSheet
+   881→        open={feedbackOpen}
+   882→        feedbackCategory={feedbackCategory}
+   883→        setFeedbackCategory={setFeedbackCategory}
+   884→        feedbackContent={feedbackContent}
+   885→        setFeedbackContent={setFeedbackContent}
+   886→        feedbackContact={feedbackContact}
+   887→        setFeedbackContact={setFeedbackContact}
+   888→        feedbackSubmitting={feedbackSubmitting}
+   889→        setFeedbackOpen={setFeedbackOpen}
+   890→        submitFeedback={submitFeedback}
+   891→        themeColor={themeColor}
+   892→      />
+   893→
+   894→      {/* ============ Image Cropper ============ */}
+   895→      <ImageCropper
+   896→        open={cropperOpen}
+   897→        imageSrc={cropperImageSrc}
+   898→        onClose={() => {
+   899→          setCropperOpen(false);
+   900→          setCropperImageSrc(null);
+   901→        }}
+   902→        onCropComplete={cropperMode === 'avatar' ? handleAvatarCropComplete : handleWallpaperCropComplete}
+   903→        aspectRatio={cropperMode === 'avatar' ? 1 : undefined}
+   904→        circularCrop={cropperMode === 'avatar'}
+   905→        title={cropperMode === 'avatar' ? '裁剪头像' : '裁剪壁纸'}
+   906→        themeColor={themeColor}
+   907→      />
+   908→
+   909→      {/* ============ Notification Panel ============ */}
+   910→      <AnimatePresence>
+   911→        {notifPanelOpen && (
+   912→          <motion.div
+   913→            initial={{ opacity: 0 }}
+   914→            animate={{ opacity: 1 }}
+   915→            exit={{ opacity: 0 }}
+   916→            className="fixed inset-0 z-[250]"
+   917→            style={{ background: 'rgba(0,0,0,0.5)', backdropFilter: 'blur(4px)' }}
+   918→            onClick={() => setNotifPanelOpen(false)}
+   919→          >
+   920→            <motion.div
+   921→              initial={{ y: -20, opacity: 0, scale: 0.95 }}
+   922→              animate={{ y: 0, opacity: 1, scale: 1 }}
+   923→              exit={{ y: -20, opacity: 0, scale: 0.95 }}
+   924→              transition={{ type: 'spring', damping: 25, stiffness: 300 }}
+   925→              className="absolute top-16 right-4 w-80 rounded-2xl overflow-hidden"
+   926→              style={{ background: '#1a2027', border: '1px solid rgba(255,255,255,0.08)', boxShadow: '0 20px 60px rgba(0,0,0,0.5)' }}
+   927→              onClick={e => e.stopPropagation()}
+   928→            >
+   929→              {/* Header */}
+   930→              <div className="flex justify-between items-center px-4 py-3"
+   931→                style={{ borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
+   932→                <span className="text-sm font-medium">消息通知</span>
+   933→                <button className="text-xs px-2 py-1 rounded-md transition-all active:scale-95"
+   934→                  style={{ color: themeColor, background: `${themeColor}15` }}
+   935→                  onClick={() => { toast({ description: '已全部标记为已读' }); setNotifPanelOpen(false); }}>
+   936→                  全部已读
+   937→                </button>
+   938→              </div>
+   939→              {/* Notifications List */}
+   940→              <div className="max-h-80 overflow-y-auto">
+   941→                {(() => {
+   942→                  const notifs = [];
+   943→                  const activePer = hasActivePeriod();
+   944→                  if (activePer) {
+   945→                    notifs.push({
+   946→                      icon: '🩸',
+   947→                      title: '经期进行中',
+   948→                      desc: `经期已开始 ${daysBetween(parseDate(activePer.startDate), new Date()) + 1} 天，记得记录每天状况`,
+   949→                      time: '今天',
+   950→                    });
+   951→                  }
+   952→                  if (cycleInfo.daysUntilNext <= 3 && cycleInfo.daysUntilNext > 0) {
+   953→                    notifs.push({
+   954→                      icon: '📅',
+   955→                      title: '经期即将来临',
+   956→                      desc: `预计 ${cycleInfo.daysUntilNext} 天后开始，提前做好准备`,
+   957→                      time: '今天',
+   958→                    });
+   959→                  }
+   960→                  if (cycleInfo.phase === 'ovulation') {
+   961→                    notifs.push({
+   962→                      icon: '🌸',
+   963→                      title: '排卵期提醒',
+   964→                      desc: '当前处于排卵期，注意身体变化',
+   965→                      time: '今天',
+   966→                    });
+   967→                  }
+   968→                  notifs.push({
+   969→                    icon: '💧',
+   970→                    title: '每日记录提醒',
+   971→                    desc: '别忘了记录今天的身体状况',
+   972→                    time: '每天',
+   973→                  });
+   974→                  if (records.length === 0) {
+   975→                    notifs.push({
+   976→                      icon: '📝',
+   977→                      title: '开始记录',
+   978→                      desc: '还没有任何记录，点击记录按钮开始吧',
+   979→                      time: '提示',
+   980→                    });
+   981→                  }
+   982→                  return notifs.length > 0 ? notifs.map((n, i) => (
+   983→                    <div key={i} className="flex items-start gap-3 px-4 py-3 transition-all cursor-pointer hover:bg-white/5"
+   984→                      style={{ borderBottom: i < notifs.length - 1 ? '1px solid rgba(255,255,255,0.04)' : 'none' }}
+   985→                      onClick={() => setNotifPanelOpen(false)}>
+   986→                      <span className="text-lg mt-0.5">{n.icon}</span>
+   987→                      <div className="flex-1 min-w-0">
+   988→                        <p className="text-sm font-medium">{n.title}</p>
+   989→                        <p className="text-xs mt-0.5 leading-relaxed" style={{ color: '#a8a29e' }}>{n.desc}</p>
+   990→                      </div>
+   991→                      <span className="text-[10px] flex-shrink-0 mt-1" style={{ color: '#6b7280' }}>{n.time}</span>
+   992→                    </div>
+   993→                  )) : (
+   994→                    <div className="px-4 py-8 text-center">
+   995→                      <p className="text-sm" style={{ color: '#6b7280' }}>暂无通知</p>
+   996→                    </div>
+   997→                  );
+   998→                })()}
+   999→              </div>
+  1000→              {/* Footer */}
+  1001→              <div className="px-4 py-2.5 text-center"
+  1002→                style={{ borderTop: '1px solid rgba(255,255,255,0.06)' }}>
+  1003→                <button className="text-xs transition-all" style={{ color: '#6b7280' }}
+  1004→                  onClick={() => setNotifPanelOpen(false)}>
+  1005→                  关闭
+  1006→                </button>
+  1007→              </div>
+  1008→            </motion.div>
+  1009→          </motion.div>
+  1010→        )}
+  1011→      </AnimatePresence>
+  1012→    </div>
+  1013→  );
+  1014→}
+  1015→

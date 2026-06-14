@@ -238,8 +238,9 @@ export default function LunaApp() {
     const lastPeriod = sortedPeriods[0];
 
     if (!lastPeriod) {
+      // 首次安装空状态：返回特殊标记，首页据此显示引导
       return {
-        phase: 'follicular', phaseDay: 1, daysUntilNext: cycleLength,
+        phase: 'empty', phaseDay: 0, daysUntilNext: 0,
         cycleLength, periodLength, nextPeriodDate: null, lastPeriodStart: null,
       };
     }

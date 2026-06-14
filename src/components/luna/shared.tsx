@@ -80,6 +80,7 @@ export const DEFAULT_SYMPTOMS = ['痛经', '腰酸', '头痛', '疲劳', '腹胀
 export const FEEDBACK_CATEGORIES = ['功能建议', '问题反馈', '体验优化', '其他'];
 
 export const PHASE_INFO: Record<string, { name: string; desc: string; tip: string; color: string; icon: string }> = {
+  empty: { name: '欢迎', desc: '开始记录你的周期', tip: '点击下方日历标记经期开始日期，即可开始追踪', color: '#d4a574', icon: '🌸' },
   period: { name: '经期', desc: '休养期', tip: '注意保暖休息，避免剧烈运动', color: '#e07a5f', icon: '🩸' },
   follicular: { name: '卵泡期', desc: '能量回升期', tip: '雌激素水平上升，适合进行高强度运动和创造性工作', color: '#81b29a', icon: '🌱' },
   ovulation: { name: '排卵期', desc: '高峰期', tip: '精力充沛，社交能力和创造力最佳', color: '#d4a574', icon: '✨' },
