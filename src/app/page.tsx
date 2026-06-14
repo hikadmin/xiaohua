@@ -157,14 +157,21 @@ export default function LunaApp() {
     try {
       await seedApi.create();
     } catch {
-      // seed 失败静默处理
+      // seed 失败静默处理（可能在 local 模式下首次请求也失败）
     }
   }, []);
 
   useEffect(() => {
     const init = async () => {
+      // 先尝试 seed，如果失败则重试一次（可能在 server → local 模式切换后）
       await seedData();
-      await Promise.all([fetchPeriods(), fetchRecords(), fetchProfile(), fetchSettings()]);
+      try {
+        await Promise.all([fetchPeriods(), fetchRecords(), fetchProfile(), fetchSettings()]);
+      } catch {
+        // 如果首次请求失败（可能是 server→local 模式自动切换），重试
+        await seedData();
+        await Promise.all([fetchPeriods(), fetchRecords(), fetchProfile(), fetchSettings()]);
+      }
       setIsLoaded(true);
       setTimeout(() => setRingAnimated(true), 300);
     };

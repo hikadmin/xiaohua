@@ -26,17 +26,19 @@ import type {
   ExportDataResponse,
 } from '@/lib/api/types'
 
-// Local mode stubs (Capacitor/Android) — not used in web mode
-const localPeriodsApi = {} as any;
-const localRecordsApi = {} as any;
-const localProfileApi = {} as any;
-const localSettingsApi = {} as any;
-const localFeedbackApi = {} as any;
-const localGetCycleStats = (() => {}) as any;
-const localGetDashboard = (() => {}) as any;
-const localGetCalendarMonth = (() => {}) as any;
-const localExportData = (() => {}) as any;
-const localSeedData = (() => {}) as any;
+// Local mode API implementations (Capacitor/Android) — uses IndexedDB
+import {
+  localPeriodsApi,
+  localRecordsApi,
+  localProfileApi,
+  localSettingsApi,
+  localFeedbackApi,
+  localGetCycleStats,
+  localGetDashboard,
+  localGetCalendarMonth,
+  localExportData,
+  localSeedData,
+} from './local-api'
 
 // ============ 模式检测 ============
 
@@ -57,7 +59,12 @@ export function setApiMode(mode: ApiMode) {
 /** 自动检测模式：优先检查 Capacitor 环境 */
 function detectMode(): ApiMode {
   if (typeof window === 'undefined') return 'server'
-  // 如果标记了本地模式或检测到 Capacitor 环境
+  // 如果之前已保存 local 模式（例如服务器不可用时自动切换的）
+  try {
+    const savedMode = localStorage.getItem('luna_api_mode')
+    if (savedMode === 'local') return 'local'
+  } catch {}
+  // 如果标记了本地模式
   if ((window as Record<string, unknown>).__LUNA_LOCAL_MODE__) return 'local'
   // Capacitor 环境检测
   if (typeof (window as Record<string, unknown>).Capacitor !== 'undefined') return 'local'
@@ -109,6 +116,18 @@ async function request<T>(
 
     return json.data as T
   } catch (error) {
+    // 如果是网络错误且当前是 server 模式，自动回退到 local 模式
+    if (error instanceof TypeError && error.message.includes('fetch')) {
+      if (currentMode === 'server') {
+        console.warn('[Luna] Server unavailable, auto-switching to local mode (IndexedDB)')
+        currentMode = 'local'
+        // 保存模式到 localStorage
+        if (typeof window !== 'undefined') {
+          try { localStorage.setItem('luna_api_mode', 'local') } catch {}
+        }
+      }
+      throw new ApiError('服务器不可用，已切换到离线模式', 0)
+    }
     if (error instanceof ApiError) throw error
     throw new ApiError('网络连接失败，请检查网络后重试', 0)
   }

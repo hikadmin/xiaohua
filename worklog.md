@@ -1,6 +1,48 @@
 # Work Log — Task 4: Refactor page.tsx for Memory Optimization
 
 ---
+Task ID: 10
+Agent: Main
+Task: 修复 APK 打包后"经期来了"标记功能不可用问题
+
+Work Log:
+- 分析问题根因：`src/services/api.ts` 中 local-api 实现为空对象 `{} as any`
+  - 原先的 local-api.ts 和 local-db.ts 文件在之前被删除或未提交
+  - 导致 Capacitor 环境下所有 API 调用返回 undefined，功能完全不可用
+- 创建 `src/services/local-db.ts`：Dexie.js + IndexedDB 数据库层
+  - 5个数据表：periods, records, profile, settings, feedback
+  - 单例 LunaDatabase 类，自动建表
+  - 工具函数：generateId(), nowISO(), dateStr()
+- 创建 `src/services/local-api.ts`：完整本地 API 实现
+  - periods API: getAll, create, update, delete
+  - records API: getAll, upsert, getByDate, updateByDate, deleteByDate
+  - profile API: get (自动创建默认), update
+  - settings API: getAll, update, batchUpdate
+  - feedback API: getAll, create
+  - 统计: localGetCycleStats — 周期统计、规律性判断、连续记录天数
+  - 日历: localGetCalendarMonth — 月历数据、经期标记、预测、易孕期
+  - 导出: localExportData
+  - 仪表盘: localGetDashboard
+  - 初始化: localSeedData — 自动创建默认数据
+- 更新 `src/services/api.ts`：
+  - 替换空 stub 为真实 local-api 导入
+  - 添加 server→local 自动回退机制：fetch 失败时自动切换到 local 模式
+  - 模式检测增加 localStorage 持久化，重启后保持 local 模式
+- 更新 `src/app/page.tsx`：
+  - 初始化增加重试逻辑：首次请求失败后自动重试（处理 server→local 切换场景）
+
+Stage Summary:
+- ✅ 根因：local-api.ts 和 local-db.ts 文件缺失，所有本地 API 为空 stub
+- ✅ 修复：完整实现 IndexedDB 本地数据库层 + 21 个 API 端点
+- ✅ 增强：server→local 自动回退 + 模式持久化 + 初始化重试
+- ✅ web 模式验证通过，lint 通过，dev server 正常
+- ✅ bun 运行测试验证 local-api 所有方法可用
+
+问题说明（给用户）：
+APK 打包后功能不可用是因为 Capacitor 环境下没有后端服务器，需要使用 IndexedDB 本地存储。
+现在已修复，下次打包 APK 后所有功能（经期标记、记录、设置等）都会使用本地数据库正常工作。
+
+---
 Task ID: 9
 Agent: Main
 Task: 修复头像上传、壁纸裁剪、通知铃铛功能
