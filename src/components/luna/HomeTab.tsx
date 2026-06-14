@@ -20,11 +20,12 @@ interface HomeTabProps {
   setLogTab: (tab: 'record' | 'history') => void;
   ringAnimated: boolean;
   themeColor: string;
+  onBellClick: () => void;
 }
 
 export default function HomeTab({
   today, cycleInfo, cycleStats, records, dailyTipIndex,
-  setDailyTipIndex, setActiveTab, setLogTab, ringAnimated, themeColor,
+  setDailyTipIndex, setActiveTab, setLogTab, ringAnimated, themeColor, onBellClick,
 }: HomeTabProps) {
   const phaseData = PHASE_INFO[cycleInfo.phase] || PHASE_INFO.follicular;
 
@@ -47,7 +48,8 @@ export default function HomeTab({
             </p>
           </div>
           <button className="w-10 h-10 rounded-full flex items-center justify-center transition-all hover:scale-105 active:scale-95"
-            style={{ background: '#232b35', border: '1px solid rgba(255,255,255,0.08)' }}>
+            style={{ background: '#232b35', border: '1px solid rgba(255,255,255,0.08)' }}
+            onClick={onBellClick}>
             <Bell size={18} style={{ color: '#a8a29e' }} />
           </button>
         </div>

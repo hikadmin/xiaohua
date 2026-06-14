@@ -18,6 +18,7 @@ import SymptomSheet from '@/components/luna/SymptomSheet';
 import ProfileEditSheet from '@/components/luna/ProfileEditSheet';
 import DeleteConfirmDialog from '@/components/luna/DeleteConfirmDialog';
 import FeedbackSheet from '@/components/luna/FeedbackSheet';
+import ImageCropper from '@/components/luna/ImageCropper';
 import {
   periodsApi, recordsApi, profileApi, settingsApi, feedbackApi, seedApi, exportApi,
   ApiError,
@@ -77,6 +78,14 @@ export default function LunaApp() {
   // Avatar edit state
   const [editAvatar, setEditAvatar] = useState('');
   const fileInputRef = React.useRef<HTMLInputElement>(null);
+
+  // Image cropper state
+  const [cropperOpen, setCropperOpen] = useState(false);
+  const [cropperImageSrc, setCropperImageSrc] = useState<string | null>(null);
+  const [cropperMode, setCropperMode] = useState<'avatar' | 'wallpaper'>('avatar');
+
+  // Notification panel state
+  const [notifPanelOpen, setNotifPanelOpen] = useState(false);
 
   // Global theme state
   const [wallpaper, setWallpaperState] = useState<string | null>(null);
@@ -420,16 +429,29 @@ export default function LunaApp() {
   function handleAvatarUpload(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
     if (!file) return;
-    if (file.size > 2 * 1024 * 1024) {
-      toast({ description: '图片大小不能超过2MB' });
+    if (file.size > 5 * 1024 * 1024) {
+      toast({ description: '图片大小不能超过5MB' });
       return;
     }
     const reader = new FileReader();
     reader.onload = (ev) => {
       const result = ev.target?.result as string;
-      setEditAvatar(result);
+      setCropperImageSrc(result);
+      setCropperMode('avatar');
+      setCropperOpen(true);
     };
     reader.readAsDataURL(file);
+    e.target.value = '';
+  }
+
+  function handleAvatarCropComplete(croppedDataUrl: string) {
+    setEditAvatar(croppedDataUrl);
+  }
+
+  function handleWallpaperCropComplete(croppedDataUrl: string) {
+    setWallpaperStore(croppedDataUrl);
+    setWallpaperState(croppedDataUrl);
+    toast({ description: '壁纸已设置 🎨' });
   }
 
   async function deleteRecord(id: string) {
@@ -587,6 +609,7 @@ export default function LunaApp() {
               setLogTab={setLogTab}
               ringAnimated={ringAnimated}
               themeColor={themeColor}
+              onBellClick={() => setNotifPanelOpen(true)}
             />
           )}
 
@@ -650,6 +673,11 @@ export default function LunaApp() {
               onWallpaperChange={(url: string | null) => {
                 setWallpaperStore(url);
                 setWallpaperState(url);
+              }}
+              onWallpaperCropRequest={(imageSrc: string) => {
+                setCropperImageSrc(imageSrc);
+                setCropperMode('wallpaper');
+                setCropperOpen(true);
               }}
               onThemeColorChange={(color: string) => {
                 setThemeColorStore(color);
@@ -827,6 +855,125 @@ export default function LunaApp() {
         submitFeedback={submitFeedback}
         themeColor={themeColor}
       />
+
+      {/* ============ Image Cropper ============ */}
+      <ImageCropper
+        open={cropperOpen}
+        imageSrc={cropperImageSrc}
+        onClose={() => {
+          setCropperOpen(false);
+          setCropperImageSrc(null);
+        }}
+        onCropComplete={cropperMode === 'avatar' ? handleAvatarCropComplete : handleWallpaperCropComplete}
+        aspectRatio={cropperMode === 'avatar' ? 1 : undefined}
+        circularCrop={cropperMode === 'avatar'}
+        title={cropperMode === 'avatar' ? '裁剪头像' : '裁剪壁纸'}
+        themeColor={themeColor}
+      />
+
+      {/* ============ Notification Panel ============ */}
+      <AnimatePresence>
+        {notifPanelOpen && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-[250]"
+            style={{ background: 'rgba(0,0,0,0.5)', backdropFilter: 'blur(4px)' }}
+            onClick={() => setNotifPanelOpen(false)}
+          >
+            <motion.div
+              initial={{ y: -20, opacity: 0, scale: 0.95 }}
+              animate={{ y: 0, opacity: 1, scale: 1 }}
+              exit={{ y: -20, opacity: 0, scale: 0.95 }}
+              transition={{ type: 'spring', damping: 25, stiffness: 300 }}
+              className="absolute top-16 right-4 w-80 rounded-2xl overflow-hidden"
+              style={{ background: '#1a2027', border: '1px solid rgba(255,255,255,0.08)', boxShadow: '0 20px 60px rgba(0,0,0,0.5)' }}
+              onClick={e => e.stopPropagation()}
+            >
+              {/* Header */}
+              <div className="flex justify-between items-center px-4 py-3"
+                style={{ borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
+                <span className="text-sm font-medium">消息通知</span>
+                <button className="text-xs px-2 py-1 rounded-md transition-all active:scale-95"
+                  style={{ color: themeColor, background: `${themeColor}15` }}
+                  onClick={() => { toast({ description: '已全部标记为已读' }); setNotifPanelOpen(false); }}>
+                  全部已读
+                </button>
+              </div>
+              {/* Notifications List */}
+              <div className="max-h-80 overflow-y-auto">
+                {(() => {
+                  const notifs = [];
+                  const activePer = hasActivePeriod();
+                  if (activePer) {
+                    notifs.push({
+                      icon: '🩸',
+                      title: '经期进行中',
+                      desc: `经期已开始 ${daysBetween(parseDate(activePer.startDate), new Date()) + 1} 天，记得记录每天状况`,
+                      time: '今天',
+                    });
+                  }
+                  if (cycleInfo.daysUntilNext <= 3 && cycleInfo.daysUntilNext > 0) {
+                    notifs.push({
+                      icon: '📅',
+                      title: '经期即将来临',
+                      desc: `预计 ${cycleInfo.daysUntilNext} 天后开始，提前做好准备`,
+                      time: '今天',
+                    });
+                  }
+                  if (cycleInfo.phase === 'ovulation') {
+                    notifs.push({
+                      icon: '🌸',
+                      title: '排卵期提醒',
+                      desc: '当前处于排卵期，注意身体变化',
+                      time: '今天',
+                    });
+                  }
+                  notifs.push({
+                    icon: '💧',
+                    title: '每日记录提醒',
+                    desc: '别忘了记录今天的身体状况',
+                    time: '每天',
+                  });
+                  if (records.length === 0) {
+                    notifs.push({
+                      icon: '📝',
+                      title: '开始记录',
+                      desc: '还没有任何记录，点击记录按钮开始吧',
+                      time: '提示',
+                    });
+                  }
+                  return notifs.length > 0 ? notifs.map((n, i) => (
+                    <div key={i} className="flex items-start gap-3 px-4 py-3 transition-all cursor-pointer hover:bg-white/5"
+                      style={{ borderBottom: i < notifs.length - 1 ? '1px solid rgba(255,255,255,0.04)' : 'none' }}
+                      onClick={() => setNotifPanelOpen(false)}>
+                      <span className="text-lg mt-0.5">{n.icon}</span>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-medium">{n.title}</p>
+                        <p className="text-xs mt-0.5 leading-relaxed" style={{ color: '#a8a29e' }}>{n.desc}</p>
+                      </div>
+                      <span className="text-[10px] flex-shrink-0 mt-1" style={{ color: '#6b7280' }}>{n.time}</span>
+                    </div>
+                  )) : (
+                    <div className="px-4 py-8 text-center">
+                      <p className="text-sm" style={{ color: '#6b7280' }}>暂无通知</p>
+                    </div>
+                  );
+                })()}
+              </div>
+              {/* Footer */}
+              <div className="px-4 py-2.5 text-center"
+                style={{ borderTop: '1px solid rgba(255,255,255,0.06)' }}>
+                <button className="text-xs transition-all" style={{ color: '#6b7280' }}
+                  onClick={() => setNotifPanelOpen(false)}>
+                  关闭
+                </button>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }

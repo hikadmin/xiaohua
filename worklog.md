@@ -1,5 +1,46 @@
 # Work Log — Task 4: Refactor page.tsx for Memory Optimization
 
+---
+Task ID: 9
+Agent: Main
+Task: 修复头像上传、壁纸裁剪、通知铃铛功能
+
+Work Log:
+- 创建 ImageCropper 组件 (`src/components/luna/ImageCropper.tsx`)：基于 react-image-crop 库
+  - 支持圆形裁剪（头像模式）和矩形裁剪（壁纸模式）
+  - 提供缩放、旋转、重置控制工具栏
+  - 输出最大1024px的裁剪图片，自动限制大小
+  - 圆形裁剪自动将结果裁剪为圆形
+- 修复头像上传功能：
+  - ProfileEditSheet 中的头像上传现在触发 ImageCropper
+  - 用户上传图片后先进入裁剪界面，选择圆形区域后确认
+  - 裁剪结果自动设置为头像
+  - 文件大小限制从2MB提升到5MB
+- 优化壁纸上传功能：
+  - ProfileTab 中的壁纸上传现在触发 ImageCropper
+  - 用户上传图片后先进入裁剪界面，选择壁纸区域后确认
+  - 新增 onWallpaperCropRequest prop，传递图片源到裁剪器
+  - 文件大小限制从5MB提升到10MB
+- 修复通知铃铛功能：
+  - HomeTab 新增 onBellClick prop
+  - 首页铃铛图标点击后弹出通知面板
+  - 通知面板根据当前周期状态动态显示通知内容（经期进行中、经期即将来临、排卵期提醒、每日记录提醒、开始记录提示）
+  - 提供"全部已读"和"关闭"按钮
+  - 点击通知可关闭面板
+
+Modified Files:
+- `src/components/luna/ImageCropper.tsx` — 新文件：图片裁剪组件
+- `src/components/luna/HomeTab.tsx` — 新增 onBellClick prop，铃铛按钮绑定点击事件
+- `src/components/luna/ProfileTab.tsx` — 新增 onWallpaperCropRequest prop，壁纸上传改为裁剪模式
+- `src/app/page.tsx` — 新增 cropper 状态管理、通知面板状态、ImageCropper 和通知面板渲染
+
+Stage Summary:
+- ✅ 头像上传：支持图片裁剪选择圆形区域
+- ✅ 壁纸上传：支持图片裁剪选择指定区域
+- ✅ 通知铃铛：点击弹出动态通知面板
+- ✅ lint 通过，dev server 正常运行
+- ✅ agent-browser 验证：主题颜色切换全局生效，通知面板弹出正常
+
 ## Task ID: 4
 ## Date: 2026-03-04
 ## Status: ✅ Completed

@@ -34,6 +34,7 @@ interface ProfileTabProps {
   wallpaper: string | null;
   themeColor: string;
   onWallpaperChange: (url: string | null) => void;
+  onWallpaperCropRequest: (imageSrc: string) => void;
   onThemeColorChange: (color: string) => void;
   wallpaperInputRef: React.RefObject<HTMLInputElement | null>;
 }
@@ -42,22 +43,22 @@ export default function ProfileTab({
   profile, records, periods, cycleStats, settings, cycleInfo,
   setProfileEditOpen, setEditName, setEditAvatar, setEditCycleLength, setEditPeriodLength,
   toggleSetting, exportCSV, setFeedbackOpen, toast,
-  wallpaper, themeColor, onWallpaperChange, onThemeColorChange, wallpaperInputRef,
+  wallpaper, themeColor, onWallpaperChange, onWallpaperCropRequest, onThemeColorChange, wallpaperInputRef,
 }: ProfileTabProps) {
   const [showColorPicker, setShowColorPicker] = useState(false);
 
   function handleWallpaperUpload(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
     if (!file) return;
-    if (file.size > 5 * 1024 * 1024) {
-      toast({ description: '壁纸图片大小不能超过5MB' });
+    if (file.size > 10 * 1024 * 1024) {
+      toast({ description: '壁纸图片大小不能超过10MB' });
       return;
     }
     const reader = new FileReader();
     reader.onload = (ev) => {
       const result = ev.target?.result as string;
-      onWallpaperChange(result);
-      toast({ description: '壁纸已设置 🎨' });
+      // Open cropper for wallpaper
+      onWallpaperCropRequest(result);
     };
     reader.readAsDataURL(file);
     // Reset file input
