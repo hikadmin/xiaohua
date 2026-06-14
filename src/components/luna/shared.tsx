@@ -75,6 +75,14 @@ export const WEEKDAYS_FULL = ['周日', '周一', '周二', '周三', '周四', 
 export const FLOW_LABELS = ['无量', '点滴', '少量', '中等', '大量'];
 export const MOOD_LABELS = ['', '开心', '平静', '害羞', '低落', '烦躁', '焦虑'];
 export const MOOD_EMOJIS = ['', '😊', '😌', '😳', '😔', '😤', '😰'];
+
+/** 害羞表情使用自定义图片，其他使用文字emoji */
+export function renderMoodEmoji(mood: number, className: string = 'text-xl'): React.ReactNode {
+  if (mood === 3) {
+    return <img src="/emoji-shy.png" alt="害羞" className={className} style={{ display: 'inline-block', verticalAlign: 'middle' }} />;
+  }
+  return <span className={className}>{MOOD_EMOJIS[mood]}</span>;
+}
 export const DEFAULT_SYMPTOMS = ['痛经', '腰酸', '头痛', '疲劳', '腹胀', '乳房胀痛'];
 export const FEEDBACK_CATEGORIES = ['功能建议', '问题反馈', '体验优化', '其他'];
 

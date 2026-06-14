@@ -1,6 +1,29 @@
 # Work Log — 小桦 Period Tracker
 
 ---
+Task ID: 13
+Agent: Main
+Task: 替换害羞表情为自定义图片emoji
+
+Work Log:
+- 用户要求将"害羞"情绪的😳文字emoji替换为自定义图片emoji
+- 将上传的图片复制到 public/emoji-shy.png（67x61 PNG）
+- 在 shared.tsx 新增 renderMoodEmoji() 辅助函数：
+  - mood=3（害羞）时渲染 <img src="/emoji-shy.png">
+  - 其他mood仍使用文字emoji
+- 更新 LogTab.tsx：
+  - 情绪选择按钮：MOOD_EMOJIS[mood] → renderMoodEmoji(mood, 'text-xl w-6 h-6')
+  - 历史记录列表：MOOD_EMOJIS[record.mood] → renderMoodEmoji(record.mood, 'text-sm w-4 h-4 inline-block')
+- 更新 HomeTab.tsx：
+  - 最近记录图标：MOOD_EMOJIS[record.mood] → renderMoodEmoji(record.mood, 'text-sm w-5 h-5')
+
+Stage Summary:
+- ✅ 害羞emoji替换为自定义图片，在记录页、历史记录、首页均正确显示
+- ✅ 其他5种情绪emoji保持文字emoji不变
+- ✅ lint通过，dev server正常
+- ✅ agent-browser验证：图片正确加载，无broken image
+
+---
 Task ID: 12
 Agent: Main
 Task: 修复 APK 图标和"取消经期记录"功能
