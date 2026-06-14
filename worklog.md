@@ -1,6 +1,33 @@
 # Work Log — 小桦 Period Tracker
 
 ---
+Task ID: 14
+Agent: Main
+Task: 统一所有6个情绪emoji为自定义图片风格
+
+Work Log:
+- 用户要求：参考提供的害羞表情图片，制作与其他emoji格式一致的害羞表情
+- 第一次尝试：只替换害羞emoji为自定义图片，但与文字emoji(😊😌😔😤😰)风格不一致
+- 第二次尝试：使用😳 Unicode emoji，但与参考图片(闭眼+红晕)不符
+- 最终方案：生成所有6个emoji的统一风格自定义图片
+  - 使用AI图像生成，一次性生成6个emoji（开心/平静/害羞/低落/烦躁/焦虑）
+  - 统一扁平化小黄脸风格，与标准emoji视觉一致
+  - Python脚本：去除白色背景→裁剪每个emoji→正方形→缩放128x128
+  - 保存为 public/emoji-happy.png, emoji-calm.png, emoji-shy.png, emoji-sad.png, emoji-angry.png, emoji-anxious.png
+- 更新 shared.tsx renderMoodEmoji() 函数：
+  - 新增 MOOD_EMOJI_IMAGES 映射（mood 1-6 → 对应图片路径）
+  - 所有6个mood统一渲染为 <img> 标签，使用 inline-block + 1.2em 尺寸
+  - 保留 MOOD_EMOJIS 文字数组作为后备
+- VLM验证：6个emoji风格基本统一，都是"小黄脸+情绪符号"卡通风格
+
+Stage Summary:
+- ✅ 6个情绪emoji全部使用统一风格的自定义图片
+- ✅ 害羞emoji：闭眼+红晕+微笑，符合用户参考图
+- ✅ 所有emoji格式一致（img标签，1.2em大小，inline-block）
+- ✅ 记录页、历史记录、首页均正确显示
+- ✅ lint通过，dev server正常
+
+---
 Task ID: 13
 Agent: Main
 Task: 替换害羞表情为自定义图片emoji

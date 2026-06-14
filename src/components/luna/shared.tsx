@@ -76,10 +76,28 @@ export const FLOW_LABELS = ['无量', '点滴', '少量', '中等', '大量'];
 export const MOOD_LABELS = ['', '开心', '平静', '害羞', '低落', '烦躁', '焦虑'];
 export const MOOD_EMOJIS = ['', '😊', '😌', '😳', '😔', '😤', '😰'];
 
-/** 害羞表情使用自定义图片，其他使用文字emoji */
+/** 自定义emoji图片映射（统一风格） */
+const MOOD_EMOJI_IMAGES: Record<number, string> = {
+  1: '/emoji-happy.png',
+  2: '/emoji-calm.png',
+  3: '/emoji-shy.png',
+  4: '/emoji-sad.png',
+  5: '/emoji-angry.png',
+  6: '/emoji-anxious.png',
+};
+
+/** 统一使用自定义emoji图片渲染，保持风格一致 */
 export function renderMoodEmoji(mood: number, className: string = 'text-xl'): React.ReactNode {
-  if (mood === 3) {
-    return <img src="/emoji-shy.png" alt="害羞" className={className} style={{ display: 'inline-block', verticalAlign: 'middle' }} />;
+  const imgSrc = MOOD_EMOJI_IMAGES[mood];
+  if (imgSrc) {
+    return (
+      <img
+        src={imgSrc}
+        alt={MOOD_LABELS[mood]}
+        className={`${className} inline-block align-middle`}
+        style={{ width: '1.2em', height: '1.2em' }}
+      />
+    );
   }
   return <span className={className}>{MOOD_EMOJIS[mood]}</span>;
 }
