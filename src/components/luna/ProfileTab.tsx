@@ -102,13 +102,13 @@ export default function ProfileTab({
             )}
           </div>
           <div className="flex-1">
-            <p className="text-xl font-light" style={{ fontFamily: 'Georgia, serif' }}>{profile?.name || 'Luna'}</p>
+            <p className="text-xl font-light" style={{ fontFamily: 'Georgia, serif' }}>{profile?.name || '小桦'}</p>
             <p className="text-sm" style={{ color: '#a8a29e' }}>已记录 {records.length} 天 · {cycleStats.totalCycles} 个周期</p>
           </div>
           <button className="w-10 h-10 rounded-xl flex items-center justify-center transition-all hover:scale-105 active:scale-95"
             style={{ background: '#232b35', border: '1px solid rgba(255,255,255,0.08)' }}
             onClick={() => {
-              setEditName(profile?.name || 'Luna');
+              setEditName(profile?.name || '小桦');
               setEditAvatar(profile?.avatar || '');
               setEditCycleLength(profile?.cycleLength || 28);
               setEditPeriodLength(profile?.periodLength || 5);

@@ -2,7 +2,7 @@ import type { CapacitorConfig } from '@capacitor/cli';
 
 const config: CapacitorConfig = {
   appId: 'com.luna.periodtracker',
-  appName: '经期来了',
+  appName: '小桦',
   webDir: 'out',                   // Next.js 静态导出目录
   server: {
     // 开发时可以指向 dev server 实现热更新
@@ -15,7 +15,7 @@ const config: CapacitorConfig = {
       launchAutoHide: true,
       backgroundColor: '#0f1419',
       showSpinner: true,
-      spinnerColor: '#e07a5f',
+      spinnerColor: '#e07a5f',  // matches theme default
       androidScaleType: 'CENTER_CROP',
       androidSplashResourceName: 'splash',
     },

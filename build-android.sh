@@ -1,6 +1,6 @@
 #!/bin/bash
 # ============================================
-# Luna 经期来了 — Android APK 构建脚本
+# 小桦 — Android APK 构建脚本
 # ============================================
 # 
 # 前置条件:
@@ -23,7 +23,7 @@ set -e
 BUILD_TYPE="${1:-debug}"
 PROJECT_DIR="$(cd "$(dirname "$0")" && pwd)"
 
-echo "🌙 Luna 经期来了 — Android APK 构建"
+echo "🌸 小桦 — Android APK 构建"
 echo "======================================"
 echo "构建类型: $BUILD_TYPE"
 echo "项目目录: $PROJECT_DIR"

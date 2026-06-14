@@ -1,4 +1,4 @@
-// ============ Luna Period Tracker — Standalone Embedded HTTP Server ============
+// ============ 小桦 Period Tracker — Standalone Embedded HTTP Server ============
 // Bundled with the Android APK, runs as a local HTTP server on the device.
 // Uses bun:sqlite for persistence, serves all 21 API endpoints.
 
@@ -25,7 +25,7 @@ db.run('PRAGMA journal_mode = WAL')
 db.run(`
   CREATE TABLE IF NOT EXISTS UserProfile (
     id TEXT PRIMARY KEY,
-    name TEXT DEFAULT 'Luna',
+    name TEXT DEFAULT '小桦',
     avatar TEXT DEFAULT '',
     cycleLength INTEGER DEFAULT 28,
     periodLength INTEGER DEFAULT 5,
@@ -750,7 +750,7 @@ function getProfile(): Response {
       const now = new Date().toISOString()
       db.run(
         'INSERT INTO UserProfile (id, name, avatar, cycleLength, periodLength, createdAt, updatedAt) VALUES (?, ?, ?, ?, ?, ?, ?)',
-        [id, 'Luna', '', 28, 5, now, now]
+        [id, '小桦', '', 28, 5, now, now]
       )
       profile = db.query('SELECT * FROM UserProfile WHERE id = ?').get(id)
     }
@@ -794,7 +794,7 @@ function updateProfile(body: Record<string, unknown>): Response {
       const now = new Date().toISOString()
       db.run(
         'INSERT INTO UserProfile (id, name, avatar, cycleLength, periodLength, lastPeriodStart, createdAt, updatedAt) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
-        [id, (body.name as string) ?? 'Luna', (body.avatar as string) ?? '', (body.cycleLength as number) ?? 28, (body.periodLength as number) ?? 5, (body.lastPeriodStart as string) ?? null, now, now]
+        [id, (body.name as string) ?? '小桦', (body.avatar as string) ?? '', (body.cycleLength as number) ?? 28, (body.periodLength as number) ?? 5, (body.lastPeriodStart as string) ?? null, now, now]
       )
       profile = db.query('SELECT * FROM UserProfile WHERE id = ?').get(id)
       return created(profile, '用户资料创建成功')
@@ -1068,7 +1068,7 @@ function seedData(): Response {
       const now = new Date().toISOString()
       db.run(
         'INSERT INTO UserProfile (id, name, avatar, cycleLength, periodLength, lastPeriodStart, createdAt, updatedAt) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
-        [id, 'Luna', '', 28, 5, todayStr, now, now]
+        [id, '小桦', '', 28, 5, todayStr, now, now]
       )
       profile = db.query('SELECT * FROM UserProfile WHERE id = ?').get(id)
     }
@@ -1329,6 +1329,6 @@ const server = Bun.serve({
   },
 })
 
-console.log(`🌙 Luna Server running on http://localhost:${PORT}`)
+console.log(`🌸 小桦 Server running on http://localhost:${PORT}`)
 console.log(`📦 Database: ${DB_PATH}`)
 console.log(`🔗 API base: http://localhost:${PORT}/api`)

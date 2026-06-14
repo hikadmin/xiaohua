@@ -1,3 +1,53 @@
+# Work Log — 小桦 Period Tracker
+
+---
+Task ID: 11
+Agent: Main
+Task: 应用品牌更新 + APK本地模式修复
+
+Work Log:
+- 上传图标处理：用户上传了 1254x1254 PNG 图标
+  - 使用 Python PIL 生成所有尺寸图标（72, 96, 128, 144, 152, 192, 384, 512px）
+  - 生成 favicon-32x32.png、apple-touch-icon-180x180.png
+  - 保存到 public/icons/ 目录
+- 应用品牌更新：应用名从"经期来了/Luna"改为"小桦"
+  - capacitor.config.ts: appName → '小桦'
+  - manifest.json: name → '小桦 - 经期追踪', short_name → '小桦'
+  - layout.tsx: title → '小桦 - 经期追踪', description更新, apple-touch-icon路径
+  - page.tsx: 启动动画 L → 桦, Luna → 小桦
+  - ProfileTab.tsx: 默认名 'Luna' → '小桦' (2处)
+  - ProfileEditSheet/ActionSheet默认名
+  - local-api.ts: 默认profile名 'Luna' → '小桦' (2处)
+  - api/seed/route.ts: 默认名 'Luna' → '小桦'
+  - api/profile/route.ts: 默认名 'Luna' → '小桦' (2处)
+  - luna-server/index.ts: 默认名 'Luna' → '小桦' (4处), 启动日志更新
+  - build-android.sh: 注释和日志更新
+- APK本地模式修复：
+  - 重写 api.ts 模式检测逻辑：
+    - 懒检测（首次调用时才检测）+ 缓存
+    - 增加 Capacitor 环境检测：window.Capacitor、__LUNA_LOCAL_MODE__、非localhost的https scheme
+    - 添加 redetectMode() 函数，支持运行时重新检测
+    - 改进错误检测：isNetworkError() 更全面
+    - 导出 ApiError 类和 setApiMode 函数
+  - page.tsx 初始化改进：
+    - 添加 Capacitor/Local Mode 检测 useEffect
+    - 初始化重试机制从2次增加到3次
+    - 每次重试间隔200ms等待模式切换完成
+- QA验证：agent-browser 全面测试通过
+  - 首页、日历、记录、我的 四个Tab全部正常
+  - 经期标记（FAB按钮 + ActionSheet）正常
+  - 通知铃铛面板正常
+  - 主题颜色全局切换正常
+  - 所有品牌名已更新为"小桦"
+
+Stage Summary:
+- ✅ 应用名全面更新为"小桦"
+- ✅ 自定义图标已生成并替换所有尺寸
+- ✅ 包名 com.luna.periodtracker 保持不变
+- ✅ APK本地模式（IndexedDB）修复增强
+- ✅ lint通过，dev server正常
+- ✅ 全功能QA验证通过
+
 # Work Log — Task 4: Refactor page.tsx for Memory Optimization
 
 ---

@@ -21,7 +21,7 @@ import FeedbackSheet from '@/components/luna/FeedbackSheet';
 import ImageCropper from '@/components/luna/ImageCropper';
 import {
   periodsApi, recordsApi, profileApi, settingsApi, feedbackApi, seedApi, exportApi,
-  ApiError,
+  ApiError, redetectMode, getApiMode, setApiMode,
 } from '@/services/api';
 import { getWallpaper, getThemeColor, subscribeTheme, applyThemeToDOM, THEME_COLORS, setWallpaper as setWallpaperStore, setThemeColor as setThemeColorStore } from '@/lib/theme-store';
 
@@ -100,6 +100,15 @@ export default function LunaApp() {
 
   const { toast } = useToast();
 
+  // ============ Capacitor / Local Mode Detection ============
+  useEffect(() => {
+    // 在客户端重新检测模式（确保 Capacitor 环境正确检测）
+    const detectedMode = redetectMode();
+    if (detectedMode === 'local') {
+      console.log('[小桦] Running in local mode (IndexedDB)');
+    }
+  }, []);
+
   // ============ Theme Sync ============
   useEffect(() => {
     // Load initial theme values
@@ -163,14 +172,21 @@ export default function LunaApp() {
 
   useEffect(() => {
     const init = async () => {
-      // 先尝试 seed，如果失败则重试一次（可能在 server → local 模式切换后）
-      await seedData();
-      try {
-        await Promise.all([fetchPeriods(), fetchRecords(), fetchProfile(), fetchSettings()]);
-      } catch {
-        // 如果首次请求失败（可能是 server→local 模式自动切换），重试
-        await seedData();
-        await Promise.all([fetchPeriods(), fetchRecords(), fetchProfile(), fetchSettings()]);
+      // 初始化数据（自动适配 server/local 模式）
+      // 使用重试机制确保 server→local 自动切换后能正确加载数据
+      const maxRetries = 3;
+      for (let attempt = 0; attempt < maxRetries; attempt++) {
+        try {
+          await seedData();
+          await Promise.all([fetchPeriods(), fetchRecords(), fetchProfile(), fetchSettings()]);
+          break; // 成功则跳出循环
+        } catch {
+          // 首次请求失败可能是 server→local 模式切换
+          // 等待一小段时间让模式切换完成，然后重试
+          if (attempt < maxRetries - 1) {
+            await new Promise(r => setTimeout(r, 200));
+          }
+        }
       }
       setIsLoaded(true);
       setTimeout(() => setRingAnimated(true), 300);
@@ -806,9 +822,9 @@ export default function LunaApp() {
                 animate={{ scale: [1, 1.05, 1] }}
                 transition={{ duration: 2, repeat: Infinity, ease: 'easeInOut' }}
               >
-                <span className="text-3xl font-light" style={{ fontFamily: 'Georgia, serif', color: '#0f1419' }}>L</span>
+                <span className="text-3xl font-light" style={{ fontFamily: 'Georgia, serif', color: '#0f1419' }}>桦</span>
               </motion.div>
-              <p className="text-xl font-light" style={{ fontFamily: 'Georgia, serif' }}>Luna</p>
+              <p className="text-xl font-light" style={{ fontFamily: 'Georgia, serif' }}>小桦</p>
               <p className="text-sm mt-1" style={{ color: '#6b7280' }}>经期追踪</p>
               <motion.div
                 className="w-16 h-1 rounded-full mx-auto mt-4"

@@ -13,7 +13,7 @@ export async function POST() {
     if (!profile) {
       profile = await db.userProfile.create({
         data: {
-          name: 'Luna',
+          name: '小桦',
           cycleLength: 28,
           periodLength: 5,
           lastPeriodStart: todayStr,

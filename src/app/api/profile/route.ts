@@ -10,7 +10,7 @@ export async function GET() {
     if (!profile) {
       profile = await db.userProfile.create({
         data: {
-          name: 'Luna',
+          name: '小桦',
           cycleLength: 28,
           periodLength: 5,
         },
@@ -60,7 +60,7 @@ export async function PUT(request: NextRequest) {
     if (!profile) {
       profile = await db.userProfile.create({
         data: {
-          name: (data.name as string) ?? 'Luna',
+          name: (data.name as string) ?? '小桦',
           avatar: (data.avatar as string) ?? '',
           cycleLength: (data.cycleLength as number) ?? 28,
           periodLength: (data.periodLength as number) ?? 5,

@@ -3,17 +3,17 @@ import "./globals.css";
 import { Toaster } from "@/components/ui/toaster";
 
 export const metadata: Metadata = {
-  title: "Luna - 经期追踪",
-  description: "智能经期追踪，守护女性健康",
+  title: "小桦 - 经期追踪",
+  description: "小桦 — 温暖、私密、科学的经期健康管理",
   icons: {
     icon: "/icons/icon-192x192.png",
-    apple: "/icons/icon-152x152.png",
+    apple: "/icons/apple-touch-icon.png",
   },
   manifest: "/manifest.json",
   appleWebApp: {
     capable: true,
     statusBarStyle: "black-translucent",
-    title: "Luna",
+    title: "小桦",
   },
 };
 
@@ -34,7 +34,7 @@ export default function RootLayout({
   return (
     <html lang="zh-CN" suppressHydrationWarning>
       <head>
-        <link rel="apple-touch-icon" href="/icons/icon-152x152.png" />
+        <link rel="apple-touch-icon" href="/icons/apple-touch-icon.png" />
         <meta name="apple-mobile-web-app-capable" content="yes" />
       </head>
       <body className="antialiased">
