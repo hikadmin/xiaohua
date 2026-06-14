@@ -5,7 +5,7 @@ import { motion } from 'framer-motion';
 import { FileText, Droplets, Heart, Activity, Plus, X } from 'lucide-react';
 import {
   formatDateChinese, FLOW_LABELS, MOOD_LABELS, MOOD_EMOJIS,
-  DEFAULT_SYMPTOMS, parseDate, renderMoodEmoji,
+  DEFAULT_SYMPTOMS, parseDate,
   type DailyRecord, type CycleInfo,
 } from './shared';
 
@@ -165,7 +165,7 @@ export default function LogTab({
                     border: currentMood === mood ? `1px solid ${themeColor}33` : '1px solid transparent',
                   }}
                   onClick={() => setCurrentMood(mood)}>
-                  {renderMoodEmoji(mood, 'text-xl w-6 h-6')}
+                  <span className='text-xl'>{MOOD_EMOJIS[mood]}</span>
                   <span className="text-[11px]" style={{ color: currentMood === mood ? themeColor : '#6b7280' }}>
                     {MOOD_LABELS[mood]}
                   </span>
@@ -244,7 +244,7 @@ export default function LogTab({
                     </div>
                     <div className="flex items-center gap-2">
                       <span className="text-xs" style={{ color: '#6b7280' }}>
-                        {renderMoodEmoji(record.mood, 'text-sm w-4 h-4 inline-block')} {MOOD_LABELS[record.mood]}
+                        {MOOD_EMOJIS[record.mood]} {MOOD_LABELS[record.mood]}
                       </span>
                       <button className="w-7 h-7 rounded-lg flex items-center justify-center transition-all hover:scale-110 active:scale-90"
                         style={{ background: 'rgba(239,68,68,0.08)' }}

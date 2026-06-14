@@ -5,7 +5,7 @@ import { motion } from 'framer-motion';
 import { Bell, Activity, Droplets, ArrowRight } from 'lucide-react';
 import {
   StaggerIn, formatDateChinese, PHASE_INFO, RING_TICK_MARKS,
-  DAILY_TIPS, MOOD_EMOJIS, FLOW_LABELS, parseDate, renderMoodEmoji,
+  DAILY_TIPS, MOOD_EMOJIS, FLOW_LABELS, parseDate,
   type DailyRecord, type CycleInfo, type CycleStats, type TabPage,
 } from './shared';
 
@@ -224,7 +224,7 @@ export default function HomeTab({
                   style={{ borderColor: 'rgba(255,255,255,0.04)' }}>
                   <div className="w-8 h-8 rounded-xl flex items-center justify-center text-sm"
                     style={{ background: `${phaseData.color}15` }}>
-                    {renderMoodEmoji(record.mood, 'text-sm w-5 h-5') || '📝'}
+                    {MOOD_EMOJIS[record.mood] || '📝'}
                   </div>
                   <div className="flex-1 min-w-0">
                     <p className="text-sm font-medium">{d.getMonth() + 1}月{d.getDate()}日</p>
