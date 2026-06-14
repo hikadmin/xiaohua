@@ -586,6 +586,7 @@ export default function LunaApp() {
               setActiveTab={setActiveTab}
               setLogTab={setLogTab}
               ringAnimated={ringAnimated}
+              themeColor={themeColor}
             />
           )}
 
@@ -600,6 +601,7 @@ export default function LunaApp() {
               calendarDays={calendarDays}
               periods={periods}
               setActionSheet={setActionSheet}
+              themeColor={themeColor}
             />
           )}
 
@@ -733,6 +735,7 @@ export default function LunaApp() {
         extendPeriod={extendPeriod}
         fetchPeriods={fetchPeriods}
         toast={toast}
+        themeColor={themeColor}
       />
 
       {/* ============ Add Symptom Sheet ============ */}
@@ -743,6 +746,7 @@ export default function LunaApp() {
         setSymptomSheetOpen={setSymptomSheetOpen}
         setCustomSymptoms={setCustomSymptoms}
         toast={toast}
+        themeColor={themeColor}
       />
 
       {/* ============ Loading Overlay ============ */}
@@ -763,7 +767,7 @@ export default function LunaApp() {
             >
               <motion.div
                 className="w-20 h-20 rounded-full mx-auto mb-4 flex items-center justify-center"
-                style={{ background: 'linear-gradient(135deg, #e07a5f, #81b29a)' }}
+                style={{ background: `linear-gradient(135deg, ${themeColor}, #81b29a)` }}
                 animate={{ scale: [1, 1.05, 1] }}
                 transition={{ duration: 2, repeat: Infinity, ease: 'easeInOut' }}
               >
@@ -773,7 +777,7 @@ export default function LunaApp() {
               <p className="text-sm mt-1" style={{ color: '#6b7280' }}>经期追踪</p>
               <motion.div
                 className="w-16 h-1 rounded-full mx-auto mt-4"
-                style={{ background: 'linear-gradient(90deg, #e07a5f, #81b29a)' }}
+                style={{ background: `linear-gradient(90deg, ${themeColor}, #81b29a)` }}
                 animate={{ scaleX: [0.5, 1, 0.5] }}
                 transition={{ duration: 1.5, repeat: Infinity, ease: 'easeInOut' }}
               />
@@ -797,6 +801,7 @@ export default function LunaApp() {
         saveProfile={saveProfile}
         handleAvatarUpload={handleAvatarUpload}
         fileInputRef={fileInputRef}
+        themeColor={themeColor}
       />
 
       {/* ============ Delete Confirmation Dialog ============ */}
@@ -820,6 +825,7 @@ export default function LunaApp() {
         feedbackSubmitting={feedbackSubmitting}
         setFeedbackOpen={setFeedbackOpen}
         submitFeedback={submitFeedback}
+        themeColor={themeColor}
       />
     </div>
   );

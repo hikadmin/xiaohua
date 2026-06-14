@@ -11,10 +11,11 @@ interface SymptomSheetProps {
   setSymptomSheetOpen: React.Dispatch<React.SetStateAction<boolean>>;
   setCustomSymptoms: React.Dispatch<React.SetStateAction<string[]>>;
   toast: (opts: { description: string }) => void;
+  themeColor: string;
 }
 
 export default function SymptomSheet({
-  open, newSymptom, setNewSymptom, setSymptomSheetOpen, setCustomSymptoms, toast,
+  open, newSymptom, setNewSymptom, setSymptomSheetOpen, setCustomSymptoms, toast, themeColor,
 }: SymptomSheetProps) {
   if (!open) return null;
 
@@ -46,7 +47,7 @@ export default function SymptomSheet({
               placeholder="输入症状名称..."
               value={newSymptom}
               onChange={e => setNewSymptom(e.target.value)}
-              onFocus={e => e.currentTarget.style.borderColor = '#d4a57440'}
+              onFocus={e => e.currentTarget.style.borderColor = `${themeColor}40`}
               onBlur={e => e.currentTarget.style.borderColor = 'rgba(255,255,255,0.06)'}
               onKeyDown={e => {
                 if (e.key === 'Enter' && newSymptom.trim()) {
@@ -59,7 +60,7 @@ export default function SymptomSheet({
           </div>
           <motion.button
             className="w-full py-4 rounded-2xl font-medium text-lg"
-            style={{ background: 'linear-gradient(135deg, #e07a5f, #d4a574)', color: '#0f1419' }}
+            style={{ background: `linear-gradient(135deg, ${themeColor}, ${themeColor}cc)`, color: '#0f1419' }}
             whileTap={{ scale: 0.97 }}
             onClick={() => {
               if (newSymptom.trim()) {

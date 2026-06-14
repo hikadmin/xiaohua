@@ -18,12 +18,13 @@ interface ProfileEditSheetProps {
   saveProfile: () => void;
   handleAvatarUpload: (e: React.ChangeEvent<HTMLInputElement>) => void;
   fileInputRef: React.RefObject<HTMLInputElement | null>;
+  themeColor: string;
 }
 
 export default function ProfileEditSheet({
   open, editName, setEditName, editAvatar, setEditAvatar,
   editCycleLength, setEditCycleLength, editPeriodLength, setEditPeriodLength,
-  setProfileEditOpen, saveProfile, handleAvatarUpload, fileInputRef,
+  setProfileEditOpen, saveProfile, handleAvatarUpload, fileInputRef, themeColor,
 }: ProfileEditSheetProps) {
   if (!open) return null;
 
@@ -53,7 +54,7 @@ export default function ProfileEditSheet({
           <div className="flex justify-center mb-6">
             <div className="relative">
               <div className="w-24 h-24 rounded-full flex items-center justify-center overflow-hidden"
-                style={{ background: editAvatar ? 'transparent' : 'linear-gradient(135deg, #e07a5f, #81b29a)', border: '3px solid rgba(255,255,255,0.1)' }}>
+                style={{ background: editAvatar ? 'transparent' : `linear-gradient(135deg, ${themeColor}, #81b29a)`, border: '3px solid rgba(255,255,255,0.1)' }}>
                 {editAvatar ? (
                   <img src={editAvatar} alt="头像预览" className="w-full h-full object-cover" />
                 ) : (
@@ -64,7 +65,7 @@ export default function ProfileEditSheet({
               </div>
               <button
                 className="absolute -bottom-1 -right-1 w-9 h-9 rounded-full flex items-center justify-center shadow-lg transition-all active:scale-90"
-                style={{ background: 'linear-gradient(135deg, #e07a5f, #d4a574)' }}
+                style={{ background: `linear-gradient(135deg, ${themeColor}, ${themeColor}cc)` }}
                 onClick={() => fileInputRef.current?.click()}>
                 <Camera size={16} style={{ color: '#0f1419' }} />
               </button>
@@ -95,7 +96,7 @@ export default function ProfileEditSheet({
               placeholder="输入昵称..."
               value={editName}
               onChange={e => setEditName(e.target.value)}
-              onFocus={e => e.currentTarget.style.borderColor = '#d4a57440'}
+              onFocus={e => e.currentTarget.style.borderColor = `${themeColor}40`}
               onBlur={e => e.currentTarget.style.borderColor = 'rgba(255,255,255,0.06)'}
             />
           </div>
@@ -152,7 +153,7 @@ export default function ProfileEditSheet({
 
           <motion.button
             className="w-full py-4 rounded-2xl font-medium text-lg"
-            style={{ background: 'linear-gradient(135deg, #e07a5f, #d4a574)', color: '#0f1419' }}
+            style={{ background: `linear-gradient(135deg, ${themeColor}, ${themeColor}cc)`, color: '#0f1419' }}
             whileTap={{ scale: 0.97 }}
             onClick={saveProfile}>
             保存

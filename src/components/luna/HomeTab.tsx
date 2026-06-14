@@ -19,11 +19,12 @@ interface HomeTabProps {
   setActiveTab: (tab: TabPage) => void;
   setLogTab: (tab: 'record' | 'history') => void;
   ringAnimated: boolean;
+  themeColor: string;
 }
 
 export default function HomeTab({
   today, cycleInfo, cycleStats, records, dailyTipIndex,
-  setDailyTipIndex, setActiveTab, setLogTab, ringAnimated,
+  setDailyTipIndex, setActiveTab, setLogTab, ringAnimated, themeColor,
 }: HomeTabProps) {
   const phaseData = PHASE_INFO[cycleInfo.phase] || PHASE_INFO.follicular;
 
@@ -79,7 +80,7 @@ export default function HomeTab({
             <svg width="240" height="240" viewBox="0 0 240 240" style={{ transform: 'rotate(-90deg)' }}>
               <defs>
                 <linearGradient id="ringGradient" x1="0%" y1="0%" x2="100%" y2="100%">
-                  <stop offset="0%" stopColor={phaseData.color} />
+                  <stop offset="0%" stopColor={themeColor} />
                   <stop offset="50%" stopColor="#d4a574" />
                   <stop offset="100%" stopColor="#81b29a" />
                 </linearGradient>
@@ -143,7 +144,7 @@ export default function HomeTab({
           </div>
           <div className="rounded-[20px] p-4" style={{ background: '#232b35', border: '1px solid rgba(255,255,255,0.08)' }}>
             <div className="flex items-center gap-2 mb-2">
-              <Droplets size={14} style={{ color: '#e07a5f' }} />
+              <Droplets size={14} style={{ color: themeColor }} />
               <p className="text-xs" style={{ color: '#6b7280' }}>经期长度</p>
             </div>
             <p className="text-2xl font-light" style={{ fontFamily: 'Georgia, serif' }}>
@@ -164,8 +165,8 @@ export default function HomeTab({
               className="rounded-l-full transition-all"
               style={{
                 width: `${(cycleInfo.periodLength / cycleInfo.cycleLength) * 100}%`,
-                background: '#e07a5f',
-                boxShadow: cycleInfo.phase === 'period' ? '0 0 8px #e07a5f80' : 'none',
+                background: themeColor,
+                boxShadow: cycleInfo.phase === 'period' ? `0 0 8px ${themeColor}80` : 'none',
               }} />
             {/* Follicular phase */}
             <div
@@ -193,7 +194,7 @@ export default function HomeTab({
               }} />
           </div>
           <div className="flex justify-between text-xs" style={{ color: '#6b7280' }}>
-            <span style={{ color: cycleInfo.phase === 'period' ? '#e07a5f' : '#6b7280' }}>经期</span>
+            <span style={{ color: cycleInfo.phase === 'period' ? themeColor : '#6b7280' }}>经期</span>
             <span style={{ color: cycleInfo.phase === 'follicular' ? '#81b29a' : '#6b7280' }}>卵泡期</span>
             <span style={{ color: cycleInfo.phase === 'ovulation' ? '#d4a574' : '#6b7280' }}>排卵</span>
             <span style={{ color: cycleInfo.phase === 'luteal' ? '#f2cc8f' : '#6b7280' }}>黄体期</span>
@@ -228,7 +229,7 @@ export default function HomeTab({
                     <div className="flex gap-1 mt-0.5 flex-wrap">
                       {symptoms.slice(0, 2).map((s: string, i: number) => (
                         <span key={i} className="text-[11px] px-1.5 py-0.5 rounded-md"
-                          style={{ background: 'rgba(224,122,95,0.1)', color: '#e07a5f' }}>
+                          style={{ background: `${themeColor}1a`, color: themeColor }}>
                           {s}
                         </span>
                       ))}
@@ -312,7 +313,7 @@ export default function HomeTab({
                       style={{
                         height,
                         background: isLast
-                          ? 'linear-gradient(to top, #e07a5f, #d4a574)'
+                          ? `linear-gradient(to top, ${themeColor}, ${themeColor}cc)`
                           : 'rgba(255,255,255,0.08)',
                         minHeight: 8,
                       }}
@@ -327,7 +328,7 @@ export default function HomeTab({
             <div className="flex items-center justify-between mt-2 pt-2" style={{ borderTop: '1px solid rgba(255,255,255,0.04)' }}>
               <span className="text-[11px]" style={{ color: '#6b7280' }}>平均 {cycleStats.avgCycle} 天</span>
               <div className="flex items-center gap-1">
-                <div className="w-2 h-2 rounded-full" style={{ background: '#e07a5f' }} />
+                <div className="w-2 h-2 rounded-full" style={{ background: themeColor }} />
                 <span className="text-[11px]" style={{ color: '#6b7280' }}>最近</span>
               </div>
             </div>

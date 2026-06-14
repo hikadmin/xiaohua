@@ -7,16 +7,17 @@ import { type Period, type PeriodInfoResult } from './shared';
 
 // ============ Action Option Component ============
 function ActionOption({
-  variant, icon, title, desc, onClick,
+  variant, icon, title, desc, onClick, themeColor: actionThemeColor = '#e07a5f',
 }: {
   variant: 'primary' | 'sage' | 'danger';
   icon: React.ReactNode;
   title: string;
   desc: string;
   onClick: () => void;
+  themeColor?: string;
 }) {
   const colors = {
-    primary: { bg: 'rgba(224,122,95,0.12)', border: 'rgba(224,122,95,0.25)', iconBg: 'linear-gradient(135deg, #e07a5f, #d4a574)' },
+    primary: { bg: `${actionThemeColor}1f`, border: `${actionThemeColor}40`, iconBg: `linear-gradient(135deg, ${actionThemeColor}, ${actionThemeColor}cc)` },
     sage: { bg: 'rgba(129,178,154,0.12)', border: 'rgba(129,178,154,0.25)', iconBg: 'linear-gradient(135deg, #81b29a, #6b9e85)' },
     danger: { bg: 'rgba(239,68,68,0.08)', border: 'rgba(239,68,68,0.2)', iconBg: 'linear-gradient(135deg, #ef4444, #dc2626)' },
   };
@@ -57,12 +58,14 @@ interface ActionSheetProps {
   extendPeriod: (dateStr: string) => void;
   fetchPeriods: () => Promise<void>;
   toast: (opts: { description: string }) => void;
+  themeColor: string;
 }
 
 export default function ActionSheet({
   open, dateStr, day, calMonth, setActionSheet, periods,
   hasActivePeriod, getPeriodInfo, startPeriod, endPeriod,
   updateStart, cancelActivePeriod, extendPeriod, fetchPeriods, toast,
+  themeColor,
 }: ActionSheetProps) {
   if (!open) return null;
 
@@ -107,7 +110,7 @@ export default function ActionSheet({
                 } else if (dateStr < active.startDate) {
                   return (
                     <>
-                      <ActionOption variant="primary" icon={<ChevronLeft size={22} />} title="修改开始日期" desc="将经期开始提前至此日" onClick={() => updateStart(dateStr)} />
+                      <ActionOption variant="primary" icon={<ChevronLeft size={22} />} title="修改开始日期" desc="将经期开始提前至此日" onClick={() => updateStart(dateStr)} themeColor={themeColor} />
                       <ActionOption variant="danger" icon={<X size={22} />} title="取消本次记录" desc="删除当前进行中的经期" onClick={cancelActivePeriod} />
                     </>
                   );
@@ -122,7 +125,7 @@ export default function ActionSheet({
               } else if (periodInfo.isPeriod) {
                 return (
                   <>
-                    <ActionOption variant="primary" icon={<Plus size={22} />} title="延长经期" desc="将经期结束日期延后一天" onClick={() => extendPeriod(dateStr)} />
+                    <ActionOption variant="primary" icon={<Plus size={22} />} title="延长经期" desc="将经期结束日期延后一天" onClick={() => extendPeriod(dateStr)} themeColor={themeColor} />
                     <ActionOption variant="danger" icon={<X size={22} />} title="取消经期记录" desc="删除这一天的经期标记"
                       onClick={async () => {
                         const period = periods.find(p => {
@@ -140,7 +143,7 @@ export default function ActionSheet({
                 );
               } else {
                 return (
-                  <ActionOption variant="primary" icon={<Plus size={22} />} title="经期来了" desc="标记这一天为经期开始" onClick={() => startPeriod(dateStr)} />
+                  <ActionOption variant="primary" icon={<Plus size={22} />} title="经期来了" desc="标记这一天为经期开始" onClick={() => startPeriod(dateStr)} themeColor={themeColor} />
                 );
               }
             })()}

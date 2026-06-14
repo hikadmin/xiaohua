@@ -301,3 +301,112 @@ Modified Files:
 - `src/components/luna/ProfileTab.tsx` — 新增壁纸上传 UI、主题颜色选择器、半透明卡片效果
 - `src/app/page.tsx` — 新增 wallpaper/themeColor 状态管理、壁纸背景层、动态导航颜色、主题同步逻辑
 - `src/lib/theme-store.ts` — 新文件：全局主题状态管理（8种颜色预设、壁纸持久化、DOM 同步）
+
+---
+Task ID: 2-a
+Agent: subagent
+Task: Update HomeTab theme color
+
+Work Log:
+- Added `themeColor: string` to the HomeTabProps interface (line 22)
+- Added `themeColor` to the destructured props (line 27)
+- Replaced `stopColor={phaseData.color}` with `stopColor={themeColor}` for the first gradient stop in the cycle ring SVG (line 83), kept #d4a574 and #81b29a for other stops
+- Replaced `color: '#e07a5f'` with `color: themeColor` for Droplets icon (line 147)
+- Replaced `background: '#e07a5f'` with `background: themeColor` for period phase timeline bar (line 168)
+- Replaced `boxShadow: cycleInfo.phase === 'period' ? '0 0 8px #e07a5f80' : 'none'` with template literal using `${themeColor}80` (line 169)
+- Replaced `color: cycleInfo.phase === 'period' ? '#e07a5f' : '#6b7280'` with `themeColor` for period label (line 197)
+- Replaced `background: 'rgba(224,122,95,0.1)', color: '#e07a5f'` with `${themeColor}1a` and `themeColor` for symptom tags (line 232)
+- Replaced `'linear-gradient(to top, #e07a5f, #d4a574)'` with `` `linear-gradient(to top, ${themeColor}, ${themeColor}cc)` `` for cycle trend chart last bar (line 316)
+- Replaced `background: '#e07a5f'` with `background: themeColor` for cycle trend dot (line 331)
+
+Stage Summary:
+- All 9 hardcoded `#e07a5f` references in HomeTab.tsx replaced with dynamic `themeColor` prop
+- All `rgba(224,122,95,X)` patterns converted to hex alpha format (`${themeColor}1a`, `${themeColor}80`, `${themeColor}cc`)
+- SVG ring gradient first stop now uses themeColor instead of phaseData.color
+- HomeTab component now fully supports dynamic theme color via prop
+
+---
+Task ID: 2-b
+Agent: subagent
+Task: Update CalendarTab theme color
+
+Work Log:
+- Added `themeColor: string` to the CalendarTabProps interface (line 21)
+- Added `themeColor` to the destructured props in the function signature (line 27)
+- Line 55: `background: 'rgba(224,122,95,0.15)', color: '#e07a5f'` → `background: \`${themeColor}26\`, color: themeColor`
+- Line 75: `color: i === 0 || i === 6 ? '#e07a5f80' : '#6b7280'` → `color: i === 0 || i === 6 ? \`${themeColor}80\` : '#6b7280'`
+- Line 98: `background: '#e07a5f'` → `background: themeColor`
+- Line 121: `background: '#e07a5f'` → `background: themeColor`
+- Line 164: Legend 经期 item `{ color: '#e07a5f', bg: 'rgba(224,122,95,0.25)', border: '2px solid #e07a5f' }` → `{ color: themeColor, bg: \`${themeColor}40\`, border: \`2px solid ${themeColor}\` }`
+- Line 195: `background: 'rgba(224,122,95,0.15)'` → `background: \`${themeColor}26\``
+- Line 196: `color: '#e07a5f'` (Droplets icon) → `color: themeColor`
+
+Stage Summary:
+- All 8 hardcoded `#e07a5f` references replaced with dynamic `themeColor` prop
+- All `rgba(224,122,95,X)` patterns converted to hex alpha format (`${themeColor}26`, `${themeColor}40`, `${themeColor}80`)
+- CalendarTab component now fully supports dynamic theme color via prop
+
+---
+Task ID: 2-c
+Agent: subagent
+Task: Update ActionSheet theme color
+Description: Added `themeColor: string` to ActionSheetProps interface, destructured it in the export default function, updated ActionOption sub-component to accept an optional `themeColor` prop (aliased as `actionThemeColor` with default `#e07a5f`), replaced hardcoded primary variant colors with dynamic template literals using `actionThemeColor`, and passed `themeColor={themeColor}` to all three `<ActionOption variant="primary" ...>` usages in the main component.
+
+---
+Task ID: 2-d
+Agent: subagent
+Task: Update ProfileEditSheet, FeedbackSheet, SymptomSheet theme colors
+
+---
+Task ID: 8
+Agent: Main
+Task: 修复主题颜色全局生效 — 所有组件 themeColor prop 完善
+
+Work Log:
+- 使用 VLM 分析4个页面截图，发现大量组件未跟随主题色变化
+- HomeTab：添加 themeColor prop，替换9处硬编码 #e07a5f 和 rgba(224,122,95,X)
+  - SVG ring gradient 首色 → themeColor
+  - 经期长度图标 → themeColor
+  - 周期阶段时间线经期间条 → themeColor
+  - 经期标签文字 → themeColor
+  - 症状标签背景/颜色 → themeColor
+  - 周期趋势图最近柱和圆点 → themeColor
+- CalendarTab：添加 themeColor prop，替换8处硬编码
+  - "回到今天"按钮 → themeColor
+  - 周末标题文字 → themeColor80
+  - 经期日期背景色 → themeColor
+  - 今日经期日期边框 → themeColor
+  - 日历图例经期项 → themeColor
+  - 周期历史图标 → themeColor
+- ActionSheet：添加 themeColor prop，重构 ActionOption 子组件
+  - ActionOption 新增 themeColor? 可选prop
+  - primary 变体颜色动态化
+  - 所有 variant="primary" 用法传入 themeColor
+- ProfileEditSheet：添加 themeColor prop，替换5处硬编码
+  - 头像默认背景渐变
+  - 相机按钮渐变
+  - 输入框焦点边框
+  - 保存按钮渐变
+- FeedbackSheet：添加 themeColor prop，替换8处硬编码
+  - 图标容器背景/边框
+  - 图标颜色
+  - 分类按钮选中态
+  - 输入框焦点边框
+  - 提交按钮渐变
+- SymptomSheet：添加 themeColor prop，替换2处硬编码
+  - 输入框焦点边框
+  - 添加按钮渐变
+- page.tsx：传递 themeColor 到所有7个子组件
+  - HomeTab, CalendarTab, LogTab, ProfileTab (已有)
+  - ActionSheet, SymptomSheet, ProfileEditSheet, FeedbackSheet (新增)
+  - Loading 动画背景 → themeColor
+  - Loading 进度条 → themeColor
+- 颜色转换规则：rgba(224,122,95,0.12) → ${themeColor}1f, 0.15→26, 0.25→40, 0.3→4d 等
+
+Stage Summary:
+- ✅ 全部7个组件均已添加 themeColor prop 并替换所有硬编码颜色
+- ✅ page.tsx 已向所有组件传递 themeColor
+- ✅ src/ 目录中仅剩 theme-store.ts、globals.css、shared.tsx 中的默认值引用 #e07a5f
+- ✅ VLM 视觉验证通过：海天蓝、薰衣紫主题切换后所有交互元素颜色一致
+- ✅ lint 通过，dev server 正常运行
+- ✅ 主题色切换实时生效：底部导航、FAB按钮、记录页、日历、弹窗全部跟随

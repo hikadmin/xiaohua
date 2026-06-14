@@ -18,11 +18,13 @@ interface CalendarTabProps {
   calendarDays: CalendarDay[];
   periods: Period[];
   setActionSheet: React.Dispatch<React.SetStateAction<{ open: boolean; dateStr: string; day: number }>>;
+  themeColor: string;
 }
 
 export default function CalendarTab({
   calYear, calMonth, setCalYear, setCalMonth,
   isCurrentMonth, today, calendarDays, periods, setActionSheet,
+  themeColor,
 }: CalendarTabProps) {
   return (
     <motion.div
@@ -50,7 +52,7 @@ export default function CalendarTab({
           </p>
           {!isCurrentMonth && (
             <button className="text-xs px-3 py-1 rounded-full transition-all hover:scale-105"
-              style={{ background: 'rgba(224,122,95,0.15)', color: '#e07a5f' }}
+              style={{ background: `${themeColor}26`, color: themeColor }}
               onClick={() => { setCalYear(today.getFullYear()); setCalMonth(today.getMonth() + 1); }}>
               回到今天
             </button>
@@ -70,7 +72,7 @@ export default function CalendarTab({
       {/* Weekday Headers */}
       <div className="grid grid-cols-7 gap-1 mb-2">
         {WEEKDAYS_SHORT.map((d, i) => (
-          <div key={i} className="text-center text-xs py-2 font-medium" style={{ color: i === 0 || i === 6 ? '#e07a5f80' : '#6b7280' }}>{d}</div>
+          <div key={i} className="text-center text-xs py-2 font-medium" style={{ color: i === 0 || i === 6 ? `${themeColor}80` : '#6b7280' }}>{d}</div>
         ))}
       </div>
 
@@ -93,7 +95,7 @@ export default function CalendarTab({
             else borderRadius = '4px';
 
             bgStyle = {
-              background: '#e07a5f',
+              background: themeColor,
               color: '#0f1419',
               fontWeight: 500,
               borderRadius,
@@ -116,7 +118,7 @@ export default function CalendarTab({
             if (day.periodInfo.isPeriod) {
               bgStyle = {
                 ...bgStyle,
-                background: '#e07a5f',
+                background: themeColor,
                 boxShadow: '0 0 0 3px #d4a574',
                 transform: 'scale(1.08)',
                 zIndex: 10,
@@ -159,7 +161,7 @@ export default function CalendarTab({
         <p className="text-sm font-medium mb-4">日历图例</p>
         <div className="space-y-3">
           {[
-            { color: '#e07a5f', bg: 'rgba(224,122,95,0.25)', border: '2px solid #e07a5f', label: '经期', desc: '点击日期可记录或取消' },
+            { color: themeColor, bg: `${themeColor}40`, border: `2px solid ${themeColor}`, label: '经期', desc: '点击日期可记录或取消' },
             { color: '#81b29a', bg: 'transparent', border: '2px dashed #81b29a', label: '预测经期', desc: '根据周期推算的下次日期' },
             { color: '#d4a574', bg: 'rgba(212,165,116,0.25)', border: '2px solid #d4a574', label: '易孕期', desc: '排卵期前后，受孕几率较高' },
           ].map((item, i) => (
@@ -190,8 +192,8 @@ export default function CalendarTab({
               <div key={period.id} className="flex items-center gap-3 py-2.5 border-b last:border-0"
                 style={{ borderColor: 'rgba(255,255,255,0.04)' }}>
                 <div className="w-8 h-8 rounded-lg flex items-center justify-center"
-                  style={{ background: 'rgba(224,122,95,0.15)' }}>
-                  <Droplets size={14} style={{ color: '#e07a5f' }} />
+                  style={{ background: `${themeColor}26` }}>
+                  <Droplets size={14} style={{ color: themeColor }} />
                 </div>
                 <div className="flex-1">
                   <p className="text-sm font-medium">{startD.getMonth() + 1}月{startD.getDate()}日 — {endD ? `${endD.getMonth() + 1}月${endD.getDate()}日` : '进行中'}</p>
