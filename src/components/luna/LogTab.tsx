@@ -27,13 +27,14 @@ interface LogTabProps {
   setSymptomSheetOpen: React.Dispatch<React.SetStateAction<boolean>>;
   setDeleteConfirm: React.Dispatch<React.SetStateAction<{ open: boolean; recordId: string; date: string }>>;
   cycleInfo: CycleInfo;
+  themeColor: string;
 }
 
 export default function LogTab({
   today, logTab, setLogTab, currentFlow, setCurrentFlow,
   currentMood, setCurrentMood, selectedSymptoms, setSelectedSymptoms,
   customSymptoms, noteText, setNoteText, records, saveRecord,
-  setSymptomSheetOpen, setDeleteConfirm, cycleInfo,
+  setSymptomSheetOpen, setDeleteConfirm, cycleInfo, themeColor,
 }: LogTabProps) {
   const allSymptoms = [...DEFAULT_SYMPTOMS, ...customSymptoms];
 
@@ -73,27 +74,40 @@ export default function LogTab({
           {/* Flow Section */}
           <div className="mb-6">
             <div className="flex items-center gap-2 mb-3">
-              <Droplets size={14} style={{ color: '#e07a5f' }} />
+              <Droplets size={14} style={{ color: themeColor }} />
               <p className="text-sm font-medium">流量</p>
             </div>
-            <div className="flex gap-3 justify-between">
-              {[1, 2, 3, 4].map(level => (
+            <div className="flex gap-2 justify-between">
+              {[0, 1, 2, 3, 4].map(level => (
                 <button
                   key={level}
-                  className="flex flex-col items-center gap-2 p-3 rounded-2xl transition-all flex-1"
+                  className="flex flex-col items-center gap-2 py-3 px-1 rounded-2xl transition-all flex-1"
                   style={{
-                    background: currentFlow === level ? 'rgba(224,122,95,0.15)' : '#1a2027',
-                    border: currentFlow === level ? '1.5px solid #e07a5f' : '1.5px solid rgba(255,255,255,0.06)',
+                    background: currentFlow === level ? `${themeColor}26` : '#1a2027',
+                    border: currentFlow === level ? `1.5px solid ${themeColor}` : '1.5px solid rgba(255,255,255,0.06)',
                   }}
                   onClick={() => setCurrentFlow(level)}>
-                  <div className="rounded-full transition-all"
-                    style={{
-                      width: 14 + level * 4,
-                      height: 14 + level * 4,
-                      background: currentFlow === level ? '#e07a5f' : '#4b5563',
-                      boxShadow: currentFlow === level ? '0 0 12px #e07a5f60' : 'none',
-                    }} />
-                  <span className="text-xs" style={{ color: currentFlow === level ? '#e07a5f' : '#a8a29e' }}>
+                  {level === 0 ? (
+                    <div className="rounded-full transition-all flex items-center justify-center"
+                      style={{
+                        width: 18,
+                        height: 18,
+                        border: currentFlow === 0 ? `2px solid ${themeColor}` : '2px solid #4b5563',
+                        background: 'transparent',
+                        boxShadow: currentFlow === 0 ? `0 0 12px ${themeColor}60` : 'none',
+                      }}>
+                      <div style={{ width: 6, height: 2, background: currentFlow === 0 ? themeColor : '#4b5563', borderRadius: 1 }} />
+                    </div>
+                  ) : (
+                    <div className="rounded-full transition-all"
+                      style={{
+                        width: 14 + level * 4,
+                        height: 14 + level * 4,
+                        background: currentFlow === level ? themeColor : '#4b5563',
+                        boxShadow: currentFlow === level ? `0 0 12px ${themeColor}60` : 'none',
+                      }} />
+                  )}
+                  <span className="text-xs" style={{ color: currentFlow === level ? themeColor : '#a8a29e' }}>
                     {FLOW_LABELS[level]}
                   </span>
                 </button>
@@ -113,9 +127,9 @@ export default function LogTab({
                   key={symptom}
                   className="inline-flex items-center gap-1.5 px-4 py-2.5 rounded-xl text-sm transition-all"
                   style={{
-                    background: selectedSymptoms.includes(symptom) ? 'rgba(224,122,95,0.15)' : '#1a2027',
-                    border: selectedSymptoms.includes(symptom) ? '1.5px solid #e07a5f' : '1.5px solid rgba(255,255,255,0.06)',
-                    color: selectedSymptoms.includes(symptom) ? '#e07a5f' : '#f0ece4',
+                    background: selectedSymptoms.includes(symptom) ? `${themeColor}26` : '#1a2027',
+                    border: selectedSymptoms.includes(symptom) ? `1.5px solid ${themeColor}` : '1.5px solid rgba(255,255,255,0.06)',
+                    color: selectedSymptoms.includes(symptom) ? themeColor : '#f0ece4',
                   }}
                   onClick={() => {
                     setSelectedSymptoms(prev =>
@@ -141,18 +155,18 @@ export default function LogTab({
               <Activity size={14} style={{ color: '#81b29a' }} />
               <p className="text-sm font-medium">情绪</p>
             </div>
-            <div className="flex justify-between gap-1.5">
-              {[1, 2, 3, 4, 5].map(mood => (
+            <div className="flex justify-between gap-1">
+              {[1, 2, 3, 4, 5, 6].map(mood => (
                 <button
                   key={mood}
                   className="flex flex-col items-center gap-1.5 p-2.5 rounded-xl transition-all flex-1"
                   style={{
-                    background: currentMood === mood ? 'rgba(224,122,95,0.15)' : 'transparent',
-                    border: currentMood === mood ? '1px solid rgba(224,122,95,0.2)' : '1px solid transparent',
+                    background: currentMood === mood ? `${themeColor}26` : 'transparent',
+                    border: currentMood === mood ? `1px solid ${themeColor}33` : '1px solid transparent',
                   }}
                   onClick={() => setCurrentMood(mood)}>
                   <span className="text-xl">{MOOD_EMOJIS[mood]}</span>
-                  <span className="text-[11px]" style={{ color: currentMood === mood ? '#e07a5f' : '#6b7280' }}>
+                  <span className="text-[11px]" style={{ color: currentMood === mood ? themeColor : '#6b7280' }}>
                     {MOOD_LABELS[mood]}
                   </span>
                 </button>
@@ -178,7 +192,7 @@ export default function LogTab({
               placeholder="记录更多细节..."
               value={noteText}
               onChange={e => setNoteText(e.target.value)}
-              onFocus={e => e.currentTarget.style.borderColor = '#d4a57440'}
+              onFocus={e => e.currentTarget.style.borderColor = `${themeColor}40`}
               onBlur={e => e.currentTarget.style.borderColor = 'rgba(255,255,255,0.06)'}
             />
           </div>
@@ -186,7 +200,7 @@ export default function LogTab({
           {/* Save Button */}
           <motion.button
             className="w-full py-4 rounded-2xl font-medium text-lg"
-            style={{ background: 'linear-gradient(135deg, #e07a5f, #d4a574)', color: '#0f1419' }}
+            style={{ background: `linear-gradient(135deg, ${themeColor}, ${themeColor}cc)`, color: '#0f1419' }}
             whileTap={{ scale: 0.97 }}
             onClick={saveRecord}
           >
@@ -213,8 +227,8 @@ export default function LogTab({
                   key={record.id}
                   className="rounded-2xl p-4"
                   style={{
-                    background: isToday ? 'rgba(224,122,95,0.08)' : '#232b35',
-                    border: isToday ? '1px solid rgba(224,122,95,0.2)' : '1px solid rgba(255,255,255,0.06)',
+                    background: isToday ? `${themeColor}14` : '#232b35',
+                    border: isToday ? `1px solid ${themeColor}33` : '1px solid rgba(255,255,255,0.06)',
                   }}
                   initial={{ opacity: 0, y: 10 }}
                   animate={{ opacity: 1, y: 0 }}
@@ -223,7 +237,7 @@ export default function LogTab({
                     <div className="flex items-center gap-2">
                       <span className="font-medium">{d.getMonth() + 1}月{d.getDate()}日</span>
                       {isToday && (
-                        <span className="text-[10px] px-2 py-0.5 rounded-full" style={{ background: 'rgba(224,122,95,0.2)', color: '#e07a5f' }}>
+                        <span className="text-[10px] px-2 py-0.5 rounded-full" style={{ background: `${themeColor}33`, color: themeColor }}>
                           今天
                         </span>
                       )}
@@ -241,21 +255,29 @@ export default function LogTab({
                   </div>
                   <div className="flex items-center gap-3 mb-2">
                     <span className="text-xs" style={{ color: '#6b7280' }}>流量:</span>
-                    <div className="flex gap-1">
-                      {[1, 2, 3, 4].map(l => (
-                        <div key={l} className="w-2 rounded-full" style={{
-                          height: 6 + l * 2,
-                          background: l <= record.flow ? '#e07a5f' : 'rgba(255,255,255,0.06)',
-                        }} />
-                      ))}
-                    </div>
-                    <span className="text-xs" style={{ color: '#e07a5f' }}>{FLOW_LABELS[record.flow]}</span>
+                    {record.flow === 0 ? (
+                      <span className="text-xs px-2 py-0.5 rounded-md" style={{ background: `${themeColor}1a`, color: themeColor }}>
+                        {FLOW_LABELS[0]}
+                      </span>
+                    ) : (
+                      <>
+                        <div className="flex gap-1">
+                          {[1, 2, 3, 4].map(l => (
+                            <div key={l} className="w-2 rounded-full" style={{
+                              height: 6 + l * 2,
+                              background: l <= record.flow ? themeColor : 'rgba(255,255,255,0.06)',
+                            }} />
+                          ))}
+                        </div>
+                        <span className="text-xs" style={{ color: themeColor }}>{FLOW_LABELS[record.flow]}</span>
+                      </>
+                    )}
                   </div>
                   {symptoms.length > 0 && (
                     <div className="flex flex-wrap gap-1.5 mb-1">
                       {symptoms.map((s: string, i: number) => (
                         <span key={i} className="text-xs px-2.5 py-1 rounded-lg"
-                          style={{ background: 'rgba(224,122,95,0.1)', color: '#e07a5f' }}>
+                          style={{ background: `${themeColor}1a`, color: themeColor }}>
                           {s}
                         </span>
                       ))}

@@ -250,3 +250,54 @@ Android APK (Capacitor)
 2. npx cap add android (首次)
 3. npx cap sync android
 4. npx cap open android → Android Studio 构建 APK
+
+---
+Task ID: 7
+Agent: Main
+Task: 新增功能 — 记录页面流量/情绪选项 + 我的页面壁纸/主题颜色
+
+Work Log:
+- 修复构建错误：移除 api.ts 中对不存在的 `./local-api` 模块的导入，替换为本地 stub 变量
+- 记录页面流量：FLOW_LABELS 从 `['', '点滴', '少量', '中等', '大量']` 改为 `['无量', '点滴', '少量', '中等', '大量']`
+  - 新增 flow=0 对应"无量"选项，UI 显示空心圆+横线图标
+  - 历史记录中 flow=0 时显示"无量"标签而非流量条
+  - 默认 currentFlow 从 2 改为 0（无量）
+- 记录页面情绪：MOOD_LABELS 从 `['', '开心', '平静', '低落', '烦躁', '焦虑']` 改为 `['', '开心', '平静', '害羞', '低落', '烦躁', '焦虑']`
+  - 新增 mood=3 对应"😳 害羞"选项
+  - 情绪按钮从5个增加到6个
+- 创建全局主题管理 `src/lib/theme-store.ts`：
+  - 8种预设主题颜色：珊瑚橙、玫瑰红、薰衣紫、海天蓝、翡翠绿、琥珀金、蜜桃粉、靛青色
+  - 壁纸和主题颜色通过 localStorage 持久化
+  - 提供 subscribe/notify 机制实现跨组件同步
+  - applyThemeToDOM() 自动更新 CSS 变量
+- 我的页面壁纸上传：
+  - 隐藏 file input，点击"自定义壁纸"触发文件选择
+  - 支持5MB以内的图片，转为 base64 存储
+  - 壁纸作为全屏背景层显示，覆盖半透明遮罩保持可读性
+  - 提供壁纸预览缩略图和移除按钮
+  - 底部导航栏在有壁纸时增加毛玻璃效果
+- 我的页面主题颜色：
+  - 可展开的颜色选择面板，4x2网格布局
+  - 每个颜色有渐变圆形预览 + 中文名称
+  - 选中状态高亮显示
+  - 切换颜色后全局生效：底部导航、记录页面按钮、保存按钮等全部跟随主题色
+- ProfileTab 卡片背景改为半透明 + backdrop-filter 毛玻璃效果，在有壁纸时更美观
+- LogTab 全面替换硬编码 #e07a5f 为动态 themeColor prop
+- page.tsx 底部导航、FAB 按钮均跟随主题颜色
+
+Stage Summary:
+- ✅ 流量新增"无量"选项（flow=0）
+- ✅ 情绪新增"😳 害羞"选项（mood=3）
+- ✅ 自定义壁纸上传（全局，localStorage 持久化）
+- ✅ 8种主题颜色可选（全局，localStorage 持久化）
+- ✅ 所有硬编码 #e07a5f 颜色替换为动态主题色
+- ✅ lint 通过，dev server 正常运行
+- ✅ agent-browser 验证所有功能正常工作
+
+Modified Files:
+- `src/services/api.ts` — 移除 local-api 导入，替换为 stub
+- `src/components/luna/shared.tsx` — FLOW_LABELS 增加"无量"，MOOD_LABELS/MOOD_EMOJIS 增加"害羞"
+- `src/components/luna/LogTab.tsx` — 新增 themeColor prop，flow 选项增加 0（无量），mood 选项增加到 6 个，所有颜色跟随主题
+- `src/components/luna/ProfileTab.tsx` — 新增壁纸上传 UI、主题颜色选择器、半透明卡片效果
+- `src/app/page.tsx` — 新增 wallpaper/themeColor 状态管理、壁纸背景层、动态导航颜色、主题同步逻辑
+- `src/lib/theme-store.ts` — 新文件：全局主题状态管理（8种颜色预设、壁纸持久化、DOM 同步）

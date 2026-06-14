@@ -72,9 +72,9 @@ export interface CalendarDay {
 // ============ Constants ============
 export const WEEKDAYS_SHORT = ['日', '一', '二', '三', '四', '五', '六'];
 export const WEEKDAYS_FULL = ['周日', '周一', '周二', '周三', '周四', '周五', '周六'];
-export const FLOW_LABELS = ['', '点滴', '少量', '中等', '大量'];
-export const MOOD_LABELS = ['', '开心', '平静', '低落', '烦躁', '焦虑'];
-export const MOOD_EMOJIS = ['', '😊', '😌', '😔', '😤', '😰'];
+export const FLOW_LABELS = ['无量', '点滴', '少量', '中等', '大量'];
+export const MOOD_LABELS = ['', '开心', '平静', '害羞', '低落', '烦躁', '焦虑'];
+export const MOOD_EMOJIS = ['', '😊', '😌', '😳', '😔', '😤', '😰'];
 export const DEFAULT_SYMPTOMS = ['痛经', '腰酸', '头痛', '疲劳', '腹胀', '乳房胀痛'];
 export const FEEDBACK_CATEGORIES = ['功能建议', '问题反馈', '体验优化', '其他'];
 

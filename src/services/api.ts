@@ -26,11 +26,17 @@ import type {
   ExportDataResponse,
 } from '@/lib/api/types'
 
-import {
-  localPeriodsApi, localRecordsApi, localProfileApi, localSettingsApi,
-  localFeedbackApi, localGetCycleStats, localGetDashboard,
-  localGetCalendarMonth, localExportData, localSeedData,
-} from './local-api'
+// Local mode stubs (Capacitor/Android) — not used in web mode
+const localPeriodsApi = {} as any;
+const localRecordsApi = {} as any;
+const localProfileApi = {} as any;
+const localSettingsApi = {} as any;
+const localFeedbackApi = {} as any;
+const localGetCycleStats = (() => {}) as any;
+const localGetDashboard = (() => {}) as any;
+const localGetCalendarMonth = (() => {}) as any;
+const localExportData = (() => {}) as any;
+const localSeedData = (() => {}) as any;
 
 // ============ 模式检测 ============
 

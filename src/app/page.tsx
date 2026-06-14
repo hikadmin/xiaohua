@@ -22,6 +22,7 @@ import {
   periodsApi, recordsApi, profileApi, settingsApi, feedbackApi, seedApi, exportApi,
   ApiError,
 } from '@/services/api';
+import { getWallpaper, getThemeColor, subscribeTheme, applyThemeToDOM, THEME_COLORS, setWallpaper as setWallpaperStore, setThemeColor as setThemeColorStore } from '@/lib/theme-store';
 
 // ============ Main Component ============
 export default function LunaApp() {
@@ -51,7 +52,7 @@ export default function LunaApp() {
 
   // Log state
   const [logTab, setLogTab] = useState<'record' | 'history'>('record');
-  const [currentFlow, setCurrentFlow] = useState(2);
+  const [currentFlow, setCurrentFlow] = useState(0);
   const [currentMood, setCurrentMood] = useState(2);
   const [selectedSymptoms, setSelectedSymptoms] = useState<string[]>([]);
   const [customSymptoms, setCustomSymptoms] = useState<string[]>([]);
@@ -77,6 +78,11 @@ export default function LunaApp() {
   const [editAvatar, setEditAvatar] = useState('');
   const fileInputRef = React.useRef<HTMLInputElement>(null);
 
+  // Global theme state
+  const [wallpaper, setWallpaperState] = useState<string | null>(null);
+  const [themeColor, setThemeColorState] = useState('#e07a5f');
+  const wallpaperInputRef = React.useRef<HTMLInputElement>(null);
+
   // Daily tip state
   const [dailyTipIndex, setDailyTipIndex] = useState(() => {
     const t = new Date();
@@ -84,6 +90,22 @@ export default function LunaApp() {
   });
 
   const { toast } = useToast();
+
+  // ============ Theme Sync ============
+  useEffect(() => {
+    // Load initial theme values
+    setWallpaperState(getWallpaper());
+    setThemeColorState(getThemeColor());
+    applyThemeToDOM();
+
+    // Subscribe to theme changes from other components
+    const unsub = subscribeTheme(() => {
+      setWallpaperState(getWallpaper());
+      setThemeColorState(getThemeColor());
+      applyThemeToDOM();
+    });
+    return unsub;
+  }, []);
 
   // ============ Data Fetching (通过 API 服务层) ============
   const fetchPeriods = useCallback(async () => {
@@ -513,7 +535,15 @@ export default function LunaApp() {
 
   // ============ RENDER ============
   return (
-    <div className="min-h-screen bg-[#0f1419] text-[#f0ece4] flex flex-col overflow-hidden relative">
+    <div className="min-h-screen text-[#f0ece4] flex flex-col overflow-hidden relative"
+      style={{ background: wallpaper ? 'transparent' : '#0f1419' }}>
+      {/* Wallpaper Layer */}
+      {wallpaper && (
+        <div className="fixed inset-0 z-0">
+          <img src={wallpaper} alt="壁纸" className="w-full h-full object-cover" />
+          <div className="absolute inset-0" style={{ background: 'rgba(15, 20, 25, 0.55)' }} />
+        </div>
+      )}
       {/* Animated Background Blobs */}
       <div className="fixed inset-0 overflow-hidden pointer-events-none z-0">
         <div className="absolute rounded-full opacity-30 blur-[80px]"
@@ -592,6 +622,7 @@ export default function LunaApp() {
               setSymptomSheetOpen={setSymptomSheetOpen}
               setDeleteConfirm={setDeleteConfirm}
               cycleInfo={cycleInfo}
+              themeColor={themeColor}
             />
           )}
 
@@ -612,6 +643,17 @@ export default function LunaApp() {
               exportCSV={exportCSV}
               setFeedbackOpen={setFeedbackOpen}
               toast={toast}
+              wallpaper={wallpaper}
+              themeColor={themeColor}
+              onWallpaperChange={(url: string | null) => {
+                setWallpaperStore(url);
+                setWallpaperState(url);
+              }}
+              onThemeColorChange={(color: string) => {
+                setThemeColorStore(color);
+                setThemeColorState(color);
+              }}
+              wallpaperInputRef={wallpaperInputRef}
             />
           )}
         </AnimatePresence>
@@ -619,7 +661,7 @@ export default function LunaApp() {
 
       {/* ============ Bottom Navigation ============ */}
       <nav className="fixed bottom-0 left-0 right-0 z-50 safe-bottom"
-        style={{ background: 'linear-gradient(to top, #0f1419 80%, transparent)' }}>
+        style={{ background: wallpaper ? 'rgba(15, 20, 25, 0.85)' : 'linear-gradient(to top, #0f1419 80%, transparent)', backdropFilter: wallpaper ? 'blur(20px)' : 'none' }}>
         <div className="flex justify-around items-center pb-5 pt-2">
           {[
             { page: 'home' as TabPage, icon: Home, label: '首页' },
@@ -631,8 +673,8 @@ export default function LunaApp() {
               style={{ background: activeTab === item.page ? 'rgba(255,255,255,0.05)' : 'transparent' }}
               onClick={() => setActiveTab(item.page)}
             >
-              <item.icon size={22} style={{ color: activeTab === item.page ? '#e07a5f' : '#6b7280' }} />
-              <span className="text-[11px] font-medium" style={{ color: activeTab === item.page ? '#e07a5f' : '#6b7280' }}>
+              <item.icon size={22} style={{ color: activeTab === item.page ? themeColor : '#6b7280' }} />
+              <span className="text-[11px] font-medium" style={{ color: activeTab === item.page ? themeColor : '#6b7280' }}>
                 {item.label}
               </span>
             </button>
@@ -642,8 +684,8 @@ export default function LunaApp() {
           <motion.button
             className="w-14 h-14 rounded-full flex items-center justify-center -mt-5"
             style={{
-              background: 'linear-gradient(135deg, #e07a5f, #d4a574)',
-              boxShadow: '0 8px 24px rgba(224,122,95,0.35)',
+              background: `linear-gradient(135deg, ${themeColor}, ${themeColor}cc)`,
+              boxShadow: `0 8px 24px ${themeColor}50`,
             }}
             whileTap={{ scale: 0.9 }}
             whileHover={{ scale: 1.05 }}
@@ -665,8 +707,8 @@ export default function LunaApp() {
               style={{ background: activeTab === item.page ? 'rgba(255,255,255,0.05)' : 'transparent' }}
               onClick={() => setActiveTab(item.page)}
             >
-              <item.icon size={22} style={{ color: activeTab === item.page ? '#e07a5f' : '#6b7280' }} />
-              <span className="text-[11px] font-medium" style={{ color: activeTab === item.page ? '#e07a5f' : '#6b7280' }}>
+              <item.icon size={22} style={{ color: activeTab === item.page ? themeColor : '#6b7280' }} />
+              <span className="text-[11px] font-medium" style={{ color: activeTab === item.page ? themeColor : '#6b7280' }}>
                 {item.label}
               </span>
             </button>
