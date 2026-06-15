@@ -154,10 +154,11 @@ export async function getCycleStats(): Promise<CycleStatsResult> {
   const periodLengths: number[] = []
 
   for (let i = 1; i < periods.length; i++) {
-    if (periods[i].endDate) {
-      const cycleLen = daysBetween(parseDate(periods[i - 1].startDate), parseDate(periods[i].startDate))
-      if (cycleLen > 15 && cycleLen < 50) cycleLengths.push(cycleLen)
-    }
+    // 周期长度只需要两个相邻经期的开始日期即可计算，不需要endDate
+    const cycleLen = daysBetween(parseDate(periods[i - 1].startDate), parseDate(periods[i].startDate))
+    if (cycleLen > 15 && cycleLen < 50) cycleLengths.push(cycleLen)
+
+    // 经期长度需要endDate才能计算
     if (periods[i].endDate) {
       const periodLen = daysBetween(parseDate(periods[i].startDate), parseDate(periods[i].endDate!)) + 1
       if (periodLen > 0 && periodLen < 15) periodLengths.push(periodLen)
@@ -171,9 +172,9 @@ export async function getCycleStats(): Promise<CycleStatsResult> {
     ? Math.round(periodLengths.reduce((a, b) => a + b, 0) / periodLengths.length)
     : (profile?.periodLength || 5)
 
-  // 周期规律性判断
+  // 周期规律性判断（至少2个完整周期即可判断）
   let cycleRegularity: 'regular' | 'irregular' | 'insufficient_data' = 'insufficient_data'
-  if (cycleLengths.length >= 3) {
+  if (cycleLengths.length >= 2) {
     const stdDev = Math.sqrt(
       cycleLengths.reduce((sum, len) => sum + Math.pow(len - avgCycle, 2), 0) / cycleLengths.length
     )

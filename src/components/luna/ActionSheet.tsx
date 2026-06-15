@@ -68,11 +68,12 @@ export default function ActionSheet({
   updateStart, cancelActivePeriod, deletePeriod, extendPeriod, fetchPeriods, toast,
   themeColor,
 }: ActionSheetProps) {
-  if (!open) return null;
 
   return (
     <AnimatePresence>
+      {open && (
       <motion.div
+        key="action-sheet"
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
         exit={{ opacity: 0 }}
@@ -86,10 +87,10 @@ export default function ActionSheet({
           exit={{ y: '100%' }}
           transition={{ type: 'spring', damping: 25, stiffness: 300 }}
           className="absolute bottom-0 left-0 right-0 rounded-t-3xl p-4 pb-8"
-          style={{ background: '#1a2027', maxHeight: '80vh', overflowY: 'auto' }}
+          style={{ background: 'var(--luna-surface)', maxHeight: '80dvh', overflowY: 'auto', paddingBottom: 'max(2rem, calc(env(safe-area-inset-bottom, 0px) + 1rem))' }}
           onClick={e => e.stopPropagation()}
         >
-          <div className="w-9 h-1 rounded-full mx-auto mb-4 opacity-50" style={{ background: '#6b7280' }} />
+          <div className="w-9 h-1 rounded-full mx-auto mb-4 opacity-50" style={{ background: 'var(--luna-text-muted)' }} />
           <div className="text-center mb-4">
             <span className="text-base font-medium">
               {calMonth}月{day}日
@@ -148,12 +149,13 @@ export default function ActionSheet({
             })()}
           </div>
           <div className="text-center py-4 mt-2 cursor-pointer transition-colors"
-            style={{ color: '#6b7280' }}
+            style={{ color: 'var(--luna-text-muted)' }}
             onClick={() => setActionSheet({ open: false, dateStr: '', day: 0 })}>
             取消
           </div>
         </motion.div>
       </motion.div>
+      )}
     </AnimatePresence>
   );
 }

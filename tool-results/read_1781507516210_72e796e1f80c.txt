@@ -1,0 +1,519 @@
+     1→'use client';
+     2→
+     3→import React, { useState, useRef, useEffect } from 'react';
+     4→import { motion, AnimatePresence } from 'framer-motion';
+     5→import {
+     6→  Calendar, TrendingUp, Droplets, Check, Bell, Clock, Crosshair,
+     7→  Shield, Eye, Lock, Moon, Sun, Download, Cloud, RotateCcw,
+     8→  Globe, Info, MessageSquare, ChevronRight, Target,
+     9→  Trash2, Palette, Share2, AlertTriangle, Image as ImageIcon,
+    10→} from 'lucide-react';
+    11→import { useI18n, LOCALE_NAMES, type Locale } from '@/lib/i18n';
+    12→import {
+    13→  StaggerIn, formatShortDate,
+    14→  type DailyRecord, type UserProfile, type Setting, type Period,
+    15→  type CycleStats, type CycleInfo,
+    16→} from './shared';
+    17→import ImageCropDialog from './ImageCropDialog';
+    18→import LockSetupSheet from './LockSetupSheet';
+    19→
+    20→const THEME_COLORS = [
+    21→  { name: '暖橙', primary: '#e07a5f', secondary: '#d4a574' },
+    22→  { name: '薄荷绿', primary: '#81b29a', secondary: '#6dab8e' },
+    23→  { name: '樱花粉', primary: '#e8a0bf', secondary: '#d4869f' },
+    24→  { name: '星空紫', primary: '#9b8ec4', secondary: '#8577b0' },
+    25→  { name: '海洋蓝', primary: '#5b9bd5', secondary: '#4a8bc4' },
+    26→  { name: '日落金', primary: '#d4a574', secondary: '#c49464' },
+    27→];
+    28→
+    29→const PRESET_WALLPAPERS = [
+    30→  { name: '日落暖光', gradient: 'linear-gradient(135deg, #ff6b35, #f7931e, #ffcc02)' },
+    31→  { name: '海洋深蓝', gradient: 'linear-gradient(135deg, #0f3460, #16537e, #1a8a8a)' },
+    32→  { name: '森林绿意', gradient: 'linear-gradient(135deg, #134e5e, #1a6b3c, #2ecc71)' },
+    33→  { name: '夜空星河', gradient: 'linear-gradient(135deg, #0f0c29, #302b63, #24243e)' },
+    34→  { name: '樱花粉黛', gradient: 'linear-gradient(135deg, #ee9ca7, #ffdde1, #f8b4c8)' },
+    35→];
+    36→
+    37→interface ProfileTabProps {
+    38→  profile: UserProfile | null;
+    39→  records: DailyRecord[];
+    40→  periods: Period[];
+    41→  cycleStats: CycleStats;
+    42→  settings: Setting[];
+    43→  cycleInfo: CycleInfo;
+    44→  setProfileEditOpen: React.Dispatch<React.SetStateAction<boolean>>;
+    45→  setEditName: React.Dispatch<React.SetStateAction<string>>;
+    46→  setEditAvatar: React.Dispatch<React.SetStateAction<string>>;
+    47→  setEditCycleLength: React.Dispatch<React.SetStateAction<number>>;
+    48→  setEditPeriodLength: React.Dispatch<React.SetStateAction<number>>;
+    49→  toggleSetting: (key: string, currentValue: string) => void;
+    50→  exportCSV: () => void;
+    51→  setFeedbackOpen: React.Dispatch<React.SetStateAction<boolean>>;
+    52→  toast: (opts: { description: string }) => void;
+    53→  resetData: () => void;
+    54→  themeColor: string;
+    55→  setThemeColor: (color: string) => void;
+    56→  wallpaper: string;
+    57→  setWallpaper: (wp: string) => void;
+    58→  themeScope: 'local' | 'global';
+    59→  setThemeScope: (scope: 'local' | 'global') => void;
+    60→  onSheetOpenChange?: (open: boolean) => void;
+    61→}
+    62→
+    63→function ResetDataDialog({ open, onClose, onConfirm }: { open: boolean; onClose: () => void; onConfirm: () => void }) {
+    64→  const { t } = useI18n();
+    65→  const [confirmText, setConfirmText] = useState('');
+    66→  const [step, setStep] = useState(1);
+    67→  if (!open) return null;
+    68→  const ok = confirmText === t('reset_confirm_text');
+    69→  return (
+    70→    <motion.div className="fixed inset-0 z-[200] flex items-center justify-center px-6" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
+    71→      <div className="absolute inset-0 bg-black/60" onClick={onClose} />
+    72→      <motion.div className="relative w-full max-w-sm rounded-[24px] p-6" style={{ background: '#1a2027', border: '1px solid rgba(255,255,255,0.1)' }} initial={{ scale: 0.9, opacity: 0 }} animate={{ scale: 1, opacity: 1 }}>
+    73→        <div className="text-center mb-4">
+    74→          <div className="w-14 h-14 rounded-full mx-auto mb-3 flex items-center justify-center" style={{ background: 'rgba(239,68,68,0.15)' }}><AlertTriangle size={28} style={{ color: '#ef4444' }} /></div>
+    75→          <p className="text-lg font-medium">{t('reset_title')}</p>
+    76→        </div>
+    77→        {step === 1 ? (
+    78→          <>
+    79→            <p className="text-sm text-center mb-4" style={{ color: '#a8a29e' }}>{t('reset_warning')}</p>
+    80→            <div className="flex gap-3">
+    81→              <button className="flex-1 py-3 rounded-xl text-sm font-medium" style={{ background: 'rgba(255,255,255,0.05)', color: '#f0ece4' }} onClick={onClose}>{t('reset_cancel')}</button>
+    82→              <button className="flex-1 py-3 rounded-xl text-sm font-medium" style={{ background: 'rgba(239,68,68,0.2)', color: '#ef4444' }} onClick={() => setStep(2)}>{t('log_confirm')}</button>
+    83→            </div>
+    84→          </>
+    85→        ) : (
+    86→          <>
+    87→            <p className="text-sm text-center mb-3" style={{ color: '#ef4444' }}>{t('reset_confirm')}</p>
+    88→            <p className="text-xs text-center mb-3" style={{ color: '#6b7280' }}>{t('reset_input_hint')}</p>
+    89→            <input type="text" className="w-full px-4 py-3 rounded-xl text-sm text-center outline-none mb-4" style={{ background: '#0f1419', border: '1.5px solid rgba(255,255,255,0.06)', color: '#f0ece4' }} placeholder={t('reset_confirm_text')} value={confirmText} onChange={e => setConfirmText(e.target.value)} />
+    90→            <div className="flex gap-3">
+    91→              <button className="flex-1 py-3 rounded-xl text-sm font-medium" style={{ background: 'rgba(255,255,255,0.05)', color: '#f0ece4' }} onClick={() => { setStep(1); setConfirmText(''); }}>{t('reset_cancel')}</button>
+    92→              <button className="flex-1 py-3 rounded-xl text-sm font-medium transition-all" style={{ background: ok ? '#ef4444' : 'rgba(239,68,68,0.1)', color: ok ? '#fff' : '#6b7280', cursor: ok ? 'pointer' : 'not-allowed' }} onClick={() => { if (ok) { onConfirm(); setStep(1); setConfirmText(''); } }}>{t('reset_button')}</button>
+    93→            </div>
+    94→          </>
+    95→        )}
+    96→      </motion.div>
+    97→    </motion.div>
+    98→  );
+    99→}
+   100→
+   101→function BottomSheet({ open, onClose, title, children, footer }: { open: boolean; onClose: () => void; title: string; children: React.ReactNode; footer?: React.ReactNode }) {
+   102→  if (!open) return null;
+   103→  return (
+   104→    <AnimatePresence>{open && (
+   105→      <motion.div className="fixed inset-0 z-[200] flex items-end justify-center" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
+   106→        <div className="absolute inset-0 bg-black/50" onClick={onClose} />
+   107→        <motion.div
+   108→          className="relative w-full max-w-md rounded-t-[24px] flex flex-col"
+   109→          style={{
+   110→            background: '#1a2027',
+   111→            border: '1px solid rgba(255,255,255,0.08)',
+   112→            maxHeight: '85dvh',
+   113→            paddingBottom: 'max(3.5rem, calc(env(safe-area-inset-bottom, 0px) + 1.5rem))',
+   114→          }}
+   115→          initial={{ y: 300 }}
+   116→          animate={{ y: 0 }}
+   117→          exit={{ y: 300 }}
+   118→          transition={{ type: 'spring', damping: 25, stiffness: 300 }}
+   119→        >
+   120→          {/* Fallback for browsers without dvh support */}
+   121→          <div className="w-10 h-1 rounded-full mx-auto mb-4 mt-5 flex-shrink-0" style={{ background: 'rgba(255,255,255,0.1)' }} />
+   122→          <p className="text-lg font-medium text-center mb-4 px-6 flex-shrink-0">{title}</p>
+   123→          <div className="flex-1 overflow-y-auto px-6 overscroll-contain min-h-0" style={{ WebkitOverflowScrolling: 'touch' }}>
+   124→            {children}
+   125→          </div>
+   126→          {footer && (
+   127→            <div className="flex-shrink-0 px-6 pt-3" style={{ borderTop: '1px solid rgba(255,255,255,0.06)' }}>
+   128→              {footer}
+   129→            </div>
+   130→          )}
+   131→        </motion.div>
+   132→      </motion.div>
+   133→    )}</AnimatePresence>
+   134→  );
+   135→}
+   136→
+   137→export default function ProfileTab({
+   138→  profile, records, periods, cycleStats, settings, cycleInfo,
+   139→  setProfileEditOpen, setEditName, setEditAvatar, setEditCycleLength, setEditPeriodLength,
+   140→  toggleSetting, exportCSV, setFeedbackOpen, toast, resetData, themeColor, setThemeColor,
+   141→  wallpaper, setWallpaper, themeScope, setThemeScope, onSheetOpenChange,
+   142→}: ProfileTabProps) {
+   143→  const { t, locale, setLocale } = useI18n();
+   144→  const [resetOpen, setResetOpen] = useState(false);
+   145→  const [langOpen, setLangOpen] = useState(false);
+   146→  const [themeOpen, setThemeOpen] = useState(false);
+   147→  const [lockOpen, setLockOpen] = useState(false);
+   148→
+   149→  // Wallpaper state
+   150→  const [wallpaperOpen, setWallpaperOpen] = useState(false);
+   151→
+   152→  // Track if any sheet is open to hide nav bar
+   153→  const anySheetOpen = langOpen || themeOpen || wallpaperOpen || lockOpen;
+   154→  useEffect(() => { onSheetOpenChange?.(anySheetOpen); }, [anySheetOpen, onSheetOpenChange]);
+   155→
+   156→  const [wallpaperImageSrc, setWallpaperImageSrc] = useState('');
+   157→  const [cropOpen, setCropOpen] = useState(false);
+   158→  const wallpaperFileRef = useRef<HTMLInputElement>(null);
+   159→
+   160→  // Apply theme scope effect
+   161→  useEffect(() => {
+   162→    if (themeScope === 'global') {
+   163→      document.documentElement.style.setProperty('--theme-color', themeColor);
+   164→    } else {
+   165→      document.documentElement.style.removeProperty('--theme-color');
+   166→    }
+   167→  }, [themeScope, themeColor]);
+   168→
+   169→  const cycleReg = (() => {
+   170→    if (cycleStats.cycleLengths.length < 2) return t('profile_insufficient');
+   171→    const avg = cycleStats.avgCycle;
+   172→    const v = cycleStats.cycleLengths.reduce((s, l) => s + Math.pow(l - avg, 2), 0) / cycleStats.cycleLengths.length;
+   173→    return Math.sqrt(v) <= 4 ? t('profile_regular') : t('profile_irregular');
+   174→  })();
+   175→
+   176→  // Task 6: Enhanced WeChat share
+   177→  const shareWeChat = async () => {
+   178→    // Try native share first (works well on mobile, includes WeChat option)
+   179→    if (navigator.share) {
+   180→      try {
+   181→        await navigator.share({
+   182→          title: 'Luna',
+   183→          text: '我在使用 Luna 经期追踪应用，推荐给你！',
+   184→          url: window.location.href,
+   185→        });
+   186→        return;
+   187→      } catch {
+   188→        // User cancelled or share failed, fallback
+   189→      }
+   190→    }
+   191→
+   192→    // Fallback: generate share image via canvas and copy link
+   193→    try {
+   194→      const canvas = document.createElement('canvas');
+   195→      canvas.width = 600;
+   196→      canvas.height = 400;
+   197→      const ctx = canvas.getContext('2d');
+   198→      if (!ctx) throw new Error('No canvas');
+   199→
+   200→      // Background
+   201→      const bgGrad = ctx.createLinearGradient(0, 0, 600, 400);
+   202→      bgGrad.addColorStop(0, '#1a2027');
+   203→      bgGrad.addColorStop(1, '#0f1419');
+   204→      ctx.fillStyle = bgGrad;
+   205→      ctx.fillRect(0, 0, 600, 400);
+   206→
+   207→      // Accent circle
+   208→      const accentGrad = ctx.createRadialGradient(300, 140, 10, 300, 140, 80);
+   209→      accentGrad.addColorStop(0, themeColor);
+   210→      accentGrad.addColorStop(1, 'transparent');
+   211→      ctx.fillStyle = accentGrad;
+   212→      ctx.fillRect(0, 0, 600, 400);
+   213→
+   214→      // Logo circle
+   215→      ctx.beginPath();
+   216→      ctx.arc(300, 130, 40, 0, Math.PI * 2);
+   217→      const logoGrad = ctx.createLinearGradient(260, 90, 340, 170);
+   218→      logoGrad.addColorStop(0, themeColor);
+   219→      logoGrad.addColorStop(1, '#81b29a');
+   220→      ctx.fillStyle = logoGrad;
+   221→      ctx.fill();
+   222→
+   223→      // Logo text
+   224→      ctx.fillStyle = '#0f1419';
+   225→      ctx.font = 'bold 32px Georgia, serif';
+   226→      ctx.textAlign = 'center';
+   227→      ctx.textBaseline = 'middle';
+   228→      ctx.fillText('L', 300, 132);
+   229→
+   230→      // App name
+   231→      ctx.fillStyle = '#f0ece4';
+   232→      ctx.font = '28px Georgia, serif';
+   233→      ctx.fillText('Luna', 300, 200);
+   234→
+   235→      // Description
+   236→      ctx.fillStyle = '#a8a29e';
+   237→      ctx.font = '16px sans-serif';
+   238→      ctx.fillText('经期追踪 · 周期管理 · 健康记录', 300, 240);
+   239→
+   240→      // URL
+   241→      ctx.fillStyle = themeColor;
+   242→      ctx.font = '14px sans-serif';
+   243→      ctx.fillText(window.location.host, 300, 300);
+   244→
+   245→      // Copy link to clipboard
+   246→      await navigator.clipboard.writeText(`${window.location.href} - Luna 经期追踪`);
+   247→      toast({ description: '链接已复制，可分享给好友 📋' });
+   248→    } catch {
+   249→      toast({ description: '分享功能暂不可用' });
+   250→    }
+   251→  };
+   252→
+   253→  // Wallpaper: handle file selection
+   254→  const handleWallpaperFile = (e: React.ChangeEvent<HTMLInputElement>) => {
+   255→    const file = e.target.files?.[0];
+   256→    if (!file) return;
+   257→    if (file.size > 5 * 1024 * 1024) {
+   258→      toast({ description: '图片大小不能超过5MB' });
+   259→      return;
+   260→    }
+   261→    const reader = new FileReader();
+   262→    reader.onload = () => {
+   263→      setWallpaperImageSrc(reader.result as string);
+   264→      setCropOpen(true);
+   265→    };
+   266→    reader.readAsDataURL(file);
+   267→    // Reset input so same file can be re-selected
+   268→    e.target.value = '';
+   269→  };
+   270→
+   271→  const handleCropComplete = (croppedBase64: string) => {
+   272→    setWallpaper(croppedBase64);
+   273→    setCropOpen(false);
+   274→    setWallpaperImageSrc('');
+   275→    setWallpaperOpen(false);
+   276→    toast({ description: t('wallpaper_set') });
+   277→  };
+   278→
+   279→  const handleCropCancel = () => {
+   280→    setCropOpen(false);
+   281→    setWallpaperImageSrc('');
+   282→  };
+   283→
+   284→  const selectPresetWallpaper = (gradient: string) => {
+   285→    // Create a small canvas to convert gradient to base64
+   286→    const canvas = document.createElement('canvas');
+   287→    canvas.width = 360;
+   288→    canvas.height = 640;
+   289→    const ctx = canvas.getContext('2d');
+   290→    if (!ctx) return;
+   291→
+   292→    // Parse gradient colors from the string
+   293→    const colorMatches = gradient.match(/#[0-9a-fA-F]{6}/g);
+   294→    if (!colorMatches || colorMatches.length < 2) return;
+   295→
+   296→    const grad = ctx.createLinearGradient(0, 0, 360, 640);
+   297→    colorMatches.forEach((color, i) => {
+   298→      grad.addColorStop(i / (colorMatches.length - 1), color);
+   299→    });
+   300→    ctx.fillStyle = grad;
+   301→    ctx.fillRect(0, 0, 360, 640);
+   302→
+   303→    const base64 = canvas.toDataURL('image/jpeg', 0.85);
+   304→    setWallpaper(base64);
+   305→    setWallpaperOpen(false);
+   306→    toast({ description: t('wallpaper_set') });
+   307→  };
+   308→
+   309→  const removeWallpaper = () => {
+   310→    setWallpaper('');
+   311→    setWallpaperOpen(false);
+   312→    toast({ description: t('wallpaper_removed') });
+   313→  };
+   314→
+   315→  const appLockOn = settings.find(s => s.key === 'app_lock')?.value === 'true';
+   316→
+   317→  return (
+   318→    <motion.div key="profile" initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -20 }} transition={{ duration: 0.3 }} className="px-5 pt-12 pb-6">
+   319→      {/* User */}
+   320→      <StaggerIn delay={0.05}>
+   321→        <div className="flex items-center gap-4 mb-6">
+   322→          <div className="relative w-16 h-16 rounded-full flex items-center justify-center overflow-hidden" style={{ background: profile?.avatar ? 'transparent' : 'linear-gradient(135deg, #e07a5f, #81b29a)' }}>
+   323→            {profile?.avatar ? <img src={profile.avatar} alt="Avatar" className="w-full h-full object-cover" /> : <span className="text-2xl font-light" style={{ fontFamily: 'Georgia, serif', color: '#0f1419' }}>{profile?.name?.charAt(0) || 'L'}</span>}
+   324→          </div>
+   325→          <div className="flex-1">
+   326→            <p className="text-xl font-light" style={{ fontFamily: 'Georgia, serif' }}>{profile?.name || 'Luna'}</p>
+   327→            <p className="text-sm" style={{ color: '#a8a29e' }}>{t('profile_recorded_days')} {records.length} {t('common_days')} · {cycleStats.totalCycles} {t('profile_cycles')}</p>
+   328→          </div>
+   329→          <button className="w-10 h-10 rounded-xl flex items-center justify-center hover:scale-105 active:scale-95" style={{ background: '#232b35', border: '1px solid rgba(255,255,255,0.08)' }} onClick={() => { setEditName(profile?.name || 'Luna'); setEditAvatar(profile?.avatar || ''); setEditCycleLength(profile?.cycleLength || 28); setEditPeriodLength(profile?.periodLength || 5); setProfileEditOpen(true); }}><Target size={16} style={{ color: '#a8a29e' }} /></button>
+   330→        </div>
+   331→      </StaggerIn>
+   332→
+   333→      {/* Health */}
+   334→      <StaggerIn delay={0.1}>
+   335→        <div className="rounded-[20px] p-5 mb-4" style={{ background: '#232b35', border: '1px solid rgba(255,255,255,0.08)' }}>
+   336→          <p className="text-sm font-medium mb-4">{t('profile_health')}</p>
+   337→          <div className="space-y-4">
+   338→            {[{ l: t('profile_avg_cycle'), v: `${cycleStats.avgCycle} ${t('common_days')}`, i: <TrendingUp size={16} style={{ color: '#81b29a' }} /> }, { l: t('profile_avg_period'), v: `${cycleStats.avgPeriod} ${t('common_days')}`, i: <Droplets size={16} style={{ color: '#e07a5f' }} /> }, { l: t('profile_last_period'), v: periods.length > 0 ? formatShortDate([...periods].sort((a, b) => b.startDate.localeCompare(a.startDate))[0].startDate) : t('profile_no_record'), i: <Calendar size={16} style={{ color: '#d4a574' }} /> }, { l: t('profile_cycle_regular'), v: cycleReg, i: <Check size={16} style={{ color: cycleReg === t('profile_insufficient') ? '#6b7280' : '#81b29a' }} /> }].map((item, i) => (
+   339→              <div key={i}>
+   340→                <div className="flex justify-between items-center"><div className="flex items-center gap-2">{item.i}<span className="text-sm" style={{ color: '#a8a29e' }}>{item.l}</span></div><span className="text-sm font-medium" style={{ color: item.v === t('profile_insufficient') ? '#6b7280' : '#f0ece4' }}>{item.v}</span></div>
+   341→                {item.l === t('profile_cycle_regular') && item.v === t('profile_insufficient') && (
+   342→                  <p className="text-[11px] mt-1 ml-6" style={{ color: '#6b7280' }}>{t('profile_insufficient_tip')}</p>
+   343→                )}
+   344→              </div>
+   345→            ))}
+   346→          </div>
+   347→        </div>
+   348→      </StaggerIn>
+   349→
+   350→      {/* Reminders */}
+   351→      <StaggerIn delay={0.15}>
+   352→        <div className="rounded-[20px] p-5 mb-4" style={{ background: '#232b35', border: '1px solid rgba(255,255,255,0.08)' }}>
+   353→          <p className="text-sm font-medium mb-3">{t('profile_notification')}</p>
+   354→          {[{ key: 'period_reminder', icon: Bell, l: t('profile_period_reminder'), d: t('profile_period_reminder_desc') }, { key: 'record_reminder', icon: Clock, l: t('profile_record_reminder'), d: t('profile_record_reminder_desc') }, { key: 'ovulation_reminder', icon: Crosshair, l: t('profile_ovulation_reminder'), d: t('profile_ovulation_reminder_desc') }].map(item => {
+   355→            const s = settings.find(s => s.key === item.key); const on = s?.value === 'true';
+   356→            return (
+   357→              <div key={item.key} className="flex items-center gap-3.5 py-3.5 cursor-pointer active:scale-[0.98]" onClick={() => toggleSetting(item.key, s?.value || 'false')}>
+   358→                <div className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0" style={{ background: '#1a2027' }}><item.icon size={20} style={{ color: '#a8a29e' }} /></div>
+   359→                <div className="flex-1"><p className="text-[15px] font-medium">{item.l}</p><p className="text-xs" style={{ color: '#6b7280' }}>{item.d}</p></div>
+   360→                <div className="w-12 h-7 rounded-full relative transition-all duration-300" style={{ background: on ? '#e07a5f' : '#1a2027' }}><div className="absolute w-[22px] h-[22px] rounded-full top-[3px] transition-all duration-300" style={{ background: '#f0ece4', left: on ? '23px' : '3px' }} /></div>
+   361→              </div>
+   362→            );
+   363→          })}
+   364→        </div>
+   365→      </StaggerIn>
+   366→
+   367→      {/* Privacy */}
+   368→      <StaggerIn delay={0.2}>
+   369→        <div className="rounded-[20px] p-5 mb-4" style={{ background: '#232b35', border: '1px solid rgba(255,255,255,0.08)' }}>
+   370→          <p className="text-sm font-medium mb-3">{t('profile_privacy')}</p>
+   371→          {[{ icon: Shield, l: t('profile_app_lock'), d: appLockOn ? t('lock_status_enabled') : t('lock_status_disabled'), fn: () => setLockOpen(true), active: appLockOn }, { icon: Eye, l: t('profile_privacy_mode'), d: t('profile_privacy_mode_desc'), fn: () => toast({ description: '隐私模式开发中' }), active: false }, { icon: Lock, l: t('profile_data_encryption'), d: t('profile_data_encryption_desc'), fn: () => toast({ description: '数据加密开发中' }), active: false }].map((item, i) => (
+   372→            <div key={i} className="flex items-center gap-3.5 py-3.5 cursor-pointer active:scale-[0.98]" onClick={item.fn}>
+   373→              <div className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0" style={{ background: item.active ? 'rgba(129,178,154,0.12)' : '#1a2027' }}><item.icon size={20} style={{ color: item.active ? '#81b29a' : '#a8a29e' }} /></div>
+   374→              <div className="flex-1"><p className="text-[15px] font-medium">{item.l}</p><p className="text-xs" style={{ color: item.active ? '#81b29a' : '#6b7280' }}>{item.d}</p></div>
+   375→              {item.active ? <div className="w-2 h-2 rounded-full" style={{ background: '#81b29a' }} /> : <ChevronRight size={20} style={{ color: '#6b7280' }} />}
+   376→            </div>
+   377→          ))}
+   378→        </div>
+   379→      </StaggerIn>
+   380→
+   381→      {/* Appearance */}
+   382→      <StaggerIn delay={0.25}>
+   383→        <div className="rounded-[20px] p-5 mb-4" style={{ background: '#232b35', border: '1px solid rgba(255,255,255,0.08)' }}>
+   384→          <p className="text-sm font-medium mb-3">{t('profile_appearance')}</p>
+   385→          {[{ icon: Moon, l: t('profile_dark_mode'), d: t('profile_dark_mode_desc'), toggle: true, tk: 'dark_mode' }, { icon: Palette, l: t('profile_theme_color'), d: t('profile_theme_color_desc'), fn: () => setThemeOpen(true) }, { icon: ImageIcon, l: t('wallpaper_title'), d: wallpaper ? t('wallpaper_set') : t('wallpaper_select'), fn: () => setWallpaperOpen(true) }].map((item, i) => {
+   386→            const s = item.tk ? settings.find(s => s.key === item.tk) : null; const on = s?.value === 'true';
+   387→            return (
+   388→              <div key={i} className="flex items-center gap-3.5 py-3.5 cursor-pointer active:scale-[0.98]" onClick={() => { if (item.tk) toggleSetting(item.tk, s?.value || 'false'); else item.fn?.(); }}>
+   389→                <div className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0" style={{ background: '#1a2027' }}><item.icon size={20} style={{ color: '#a8a29e' }} /></div>
+   390→                <div className="flex-1"><p className="text-[15px] font-medium">{item.l}</p><p className="text-xs" style={{ color: '#6b7280' }}>{item.d}</p></div>
+   391→                {item.toggle ? <div className="w-12 h-7 rounded-full relative transition-all duration-300" style={{ background: on ? '#e07a5f' : '#1a2027' }}><div className="absolute w-[22px] h-[22px] rounded-full top-[3px] transition-all duration-300" style={{ background: '#f0ece4', left: on ? '23px' : '3px' }} /></div> : <ChevronRight size={20} style={{ color: '#6b7280' }} />}
+   392→              </div>
+   393→            );
+   394→          })}
+   395→        </div>
+   396→      </StaggerIn>
+   397→
+   398→      {/* Data */}
+   399→      <StaggerIn delay={0.3}>
+   400→        <div className="rounded-[20px] p-5 mb-4" style={{ background: '#232b35', border: '1px solid rgba(255,255,255,0.08)' }}>
+   401→          <p className="text-sm font-medium mb-3">{t('profile_data_management')}</p>
+   402→          {[{ icon: Download, l: t('profile_export_data'), d: t('profile_export_csv'), fn: exportCSV }, { icon: Share2, l: t('profile_export_wechat'), d: t('profile_export_wechat'), fn: shareWeChat }, { icon: Cloud, l: t('profile_cloud_sync'), d: t('profile_cloud_sync_desc'), fn: () => toast({ description: '云同步功能开发中' }) }, { icon: RotateCcw, l: t('profile_restore_data'), d: t('profile_restore_data_desc'), fn: () => toast({ description: '恢复数据功能开发中' }) }, { icon: Trash2, l: t('profile_reset_data'), d: t('profile_reset_data_desc'), fn: () => setResetOpen(true), danger: true }].map((item, i) => (
+   403→            <div key={i} className="flex items-center gap-3.5 py-3.5 cursor-pointer active:scale-[0.98]" onClick={item.fn}>
+   404→              <div className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0" style={{ background: '#1a2027' }}><item.icon size={20} style={{ color: item.danger ? '#ef4444' : '#a8a29e' }} /></div>
+   405→              <div className="flex-1"><p className="text-[15px] font-medium" style={{ color: item.danger ? '#ef4444' : '#f0ece4' }}>{item.l}</p><p className="text-xs" style={{ color: '#6b7280' }}>{item.d}</p></div>
+   406→              <ChevronRight size={20} style={{ color: item.danger ? '#ef4444' : '#6b7280' }} />
+   407→            </div>
+   408→          ))}
+   409→        </div>
+   410→      </StaggerIn>
+   411→
+   412→      {/* Other */}
+   413→      <StaggerIn delay={0.35}>
+   414→        <div className="rounded-[20px] p-5 mb-4" style={{ background: '#232b35', border: '1px solid rgba(255,255,255,0.08)' }}>
+   415→          <p className="text-sm font-medium mb-3">{t('profile_other')}</p>
+   416→          {[{ icon: Globe, l: t('profile_language'), d: LOCALE_NAMES[locale], fn: () => setLangOpen(true) }, { icon: Info, l: t('profile_about'), d: t('profile_version'), fn: () => toast({ description: 'Luna v2.0.0 🌙' }) }, { icon: MessageSquare, l: t('profile_feedback'), d: t('profile_feedback_desc'), fn: () => setFeedbackOpen(true) }].map((item, i) => (
+   417→            <div key={i} className="flex items-center gap-3.5 py-3.5 cursor-pointer active:scale-[0.98]" onClick={item.fn}>
+   418→              <div className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0" style={{ background: '#1a2027' }}><item.icon size={20} style={{ color: '#a8a29e' }} /></div>
+   419→              <div className="flex-1"><p className="text-[15px] font-medium">{item.l}</p><p className="text-xs" style={{ color: '#6b7280' }}>{item.d}</p></div>
+   420→              <ChevronRight size={20} style={{ color: '#6b7280' }} />
+   421→            </div>
+   422→          ))}
+   423→        </div>
+   424→      </StaggerIn>
+   425→
+   426→      <div className="mt-4 text-center mb-4">
+   427→        <p className="text-xs" style={{ color: '#6b7280' }}>{t('profile_security_note1')}</p>
+   428→        <p className="text-xs mt-1" style={{ color: '#6b7280' }}>{t('profile_security_note2')}</p>
+   429→      </div>
+   430→
+   431→      {/* Dialogs & Sheets */}
+   432→      <ResetDataDialog open={resetOpen} onClose={() => setResetOpen(false)} onConfirm={() => { resetData(); setResetOpen(false); }} />
+   433→
+   434→      <BottomSheet open={langOpen} onClose={() => setLangOpen(false)} title={t('profile_language')}>
+   435→        <div className="space-y-2">
+   436→          {(['zh', 'en', 'ko'] as Locale[]).map(loc => (
+   437→            <button key={loc} className="w-full flex items-center justify-between p-4 rounded-2xl transition-all active:scale-[0.98]" style={{ background: locale === loc ? 'rgba(224,122,95,0.15)' : '#232b35', border: locale === loc ? '1.5px solid #e07a5f' : '1.5px solid rgba(255,255,255,0.06)' }} onClick={() => { setLocale(loc); setLangOpen(false); }}>
+   438→              <span className="text-[15px] font-medium">{LOCALE_NAMES[loc]}</span>
+   439→              {locale === loc && <Check size={18} style={{ color: '#e07a5f' }} />}
+   440→            </button>
+   441→          ))}
+   442→        </div>
+   443→      </BottomSheet>
+   444→
+   445→      {/* Theme Color Sheet with Scope Toggle */}
+   446→      <BottomSheet open={themeOpen} onClose={() => setThemeOpen(false)} title={t('theme_title')}>
+   447→        {/* Scope Toggle */}
+   448→        <div className="flex items-center justify-between mb-4 p-3 rounded-2xl" style={{ background: '#232b35' }}>
+   449→          <span className="text-sm" style={{ color: '#a8a29e' }}>{t('theme_scope')}</span>
+   450→          <div className="flex rounded-xl overflow-hidden" style={{ background: '#0f1419' }}>
+   451→            <button className="px-4 py-2 text-xs font-medium transition-all" style={{ background: themeScope === 'local' ? themeColor : 'transparent', color: themeScope === 'local' ? '#0f1419' : '#6b7280' }} onClick={() => setThemeScope('local')}>{t('theme_scope_local')}</button>
+   452→            <button className="px-4 py-2 text-xs font-medium transition-all" style={{ background: themeScope === 'global' ? themeColor : 'transparent', color: themeScope === 'global' ? '#0f1419' : '#6b7280' }} onClick={() => setThemeScope('global')}>{t('theme_scope_global')}</button>
+   453→          </div>
+   454→        </div>
+   455→        <p className="text-xs mb-3" style={{ color: '#6b7280' }}>{t('theme_colors')}</p>
+   456→        <div className="grid grid-cols-3 gap-3">
+   457→          {THEME_COLORS.map(tc => (
+   458→            <button key={tc.primary} className="flex flex-col items-center gap-2 p-3 rounded-2xl transition-all" style={{ background: themeColor === tc.primary ? 'rgba(224,122,95,0.15)' : '#232b35', border: themeColor === tc.primary ? '1.5px solid #e07a5f' : '1.5px solid rgba(255,255,255,0.06)' }} onClick={() => { setThemeColor(tc.primary); toast({ description: `${tc.name} ✨` }); }}>
+   459→              <div className="w-10 h-10 rounded-full" style={{ background: `linear-gradient(135deg, ${tc.primary}, ${tc.secondary})` }} />
+   460→              <span className="text-xs">{tc.name}</span>
+   461→            </button>
+   462→          ))}
+   463→        </div>
+   464→      </BottomSheet>
+   465→
+   466→      {/* Wallpaper Picker Sheet */}
+   467→      <BottomSheet
+   468→        open={wallpaperOpen}
+   469→        onClose={() => setWallpaperOpen(false)}
+   470→        title={t('wallpaper_title')}
+   471→        footer={wallpaper ? (
+   472→          <button className="w-full flex items-center justify-center gap-2 py-3.5 rounded-2xl transition-all active:scale-[0.98]" style={{ background: 'rgba(239,68,68,0.08)', border: '1.5px solid rgba(239,68,68,0.15)' }} onClick={removeWallpaper}>
+   473→            <Trash2 size={18} style={{ color: '#ef4444' }} />
+   474→            <span className="text-[15px] font-medium" style={{ color: '#ef4444' }}>{t('wallpaper_remove')}</span>
+   475→          </button>
+   476→        ) : undefined}
+   477→      >
+   478→        {/* Select Image from Gallery */}
+   479→        <input ref={wallpaperFileRef} type="file" accept="image/*" className="hidden" onChange={handleWallpaperFile} />
+   480→        <button className="w-full flex items-center gap-3 p-4 rounded-2xl mb-4 transition-all active:scale-[0.98]" style={{ background: '#232b35', border: '1.5px solid rgba(255,255,255,0.06)' }} onClick={() => wallpaperFileRef.current?.click()}>
+   481→          <div className="w-10 h-10 rounded-xl flex items-center justify-center" style={{ background: 'rgba(224,122,95,0.15)' }}><ImageIcon size={20} style={{ color: '#e07a5f' }} /></div>
+   482→          <span className="text-[15px] font-medium">{t('wallpaper_select')}</span>
+   483→          <ChevronRight size={20} style={{ color: '#6b7280', marginLeft: 'auto' }} />
+   484→        </button>
+   485→
+   486→        {/* Preset Wallpapers */}
+   487→        <p className="text-xs mb-3" style={{ color: '#6b7280' }}>{t('wallpaper_preset')}</p>
+   488→        <div className="flex gap-2.5 overflow-x-auto pb-2 -mx-1 px-1" style={{ WebkitOverflowScrolling: 'touch', scrollbarWidth: 'none' }}>
+   489→          {PRESET_WALLPAPERS.map((pw, i) => (
+   490→            <button key={i} className="relative rounded-xl overflow-hidden flex-shrink-0 transition-all active:scale-95" style={{ width: '64px', height: '86px', background: pw.gradient, border: wallpaper && i === 0 ? '2px solid #e07a5f' : '1px solid rgba(255,255,255,0.06)' }} onClick={() => selectPresetWallpaper(pw.gradient)}>
+   491→              <div className="absolute inset-0 flex items-end justify-center pb-1">
+   492→                <span className="text-[9px] font-medium text-white drop-shadow-lg whitespace-nowrap">{pw.name}</span>
+   493→              </div>
+   494→            </button>
+   495→          ))}
+   496→        </div>
+   497→      </BottomSheet>
+   498→
+   499→      {/* Image Crop Dialog for Wallpaper */}
+   500→      <ImageCropDialog
+   501→        open={cropOpen}
+   502→        imageSrc={wallpaperImageSrc}
+   503→        onCropComplete={handleCropComplete}
+   504→        onCancel={handleCropCancel}
+   505→        cropShape="rect"
+   506→        aspectRatio={9 / 16}
+   507→      />
+   508→
+   509→      <LockSetupSheet
+   510→        open={lockOpen}
+   511→        onClose={() => setLockOpen(false)}
+   512→        isLockEnabled={appLockOn}
+   513→        toggleAppLock={(currentValue: string) => toggleSetting('app_lock', currentValue)}
+   514→        themeColor={themeColor}
+   515→      />
+   516→    </motion.div>
+   517→  );
+   518→}
+   519→

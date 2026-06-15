@@ -45,6 +45,61 @@
 
 :root {
   --radius: 0.625rem;
+  /* Light theme (default when not dark) */
+  --luna-bg: #f5f0eb;
+  --luna-bg-deep: #ede7e0;
+  --luna-card: #ffffff;
+  --luna-card-border: rgba(0, 0, 0, 0.06);
+  --luna-text: #1a1a2e;
+  --luna-text-secondary: #6b7280;
+  --luna-text-muted: #9ca3af;
+  --luna-surface: #f0ebe5;
+  --luna-overlay: rgba(0, 0, 0, 0.3);
+  /* shadcn/ui variables for light mode */
+  --background: #f5f0eb;
+  --foreground: #1a1a2e;
+  --card: #ffffff;
+  --card-foreground: #1a1a2e;
+  --popover: #ffffff;
+  --popover-foreground: #1a1a2e;
+  --primary: #e07a5f;
+  --primary-foreground: #ffffff;
+  --secondary: #f0ebe5;
+  --secondary-foreground: #6b7280;
+  --muted: #f0ebe5;
+  --muted-foreground: #9ca3af;
+  --accent: #d4a574;
+  --accent-foreground: #1a1a2e;
+  --destructive: #ef4444;
+  --border: rgba(0, 0, 0, 0.06);
+  --input: rgba(0, 0, 0, 0.06);
+  --ring: #e07a5f;
+  --chart-1: #e07a5f;
+  --chart-2: #81b29a;
+  --chart-3: #d4a574;
+  --chart-4: #f2cc8f;
+  --chart-5: #6b7280;
+  --sidebar: #ffffff;
+  --sidebar-foreground: #1a1a2e;
+  --sidebar-primary: #e07a5f;
+  --sidebar-primary-foreground: #ffffff;
+  --sidebar-accent: #f0ebe5;
+  --sidebar-accent-foreground: #1a1a2e;
+  --sidebar-border: rgba(0, 0, 0, 0.06);
+  --sidebar-ring: #e07a5f;
+}
+
+.dark {
+  --luna-bg: #0f1419;
+  --luna-bg-deep: #0a0e12;
+  --luna-card: #232b35;
+  --luna-card-border: rgba(255, 255, 255, 0.08);
+  --luna-text: #f0ece4;
+  --luna-text-secondary: #a8a29e;
+  --luna-text-muted: #6b7280;
+  --luna-surface: #1a2027;
+  --luna-overlay: rgba(0, 0, 0, 0.5);
+  /* shadcn/ui variables for dark mode */
   --background: #0f1419;
   --foreground: #f0ece4;
   --card: #232b35;
@@ -153,4 +208,11 @@
 
 .safe-top {
   padding-top: env(safe-area-inset-top, 0px);
+}
+
+/* dvh fallback for older browsers */
+@supports not (max-height: 1dvh) {
+  .dvh-fallback {
+    max-height: 85vh !important;
+  }
 }
