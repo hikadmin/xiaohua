@@ -43,3 +43,26 @@ Stage Summary:
 - 记录页功能完善：日历选择、编辑历史、年月筛选、搜索
 - 我的页面新增：语言切换、重置数据、主题颜色、应用锁、微信分享
 - dev server 运行正常，浏览器验证通过
+
+---
+Task ID: 2
+Agent: Main
+Task: 修复情绪选择器中焦虑(😰)表情包显示异常
+
+Work Log:
+- 使用 VLM 分析用户上传的截图，确认"焦虑"选项未正常显示对应emoji
+- 根因分析: `shared.tsx` 中的 `MOOD_LABELS` 和 `MOOD_EMOJIS` 只有6个条目（索引0-5），但 LogTab.tsx 中的 `ml` 数组有7个条目（索引0-6），因为新增了"害羞"情绪
+  - 旧: MOOD_LABELS = ['', '开心', '平静', '低落', '烦躁', '焦虑'] （无"害羞"）
+  - 旧: MOOD_EMOJIS = ['', '😊', '😌', '😔', '😤', '😰'] （6个emoji）
+  - 导致: MOOD_EMOJIS[6] 为 undefined，焦虑选项无emoji；且害羞/低落/烦躁/焦虑的emoji全部错位
+- 修复: 更新 `shared.tsx` 中的 MOOD_LABELS 和 MOOD_EMOJIS 添加"害羞"条目
+  - 新: MOOD_LABELS = ['', '开心', '平静', '害羞', '低落', '烦躁', '焦虑']
+  - 新: MOOD_EMOJIS = ['', '😊', '😌', '😳', '😔', '😤', '😰']
+- 使用 agent-browser 验证: 记录页情绪选择器所有6个情绪均正确显示emoji和文字
+- 验证焦虑(😰)选项可正常点击选中，高亮状态正常
+- 历史记录页emoji显示也正确
+
+Stage Summary:
+- 焦虑(😰)emoji显示异常已修复
+- 根因: MOOD_LABELS/MOOD_EMOJIS与LogTab的ml数组不同步，缺少"害羞"条目导致索引错位
+- 修复后所有6个情绪emoji正确映射: 😊开心、😌平静、😳害羞、😔低落、😤烦躁、😰焦虑
