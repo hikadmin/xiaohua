@@ -413,3 +413,36 @@ Stage Summary:
 - 预设壁纸缩略图比例从9:16调整为3:4，节省纵向空间
 - BottomSheet底部padding从40px增加到56px
 - agent-browser验证：所有元素完整显示，按钮不再被截断
+
+---
+Task ID: 9
+Agent: Main
+Task: 修复自定义壁纸弹窗兼容所有手机型号 — 确保移除壁纸按钮在所有屏幕尺寸下完全可见
+
+Work Log:
+- 用户反馈：之前的修复只解决了部分场景，需要兼容所有型号手机
+- 全面改造 BottomSheet 组件：
+  - 从简单 overflow-y-auto 改为 flex column 布局（flex-col）
+  - 添加 footer 插槽：底部固定区域，不被滚动影响
+  - 内容区使用 flex-1 overflow-y-auto 独立滚动
+  - 底部 padding 使用 max(3.5rem, env(safe-area-inset-bottom) + 1.5rem) 兼容刘海屏/全面屏
+  - 添加 overscroll-contain 和 WebkitOverflowScrolling: touch 优化移动端滚动
+- 壁纸弹窗布局重构：
+  - "移除壁纸"按钮从 children 移至 footer 插槽，始终固定在底部
+  - 按钮样式改为居中布局（更紧凑），仅在有壁纸时显示
+  - 预设壁纸从 grid 布局改为水平滚动列表（flex + overflow-x-auto）
+  - 每个预设壁纸固定尺寸 64x86px，不再依赖 aspect-ratio
+  - 窄屏手机上预设壁纸可水平滑动查看（scrollbarWidth: none）
+- agent-browser 多尺寸验证结果：
+  - iPhone SE (375x667): ✅ 移除按钮完全可见，底部留57px间距
+  - iPhone 14 Pro (393x852): ✅ 所有5个预设可见，按钮完全可见
+  - 小屏Android (360x640): ✅ 移除按钮完全可见，4个预设直接可见+水平滚动
+  - 大屏手机 (428x926): ✅ 布局舒适，所有元素完美显示
+- lint 通过，dev server 无报错
+
+Stage Summary:
+- BottomSheet 组件全面升级：flex布局 + footer插槽 + safe-area兼容
+- 壁纸弹窗在4种不同屏幕尺寸下均通过验证
+- "移除壁纸"按钮始终固定在底部，不会被滚动或截断
+- 预设壁纸改为水平滚动，窄屏体验更好
+- 兼容 iPhone SE / 小屏Android / 标准手机 / 大屏手机

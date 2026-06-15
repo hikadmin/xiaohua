@@ -97,16 +97,23 @@ function ResetDataDialog({ open, onClose, onConfirm }: { open: boolean; onClose:
   );
 }
 
-function BottomSheet({ open, onClose, title, children }: { open: boolean; onClose: () => void; title: string; children: React.ReactNode }) {
+function BottomSheet({ open, onClose, title, children, footer }: { open: boolean; onClose: () => void; title: string; children: React.ReactNode; footer?: React.ReactNode }) {
   if (!open) return null;
   return (
     <AnimatePresence>{open && (
       <motion.div className="fixed inset-0 z-[200] flex items-end justify-center" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
         <div className="absolute inset-0 bg-black/50" onClick={onClose} />
-        <motion.div className="relative w-full max-w-md rounded-t-[24px] px-6 pt-6 pb-14 max-h-[85vh] overflow-y-auto" style={{ background: '#1a2027', border: '1px solid rgba(255,255,255,0.08)' }} initial={{ y: 300 }} animate={{ y: 0 }} exit={{ y: 300 }} transition={{ type: 'spring', damping: 25, stiffness: 300 }}>
-          <div className="w-10 h-1 rounded-full mx-auto mb-4" style={{ background: 'rgba(255,255,255,0.1)' }} />
-          <p className="text-lg font-medium text-center mb-4">{title}</p>
-          {children}
+        <motion.div className="relative w-full max-w-md rounded-t-[24px] max-h-[85vh] flex flex-col" style={{ background: '#1a2027', border: '1px solid rgba(255,255,255,0.08)', paddingBottom: 'max(3.5rem, calc(env(safe-area-inset-bottom, 0px) + 1.5rem))' }} initial={{ y: 300 }} animate={{ y: 0 }} exit={{ y: 300 }} transition={{ type: 'spring', damping: 25, stiffness: 300 }}>
+          <div className="w-10 h-1 rounded-full mx-auto mb-4 mt-5 flex-shrink-0" style={{ background: 'rgba(255,255,255,0.1)' }} />
+          <p className="text-lg font-medium text-center mb-4 px-6 flex-shrink-0">{title}</p>
+          <div className="flex-1 overflow-y-auto px-6 overscroll-contain" style={{ WebkitOverflowScrolling: 'touch' }}>
+            {children}
+          </div>
+          {footer && (
+            <div className="flex-shrink-0 px-6 pt-3" style={{ borderTop: '1px solid rgba(255,255,255,0.06)' }}>
+              {footer}
+            </div>
+          )}
         </motion.div>
       </motion.div>
     )}</AnimatePresence>
@@ -438,7 +445,17 @@ export default function ProfileTab({
       </BottomSheet>
 
       {/* Wallpaper Picker Sheet */}
-      <BottomSheet open={wallpaperOpen} onClose={() => setWallpaperOpen(false)} title={t('wallpaper_title')}>
+      <BottomSheet
+        open={wallpaperOpen}
+        onClose={() => setWallpaperOpen(false)}
+        title={t('wallpaper_title')}
+        footer={wallpaper ? (
+          <button className="w-full flex items-center justify-center gap-2 py-3.5 rounded-2xl transition-all active:scale-[0.98]" style={{ background: 'rgba(239,68,68,0.08)', border: '1.5px solid rgba(239,68,68,0.15)' }} onClick={removeWallpaper}>
+            <Trash2 size={18} style={{ color: '#ef4444' }} />
+            <span className="text-[15px] font-medium" style={{ color: '#ef4444' }}>{t('wallpaper_remove')}</span>
+          </button>
+        ) : undefined}
+      >
         {/* Select Image from Gallery */}
         <input ref={wallpaperFileRef} type="file" accept="image/*" className="hidden" onChange={handleWallpaperFile} />
         <button className="w-full flex items-center gap-3 p-4 rounded-2xl mb-4 transition-all active:scale-[0.98]" style={{ background: '#232b35', border: '1.5px solid rgba(255,255,255,0.06)' }} onClick={() => wallpaperFileRef.current?.click()}>
@@ -449,23 +466,15 @@ export default function ProfileTab({
 
         {/* Preset Wallpapers */}
         <p className="text-xs mb-3" style={{ color: '#6b7280' }}>{t('wallpaper_preset')}</p>
-        <div className="grid grid-cols-5 gap-2 mb-4">
+        <div className="flex gap-2.5 overflow-x-auto pb-2 -mx-1 px-1" style={{ WebkitOverflowScrolling: 'touch', scrollbarWidth: 'none' }}>
           {PRESET_WALLPAPERS.map((pw, i) => (
-            <button key={i} className="relative rounded-xl overflow-hidden aspect-[3/4] transition-all active:scale-95" style={{ background: pw.gradient, border: wallpaper && i === 0 ? '2px solid #e07a5f' : '1px solid rgba(255,255,255,0.06)' }} onClick={() => selectPresetWallpaper(pw.gradient)}>
+            <button key={i} className="relative rounded-xl overflow-hidden flex-shrink-0 transition-all active:scale-95" style={{ width: '64px', height: '86px', background: pw.gradient, border: wallpaper && i === 0 ? '2px solid #e07a5f' : '1px solid rgba(255,255,255,0.06)' }} onClick={() => selectPresetWallpaper(pw.gradient)}>
               <div className="absolute inset-0 flex items-end justify-center pb-1">
-                <span className="text-[9px] font-medium text-white drop-shadow-lg">{pw.name}</span>
+                <span className="text-[9px] font-medium text-white drop-shadow-lg whitespace-nowrap">{pw.name}</span>
               </div>
             </button>
           ))}
         </div>
-
-        {/* Remove Wallpaper */}
-        {wallpaper && (
-          <button className="w-full flex items-center gap-3 p-4 rounded-2xl transition-all active:scale-[0.98] mt-2" style={{ background: 'rgba(239,68,68,0.08)', border: '1.5px solid rgba(239,68,68,0.15)' }} onClick={removeWallpaper}>
-            <div className="w-10 h-10 rounded-xl flex items-center justify-center" style={{ background: 'rgba(239,68,68,0.15)' }}><Trash2 size={20} style={{ color: '#ef4444' }} /></div>
-            <span className="text-[15px] font-medium" style={{ color: '#ef4444' }}>{t('wallpaper_remove')}</span>
-          </button>
-        )}
       </BottomSheet>
 
       {/* Image Crop Dialog for Wallpaper */}
