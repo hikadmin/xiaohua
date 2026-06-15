@@ -1,6 +1,7 @@
 import { db } from '@/lib/db'
 import { NextRequest } from 'next/server'
 import { success, created, badRequest, serverError, parseRequestBody, validateRequired, validateStringLength } from '@/lib/api/response'
+import { sendFeedbackNotification } from '@/lib/mail'
 
 // GET /api/feedback - 获取所有反馈
 export async function GET() {
@@ -44,6 +45,14 @@ export async function POST(request: NextRequest) {
         status: 'pending',
       },
     })
+
+    // Send email notification (async, don't block the response)
+    sendFeedbackNotification({
+      category: category as string,
+      content: (data.content as string).trim(),
+      contact: (data.contact as string)?.trim() || '',
+      time: new Date().toLocaleString('zh-CN', { timeZone: 'Asia/Shanghai' }),
+    }).catch(err => console.error('[Feedback] Mail notification failed:', err))
 
     return created(feedback, '反馈提交成功，感谢您的意见！')
   } catch (error) {
