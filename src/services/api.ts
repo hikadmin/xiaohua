@@ -4,6 +4,9 @@
 // 2. Local 模式：使用 IndexedDB 本地存储（Capacitor/Android APK）
 //
 // 模式切换：检测 window.__LUNA_LOCAL_MODE__ 或 Capacitor 环境
+//
+// 重要：local-api.ts 依赖 Dexie (IndexedDB)，是浏览器专用模块，
+// SSR 环境无法加载，因此使用动态 import() 按需加载。
 
 import type {
   ApiResponse,
@@ -26,12 +29,6 @@ import type {
   ExportDataResponse,
 } from '@/lib/api/types'
 
-import {
-  localPeriodsApi, localRecordsApi, localProfileApi, localSettingsApi,
-  localFeedbackApi, localGetCycleStats, localGetDashboard,
-  localGetCalendarMonth, localExportData, localSeedData,
-} from './local-api'
-
 // ============ 模式检测 ============
 
 export type ApiMode = 'server' | 'local'
@@ -51,9 +48,7 @@ export function setApiMode(mode: ApiMode) {
 /** 自动检测模式：优先检查 Capacitor 环境 */
 function detectMode(): ApiMode {
   if (typeof window === 'undefined') return 'server'
-  // 如果标记了本地模式或检测到 Capacitor 环境
   if ((window as Record<string, unknown>).__LUNA_LOCAL_MODE__) return 'local'
-  // Capacitor 环境检测
   if (typeof (window as Record<string, unknown>).Capacitor !== 'undefined') return 'local'
   return 'server'
 }
@@ -61,6 +56,19 @@ function detectMode(): ApiMode {
 // 初始化模式
 if (typeof window !== 'undefined') {
   currentMode = detectMode()
+}
+
+// ============ 动态加载 local-api（浏览器专用模块） ============
+
+type LocalApiModule = typeof import('./local-api')
+
+let localApiCache: LocalApiModule | null = null
+
+async function getLocalApi(): Promise<LocalApiModule> {
+  if (!localApiCache) {
+    localApiCache = await import('./local-api')
+  }
+  return localApiCache
 }
 
 // ============ 通用请求封装 (Server 模式) ============
@@ -111,137 +119,179 @@ async function request<T>(
 // ============ 双模式 API 接口 ============
 
 export const periodsApi = {
-  getAll(): Promise<PeriodItem[]> {
-    return currentMode === 'local'
-      ? localPeriodsApi.getAll()
-      : request<PeriodItem[]>('/api/periods')
+  async getAll(): Promise<PeriodItem[]> {
+    if (currentMode === 'local') {
+      const local = await getLocalApi()
+      return local.localPeriodsApi.getAll()
+    }
+    return request<PeriodItem[]>('/api/periods')
   },
-  create(data: CreatePeriodRequest): Promise<PeriodItem> {
-    return currentMode === 'local'
-      ? localPeriodsApi.create(data)
-      : request<PeriodItem>('/api/periods', { method: 'POST', body: JSON.stringify(data) })
+  async create(data: CreatePeriodRequest): Promise<PeriodItem> {
+    if (currentMode === 'local') {
+      const local = await getLocalApi()
+      return local.localPeriodsApi.create(data)
+    }
+    return request<PeriodItem>('/api/periods', { method: 'POST', body: JSON.stringify(data) })
   },
-  update(id: string, data: UpdatePeriodRequest): Promise<PeriodItem> {
-    return currentMode === 'local'
-      ? localPeriodsApi.update(id, data)
-      : request<PeriodItem>(`/api/periods/${id}`, { method: 'PUT', body: JSON.stringify(data) })
+  async update(id: string, data: UpdatePeriodRequest): Promise<PeriodItem> {
+    if (currentMode === 'local') {
+      const local = await getLocalApi()
+      return local.localPeriodsApi.update(id, data)
+    }
+    return request<PeriodItem>(`/api/periods/${id}`, { method: 'PUT', body: JSON.stringify(data) })
   },
-  delete(id: string): Promise<void> {
-    return currentMode === 'local'
-      ? localPeriodsApi.delete(id)
-      : request<void>(`/api/periods/${id}`, { method: 'DELETE' })
+  async delete(id: string): Promise<void> {
+    if (currentMode === 'local') {
+      const local = await getLocalApi()
+      return local.localPeriodsApi.delete(id)
+    }
+    return request<void>(`/api/periods/${id}`, { method: 'DELETE' })
   },
 }
 
 export const recordsApi = {
-  getAll(): Promise<DailyRecordItem[]> {
-    return currentMode === 'local'
-      ? localRecordsApi.getAll()
-      : request<DailyRecordItem[]>('/api/records')
+  async getAll(): Promise<DailyRecordItem[]> {
+    if (currentMode === 'local') {
+      const local = await getLocalApi()
+      return local.localRecordsApi.getAll()
+    }
+    return request<DailyRecordItem[]>('/api/records')
   },
-  upsert(data: CreateRecordRequest): Promise<DailyRecordItem> {
-    return currentMode === 'local'
-      ? localRecordsApi.upsert(data)
-      : request<DailyRecordItem>('/api/records', { method: 'POST', body: JSON.stringify(data) })
+  async upsert(data: CreateRecordRequest): Promise<DailyRecordItem> {
+    if (currentMode === 'local') {
+      const local = await getLocalApi()
+      return local.localRecordsApi.upsert(data)
+    }
+    return request<DailyRecordItem>('/api/records', { method: 'POST', body: JSON.stringify(data) })
   },
-  getByDate(date: string): Promise<DailyRecordItem> {
-    return currentMode === 'local'
-      ? localRecordsApi.getByDate(date)
-      : request<DailyRecordItem>(`/api/records/${date}`)
+  async getByDate(date: string): Promise<DailyRecordItem> {
+    if (currentMode === 'local') {
+      const local = await getLocalApi()
+      return local.localRecordsApi.getByDate(date)
+    }
+    return request<DailyRecordItem>(`/api/records/${date}`)
   },
-  updateByDate(date: string, data: UpdateRecordRequest): Promise<DailyRecordItem> {
-    return currentMode === 'local'
-      ? localRecordsApi.updateByDate(date, data)
-      : request<DailyRecordItem>(`/api/records/${date}`, { method: 'PUT', body: JSON.stringify(data) })
+  async updateByDate(date: string, data: UpdateRecordRequest): Promise<DailyRecordItem> {
+    if (currentMode === 'local') {
+      const local = await getLocalApi()
+      return local.localRecordsApi.updateByDate(date, data)
+    }
+    return request<DailyRecordItem>(`/api/records/${date}`, { method: 'PUT', body: JSON.stringify(data) })
   },
-  deleteByDate(date: string): Promise<void> {
-    return currentMode === 'local'
-      ? localRecordsApi.deleteByDate(date)
-      : request<void>(`/api/records/${date}`, { method: 'DELETE' })
+  async deleteByDate(date: string): Promise<void> {
+    if (currentMode === 'local') {
+      const local = await getLocalApi()
+      return local.localRecordsApi.deleteByDate(date)
+    }
+    return request<void>(`/api/records/${date}`, { method: 'DELETE' })
   },
 }
 
 export const profileApi = {
-  get(): Promise<UserProfileItem> {
-    return currentMode === 'local'
-      ? localProfileApi.get()
-      : request<UserProfileItem>('/api/profile')
+  async get(): Promise<UserProfileItem> {
+    if (currentMode === 'local') {
+      const local = await getLocalApi()
+      return local.localProfileApi.get()
+    }
+    return request<UserProfileItem>('/api/profile')
   },
-  update(data: UpdateProfileRequest): Promise<UserProfileItem> {
-    return currentMode === 'local'
-      ? localProfileApi.update(data)
-      : request<UserProfileItem>('/api/profile', { method: 'PUT', body: JSON.stringify(data) })
+  async update(data: UpdateProfileRequest): Promise<UserProfileItem> {
+    if (currentMode === 'local') {
+      const local = await getLocalApi()
+      return local.localProfileApi.update(data)
+    }
+    return request<UserProfileItem>('/api/profile', { method: 'PUT', body: JSON.stringify(data) })
   },
 }
 
 export const settingsApi = {
-  getAll(): Promise<SettingItem[]> {
-    return currentMode === 'local'
-      ? localSettingsApi.getAll()
-      : request<SettingItem[]>('/api/settings')
+  async getAll(): Promise<SettingItem[]> {
+    if (currentMode === 'local') {
+      const local = await getLocalApi()
+      return local.localSettingsApi.getAll()
+    }
+    return request<SettingItem[]>('/api/settings')
   },
-  update(data: UpdateSettingRequest): Promise<SettingItem> {
-    return currentMode === 'local'
-      ? localSettingsApi.update(data)
-      : request<SettingItem>('/api/settings', { method: 'PUT', body: JSON.stringify(data) })
+  async update(data: UpdateSettingRequest): Promise<SettingItem> {
+    if (currentMode === 'local') {
+      const local = await getLocalApi()
+      return local.localSettingsApi.update(data)
+    }
+    return request<SettingItem>('/api/settings', { method: 'PUT', body: JSON.stringify(data) })
   },
-  batchUpdate(data: BatchUpdateSettingsRequest): Promise<void> {
-    return currentMode === 'local'
-      ? localSettingsApi.batchUpdate(data)
-      : request<void>('/api/settings', { method: 'POST', body: JSON.stringify(data) })
+  async batchUpdate(data: BatchUpdateSettingsRequest): Promise<void> {
+    if (currentMode === 'local') {
+      const local = await getLocalApi()
+      return local.localSettingsApi.batchUpdate(data)
+    }
+    return request<void>('/api/settings', { method: 'POST', body: JSON.stringify(data) })
   },
 }
 
 export const feedbackApi = {
-  getAll(): Promise<FeedbackItem[]> {
-    return currentMode === 'local'
-      ? localFeedbackApi.getAll()
-      : request<FeedbackItem[]>('/api/feedback')
+  async getAll(): Promise<FeedbackItem[]> {
+    if (currentMode === 'local') {
+      const local = await getLocalApi()
+      return local.localFeedbackApi.getAll()
+    }
+    return request<FeedbackItem[]>('/api/feedback')
   },
-  create(data: CreateFeedbackRequest): Promise<FeedbackItem> {
-    return currentMode === 'local'
-      ? localFeedbackApi.create(data)
-      : request<FeedbackItem>('/api/feedback', { method: 'POST', body: JSON.stringify(data) })
+  async create(data: CreateFeedbackRequest): Promise<FeedbackItem> {
+    if (currentMode === 'local') {
+      const local = await getLocalApi()
+      return local.localFeedbackApi.create(data)
+    }
+    return request<FeedbackItem>('/api/feedback', { method: 'POST', body: JSON.stringify(data) })
   },
 }
 
 export const statsApi = {
-  getCycleStats(): Promise<CycleStatsResponse> {
-    return currentMode === 'local'
-      ? localGetCycleStats()
-      : request<CycleStatsResponse>('/api/stats')
+  async getCycleStats(): Promise<CycleStatsResponse> {
+    if (currentMode === 'local') {
+      const local = await getLocalApi()
+      return local.localGetCycleStats()
+    }
+    return request<CycleStatsResponse>('/api/stats')
   },
 }
 
 export const dashboardApi = {
-  get(): Promise<DashboardResponse> {
-    return currentMode === 'local'
-      ? localGetDashboard()
-      : request<DashboardResponse>('/api/dashboard')
+  async get(): Promise<DashboardResponse> {
+    if (currentMode === 'local') {
+      const local = await getLocalApi()
+      return local.localGetDashboard()
+    }
+    return request<DashboardResponse>('/api/dashboard')
   },
 }
 
 export const calendarApi = {
-  getMonth(year: number, month: number): Promise<CalendarMonthResponse> {
-    return currentMode === 'local'
-      ? localGetCalendarMonth(year, month)
-      : request<CalendarMonthResponse>(`/api/calendar?year=${year}&month=${month}`)
+  async getMonth(year: number, month: number): Promise<CalendarMonthResponse> {
+    if (currentMode === 'local') {
+      const local = await getLocalApi()
+      return local.localGetCalendarMonth(year, month)
+    }
+    return request<CalendarMonthResponse>(`/api/calendar?year=${year}&month=${month}`)
   },
 }
 
 export const exportApi = {
-  getData(): Promise<ExportDataResponse> {
-    return currentMode === 'local'
-      ? localExportData() as Promise<ExportDataResponse>
-      : request<ExportDataResponse>('/api/export')
+  async getData(): Promise<ExportDataResponse> {
+    if (currentMode === 'local') {
+      const local = await getLocalApi()
+      return local.localExportData() as Promise<ExportDataResponse>
+    }
+    return request<ExportDataResponse>('/api/export')
   },
 }
 
 export const seedApi = {
-  create(): Promise<unknown> {
-    return currentMode === 'local'
-      ? localSeedData()
-      : request<unknown>('/api/seed', { method: 'POST' })
+  async create(): Promise<unknown> {
+    if (currentMode === 'local') {
+      const local = await getLocalApi()
+      return local.localSeedData()
+    }
+    return request<unknown>('/api/seed', { method: 'POST' })
   },
 }
 

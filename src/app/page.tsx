@@ -4,6 +4,7 @@ import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Home, Calendar, FileText, User, Plus } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
+import { useI18n } from '@/lib/i18n';
 import {
   type Period, type DailyRecord, type UserProfile, type Setting, type TabPage,
   type CycleInfo, type CycleStats, type CalendarDay, type PeriodInfoResult,
@@ -25,6 +26,7 @@ import {
 
 // ============ Main Component ============
 export default function LunaApp() {
+  const { t } = useI18n();
   const [activeTab, setActiveTab] = useState<TabPage>('home');
   const [periods, setPeriods] = useState<Period[]>([]);
   const [records, setRecords] = useState<DailyRecord[]>([]);
@@ -40,9 +42,7 @@ export default function LunaApp() {
 
   // Action sheet state
   const [actionSheet, setActionSheet] = useState<{
-    open: boolean;
-    dateStr: string;
-    day: number;
+    open: boolean; dateStr: string; day: number;
   }>({ open: false, dateStr: '', day: 0 });
 
   // Symptom sheet state
@@ -56,6 +56,8 @@ export default function LunaApp() {
   const [selectedSymptoms, setSelectedSymptoms] = useState<string[]>([]);
   const [customSymptoms, setCustomSymptoms] = useState<string[]>([]);
   const [noteText, setNoteText] = useState('');
+  const [selectedDate, setSelectedDate] = useState<string>(formatDateStr(today));
+  const [editingDate, setEditingDate] = useState<string | null>(null);
 
   // Profile editing state
   const [profileEditOpen, setProfileEditOpen] = useState(false);
@@ -83,51 +85,42 @@ export default function LunaApp() {
     return (t.getFullYear() * 366 + t.getMonth() * 31 + t.getDate()) % 5;
   });
 
+  // Theme color state
+  const [themeColor, setThemeColorState] = useState('#e07a5f');
+
+  useEffect(() => {
+    try {
+      const saved = localStorage.getItem('luna_theme_color');
+      if (saved) setThemeColorState(saved);
+    } catch {}
+  }, []);
+
+  const setThemeColor = useCallback((color: string) => {
+    setThemeColorState(color);
+    try { localStorage.setItem('luna_theme_color', color); } catch {}
+  }, []);
+
   const { toast } = useToast();
 
-  // ============ Data Fetching (通过 API 服务层) ============
+  // ============ Data Fetching ============
   const fetchPeriods = useCallback(async () => {
-    try {
-      const data = await periodsApi.getAll();
-      setPeriods(data);
-    } catch (error) {
-      if (error instanceof ApiError) toast({ description: error.message });
-    }
+    try { const data = await periodsApi.getAll(); setPeriods(data); } catch (error) { if (error instanceof ApiError) toast({ description: error.message }); }
   }, [toast]);
 
   const fetchRecords = useCallback(async () => {
-    try {
-      const data = await recordsApi.getAll();
-      setRecords(data);
-    } catch (error) {
-      if (error instanceof ApiError) toast({ description: error.message });
-    }
+    try { const data = await recordsApi.getAll(); setRecords(data); } catch (error) { if (error instanceof ApiError) toast({ description: error.message }); }
   }, [toast]);
 
   const fetchProfile = useCallback(async () => {
-    try {
-      const data = await profileApi.get();
-      setProfile(data);
-    } catch (error) {
-      if (error instanceof ApiError) toast({ description: error.message });
-    }
+    try { const data = await profileApi.get(); setProfile(data); } catch (error) { if (error instanceof ApiError) toast({ description: error.message }); }
   }, [toast]);
 
   const fetchSettings = useCallback(async () => {
-    try {
-      const data = await settingsApi.getAll();
-      setSettings(data);
-    } catch (error) {
-      if (error instanceof ApiError) toast({ description: error.message });
-    }
+    try { const data = await settingsApi.getAll(); setSettings(data); } catch (error) { if (error instanceof ApiError) toast({ description: error.message }); }
   }, [toast]);
 
   const seedData = useCallback(async () => {
-    try {
-      await seedApi.create();
-    } catch {
-      // seed 失败静默处理
-    }
+    try { await seedApi.create(); } catch {}
   }, []);
 
   useEffect(() => {
@@ -140,34 +133,17 @@ export default function LunaApp() {
     init();
   }, [seedData, fetchPeriods, fetchRecords, fetchProfile, fetchSettings]);
 
-  // ============ Period Logic (前端仍需用于日历渲染) ============
+  // ============ Period Logic ============
   function getPeriodInfo(dateStr: string): PeriodInfoResult {
-    let isPeriod = false;
-    let isStart = false;
-    let isEnd = false;
-    let isActive = false;
-
+    let isPeriod = false, isStart = false, isEnd = false, isActive = false;
     for (const period of periods) {
       if (period.startDate && !period.endDate) {
-        if (dateStr === period.startDate) {
-          isPeriod = true; isStart = true; isEnd = true; isActive = true;
-          break
-        }
+        if (dateStr === period.startDate) { isPeriod = true; isStart = true; isEnd = true; isActive = true; break; }
         const startD = parseDate(period.startDate);
         const checkD = parseDate(dateStr);
-        if (checkD > startD && checkD <= new Date()) {
-          isPeriod = true;
-          if (dateStr === period.startDate) isStart = true;
-          isActive = true;
-          break
-        }
+        if (checkD > startD && checkD <= new Date()) { isPeriod = true; if (dateStr === period.startDate) isStart = true; isActive = true; break; }
       } else if (period.startDate && period.endDate) {
-        if (dateStr >= period.startDate && dateStr <= period.endDate) {
-          isPeriod = true;
-          if (dateStr === period.startDate) isStart = true;
-          if (dateStr === period.endDate) isEnd = true;
-          break
-        }
+        if (dateStr >= period.startDate && dateStr <= period.endDate) { isPeriod = true; if (dateStr === period.startDate) isStart = true; if (dateStr === period.endDate) isEnd = true; break; }
       }
     }
     return { isPeriod, isStart, isEnd, isActive };
@@ -182,45 +158,20 @@ export default function LunaApp() {
     const periodLength = profile?.periodLength || 5;
     const sortedPeriods = [...periods].sort((a, b) => b.startDate.localeCompare(a.startDate));
     const lastPeriod = sortedPeriods[0];
-
-    if (!lastPeriod) {
-      return {
-        phase: 'follicular', phaseDay: 1, daysUntilNext: cycleLength,
-        cycleLength, periodLength, nextPeriodDate: null, lastPeriodStart: null,
-      };
-    }
-
+    if (!lastPeriod) return { phase: 'follicular', phaseDay: 1, daysUntilNext: cycleLength, cycleLength, periodLength, nextPeriodDate: null, lastPeriodStart: null };
     const lastStart = parseDate(lastPeriod.startDate);
-    const now = new Date();
-    now.setHours(0, 0, 0, 0);
+    const now = new Date(); now.setHours(0, 0, 0, 0);
     const daysSinceStart = daysBetween(lastStart, now);
-
-    if (daysSinceStart < 0) {
-      return {
-        phase: 'follicular', phaseDay: 1, daysUntilNext: cycleLength,
-        cycleLength, periodLength, nextPeriodDate: null, lastPeriodStart: lastPeriod.startDate,
-      };
-    }
-
+    if (daysSinceStart < 0) return { phase: 'follicular', phaseDay: 1, daysUntilNext: cycleLength, cycleLength, periodLength, nextPeriodDate: null, lastPeriodStart: lastPeriod.startDate };
     const dayInCycle = (daysSinceStart % cycleLength) + 1;
     const nextPeriodDate = addDays(lastStart, cycleLength);
     const daysUntilNext = Math.max(0, daysBetween(now, nextPeriodDate));
-
     let phase: string;
-    if (dayInCycle <= periodLength) {
-      phase = 'period';
-    } else if (dayInCycle <= 13) {
-      phase = 'follicular';
-    } else if (dayInCycle <= 16) {
-      phase = 'ovulation';
-    } else {
-      phase = 'luteal';
-    }
-
-    return {
-      phase, phaseDay: dayInCycle, daysUntilNext,
-      cycleLength, periodLength, nextPeriodDate, lastPeriodStart: lastPeriod.startDate,
-    };
+    if (dayInCycle <= periodLength) phase = 'period';
+    else if (dayInCycle <= 13) phase = 'follicular';
+    else if (dayInCycle <= 16) phase = 'ovulation';
+    else phase = 'luteal';
+    return { phase, phaseDay: dayInCycle, daysUntilNext, cycleLength, periodLength, nextPeriodDate, lastPeriodStart: lastPeriod.startDate };
   }
 
   function getPredictedPeriodDays(): string[] {
@@ -229,14 +180,9 @@ export default function LunaApp() {
     const sortedPeriods = [...periods].sort((a, b) => b.startDate.localeCompare(a.startDate));
     const lastPeriod = sortedPeriods[0];
     if (!lastPeriod || !lastPeriod.endDate) return [];
-
     const lastEnd = parseDate(lastPeriod.endDate);
     const nextStart = addDays(lastEnd, cycleLength - periodLength + 1);
-    const days: string[] = [];
-    for (let i = 0; i < periodLength; i++) {
-      days.push(formatDateStr(addDays(nextStart, i)));
-    }
-    return days;
+    return Array.from({ length: periodLength }, (_, i) => formatDateStr(addDays(nextStart, i)));
   }
 
   function getFertileDays(): string[] {
@@ -244,541 +190,198 @@ export default function LunaApp() {
     const sortedPeriods = [...periods].sort((a, b) => b.startDate.localeCompare(a.startDate));
     const lastPeriod = sortedPeriods[0];
     if (!lastPeriod) return [];
-
     const lastStart = parseDate(lastPeriod.startDate);
     const ovulationDay = addDays(lastStart, cycleLength - 14);
-    const days: string[] = [];
-    for (let i = -4; i <= 1; i++) {
-      days.push(formatDateStr(addDays(ovulationDay, i)));
-    }
-    return days;
+    return Array.from({ length: 6 }, (_, i) => formatDateStr(addDays(ovulationDay, i - 4)));
   }
 
-  // ============ API Actions (通过 API 服务层) ============
+  // ============ API Actions ============
   async function startPeriod(dateStr: string) {
-    try {
-      await periodsApi.create({ startDate: dateStr });
-      setActionSheet({ open: false, dateStr: '', day: 0 });
-      await fetchPeriods();
-      toast({ description: '已记录经期开始 💖' });
-    } catch (error) {
-      if (error instanceof ApiError) toast({ description: error.message });
-    }
+    try { await periodsApi.create({ startDate: dateStr }); setActionSheet({ open: false, dateStr: '', day: 0 }); await fetchPeriods(); toast({ description: t('action_period_started') }); } catch (error) { if (error instanceof ApiError) toast({ description: error.message }); }
   }
-
   async function endPeriod(dateStr: string) {
-    const active = hasActivePeriod();
-    if (!active) return;
-    if (dateStr < active.startDate) {
-      toast({ description: '结束日期不能早于开始日期' });
-      return;
-    }
-    try {
-      await periodsApi.update(active.id, { endDate: dateStr });
-      setActionSheet({ open: false, dateStr: '', day: 0 });
-      await fetchPeriods();
-      toast({ description: '经期已结束，记录完成 ✅' });
-    } catch (error) {
-      if (error instanceof ApiError) toast({ description: error.message });
-    }
+    const active = hasActivePeriod(); if (!active) return;
+    if (dateStr < active.startDate) { toast({ description: t('action_end_before_start') }); return; }
+    try { await periodsApi.update(active.id, { endDate: dateStr }); setActionSheet({ open: false, dateStr: '', day: 0 }); await fetchPeriods(); toast({ description: t('action_period_ended') }); } catch (error) { if (error instanceof ApiError) toast({ description: error.message }); }
   }
-
   async function updateStart(dateStr: string) {
-    const active = hasActivePeriod();
-    if (!active) return;
-    try {
-      await periodsApi.update(active.id, { startDate: dateStr });
-      setActionSheet({ open: false, dateStr: '', day: 0 });
-      await fetchPeriods();
-      toast({ description: '开始日期已更新' });
-    } catch (error) {
-      if (error instanceof ApiError) toast({ description: error.message });
-    }
+    const active = hasActivePeriod(); if (!active) return;
+    try { await periodsApi.update(active.id, { startDate: dateStr }); setActionSheet({ open: false, dateStr: '', day: 0 }); await fetchPeriods(); toast({ description: t('action_start_updated') }); } catch (error) { if (error instanceof ApiError) toast({ description: error.message }); }
   }
-
   async function cancelActivePeriod() {
-    const active = hasActivePeriod();
-    if (!active) return;
-    try {
-      await periodsApi.delete(active.id);
-      setActionSheet({ open: false, dateStr: '', day: 0 });
-      await fetchPeriods();
-      toast({ description: '已取消当前记录' });
-    } catch (error) {
-      if (error instanceof ApiError) toast({ description: error.message });
-    }
+    const active = hasActivePeriod(); if (!active) return;
+    try { await periodsApi.delete(active.id); setActionSheet({ open: false, dateStr: '', day: 0 }); await fetchPeriods(); toast({ description: t('action_period_cancelled') }); } catch (error) { if (error instanceof ApiError) toast({ description: error.message }); }
   }
-
   async function extendPeriod(dateStr: string) {
     const sortedPeriods = [...periods].sort((a, b) => b.startDate.localeCompare(a.startDate));
-    const lastPeriod = sortedPeriods[0];
-    if (!lastPeriod) return;
-    try {
-      await periodsApi.update(lastPeriod.id, { endDate: dateStr });
-      setActionSheet({ open: false, dateStr: '', day: 0 });
-      await fetchPeriods();
-      toast({ description: '经期已延长' });
-    } catch (error) {
-      if (error instanceof ApiError) toast({ description: error.message });
-    }
+    const lastPeriod = sortedPeriods[0]; if (!lastPeriod) return;
+    try { await periodsApi.update(lastPeriod.id, { endDate: dateStr }); setActionSheet({ open: false, dateStr: '', day: 0 }); await fetchPeriods(); toast({ description: t('action_period_extended') }); } catch (error) { if (error instanceof ApiError) toast({ description: error.message }); }
   }
 
   async function saveRecord() {
-    const todayStr = formatDateStr(new Date());
-    try {
-      await recordsApi.upsert({
-        date: todayStr,
-        flow: currentFlow,
-        mood: currentMood,
-        symptoms: selectedSymptoms,
-        note: noteText,
-      });
-      await fetchRecords();
-      setNoteText('');
-      toast({ description: '记录已保存 ✨' });
-    } catch (error) {
-      if (error instanceof ApiError) toast({ description: error.message });
-    }
+    try { await recordsApi.upsert({ date: formatDateStr(new Date()), flow: currentFlow, mood: currentMood, symptoms: selectedSymptoms, note: noteText }); await fetchRecords(); setNoteText(''); toast({ description: t('log_record_saved') }); } catch (error) { if (error instanceof ApiError) toast({ description: error.message }); }
+  }
+
+  async function saveRecordForDate(date: string) {
+    try { await recordsApi.upsert({ date, flow: currentFlow, mood: currentMood, symptoms: selectedSymptoms, note: noteText }); await fetchRecords(); setNoteText(''); setEditingDate(null); toast({ description: t('log_record_saved') }); } catch (error) { if (error instanceof ApiError) toast({ description: error.message }); }
+  }
+
+  async function updateRecord(date: string) {
+    try { await recordsApi.updateByDate(date, { flow: currentFlow, mood: currentMood, symptoms: selectedSymptoms, note: noteText }); await fetchRecords(); setNoteText(''); setEditingDate(null); toast({ description: t('log_record_updated') }); } catch (error) { if (error instanceof ApiError) toast({ description: error.message }); }
   }
 
   async function toggleSetting(key: string, currentValue: string) {
-    const newValue = currentValue === 'true' ? 'false' : 'true';
-    try {
-      await settingsApi.update({ key, value: newValue });
-      await fetchSettings();
-    } catch (error) {
-      if (error instanceof ApiError) toast({ description: error.message });
-    }
+    const nv = currentValue === 'true' ? 'false' : 'true';
+    try { await settingsApi.update({ key, value: nv }); await fetchSettings(); } catch (error) { if (error instanceof ApiError) toast({ description: error.message }); }
   }
 
   async function saveProfile() {
-    try {
-      await profileApi.update({
-        name: editName,
-        avatar: editAvatar,
-        cycleLength: editCycleLength,
-        periodLength: editPeriodLength,
-      });
-      await fetchProfile();
-      setProfileEditOpen(false);
-      toast({ description: '个人资料已更新 ✅' });
-    } catch (error) {
-      if (error instanceof ApiError) toast({ description: error.message });
-    }
+    try { await profileApi.update({ name: editName, avatar: editAvatar, cycleLength: editCycleLength, periodLength: editPeriodLength }); await fetchProfile(); setProfileEditOpen(false); toast({ description: t('edit_profile_updated') }); } catch (error) { if (error instanceof ApiError) toast({ description: error.message }); }
   }
 
   async function submitFeedback() {
-    if (!feedbackContent.trim()) {
-      toast({ description: '请输入反馈内容' });
-      return;
-    }
+    if (!feedbackContent.trim()) { toast({ description: t('feedback_content_required') }); return; }
     setFeedbackSubmitting(true);
-    try {
-      await feedbackApi.create({
-        category: feedbackCategory,
-        content: feedbackContent.trim(),
-        contact: feedbackContact.trim(),
-      });
-      setFeedbackOpen(false);
-      setFeedbackContent('');
-      setFeedbackContact('');
-      setFeedbackCategory('功能建议');
-      toast({ description: '感谢您的反馈！我们会认真处理 💖' });
-    } catch (error) {
-      if (error instanceof ApiError) {
-        toast({ description: error.message });
-      } else {
-        toast({ description: '提交失败，请稍后重试' });
-      }
-    } finally {
-      setFeedbackSubmitting(false);
-    }
+    try { await feedbackApi.create({ category: feedbackCategory, content: feedbackContent.trim(), contact: feedbackContact.trim() }); setFeedbackOpen(false); setFeedbackContent(''); setFeedbackContact(''); setFeedbackCategory('功能建议'); toast({ description: t('feedback_success') }); } catch (error) { if (error instanceof ApiError) toast({ description: error.message }); else toast({ description: '提交失败，请稍后重试' }); } finally { setFeedbackSubmitting(false); }
   }
 
   function handleAvatarUpload(e: React.ChangeEvent<HTMLInputElement>) {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    if (file.size > 2 * 1024 * 1024) {
-      toast({ description: '图片大小不能超过2MB' });
-      return;
-    }
+    const file = e.target.files?.[0]; if (!file) return;
+    if (file.size > 2 * 1024 * 1024) { toast({ description: '图片大小不能超过2MB' }); return; }
     const reader = new FileReader();
-    reader.onload = (ev) => {
-      const result = ev.target?.result as string;
-      setEditAvatar(result);
-    };
+    reader.onload = (ev) => { setEditAvatar(ev.target?.result as string); };
     reader.readAsDataURL(file);
   }
 
   async function deleteRecord(id: string) {
-    const d = deleteConfirm.date;
-    try {
-      await recordsApi.deleteByDate(d);
-      setDeleteConfirm({ open: false, recordId: '', date: '' });
-      await fetchRecords();
-      toast({ description: '记录已删除' });
-    } catch (error) {
-      if (error instanceof ApiError) toast({ description: error.message });
-    }
+    try { await recordsApi.deleteByDate(deleteConfirm.date); setDeleteConfirm({ open: false, recordId: '', date: '' }); await fetchRecords(); toast({ description: t('log_record_deleted') }); } catch (error) { if (error instanceof ApiError) toast({ description: error.message }); }
   }
 
   async function exportCSV() {
+    try { const data = await exportApi.getData(); const BOM = '\uFEFF'; const blob = new Blob([BOM + data.csvContent], { type: 'text/csv;charset=utf-8;' }); const url = URL.createObjectURL(blob); const a = document.createElement('a'); a.href = url; a.download = `luna_records_${formatDateStr(new Date())}.csv`; a.click(); URL.revokeObjectURL(url); toast({ description: '数据导出成功 📁' }); } catch (error) { if (error instanceof ApiError) toast({ description: error.message }); }
+  }
+
+  async function resetData() {
     try {
-      const data = await exportApi.getData();
-      const BOM = '\uFEFF';
-      const blob = new Blob([BOM + data.csvContent], { type: 'text/csv;charset=utf-8;' });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = `luna_records_${formatDateStr(new Date())}.csv`;
-      a.click();
-      URL.revokeObjectURL(url);
-      toast({ description: '数据导出成功 📁' });
-    } catch (error) {
-      if (error instanceof ApiError) toast({ description: error.message });
-    }
+      // Clear all data via API
+      for (const p of periods) { try { await periodsApi.delete(p.id); } catch {} }
+      for (const r of records) { try { await recordsApi.deleteByDate(r.date); } catch {} }
+      await seedData();
+      await Promise.all([fetchPeriods(), fetchRecords(), fetchProfile(), fetchSettings()]);
+      toast({ description: t('reset_success') });
+    } catch { toast({ description: '重置失败' }); }
   }
 
   // ============ Calendar Generation ============
   function generateCalendarDays(): CalendarDay[] {
     const firstDay = new Date(calYear, calMonth - 1, 1);
-    const lastDay = new Date(calYear, calMonth, 0);
     const startDayOfWeek = firstDay.getDay();
-    const totalDays = lastDay.getDate();
+    const totalDays = new Date(calYear, calMonth, 0).getDate();
     const todayStr = formatDateStr(new Date());
     const predictedDays = getPredictedPeriodDays();
     const fertileDays = getFertileDays();
-
     const days: CalendarDay[] = [];
-
-    for (let i = 0; i < startDayOfWeek; i++) {
-      days.push({
-        day: 0, dateStr: '', isToday: false, isOtherMonth: true,
-        periodInfo: { isPeriod: false, isStart: false, isEnd: false, isActive: false },
-        isPredicted: false, isFertile: false,
-      });
-    }
-
+    for (let i = 0; i < startDayOfWeek; i++) days.push({ day: 0, dateStr: '', isToday: false, isOtherMonth: true, periodInfo: { isPeriod: false, isStart: false, isEnd: false, isActive: false }, isPredicted: false, isFertile: false });
     for (let day = 1; day <= totalDays; day++) {
       const dateStr = `${calYear}-${String(calMonth).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
-      const isToday = dateStr === todayStr;
       const periodInfo = getPeriodInfo(dateStr);
-      const isPredicted = predictedDays.includes(dateStr) && !periodInfo.isPeriod;
-      const isFertile = fertileDays.includes(dateStr) && !periodInfo.isPeriod && !isPredicted;
-
-      days.push({ day, dateStr, isToday, isOtherMonth: false, periodInfo, isPredicted, isFertile });
+      days.push({ day, dateStr, isToday: dateStr === todayStr, isOtherMonth: false, periodInfo, isPredicted: predictedDays.includes(dateStr) && !periodInfo.isPeriod, isFertile: fertileDays.includes(dateStr) && !periodInfo.isPeriod && !predictedDays.includes(dateStr) });
     }
-
     return days;
   }
 
   // ============ Cycle Statistics ============
   const cycleStats: CycleStats = useMemo(() => {
-    const sortedPeriods = [...periods].sort((a, b) => a.startDate.localeCompare(b.startDate));
-    const cycleLengths: number[] = [];
-    const periodLengths: number[] = [];
-
-    for (let i = 1; i < sortedPeriods.length; i++) {
-      if (sortedPeriods[i].endDate) {
-        const cycleLen = daysBetween(parseDate(sortedPeriods[i - 1].startDate), parseDate(sortedPeriods[i].startDate));
-        if (cycleLen > 15 && cycleLen < 50) cycleLengths.push(cycleLen);
-      }
-      if (sortedPeriods[i].endDate) {
-        const periodLen = daysBetween(parseDate(sortedPeriods[i].startDate), parseDate(sortedPeriods[i].endDate!)) + 1;
-        if (periodLen > 0 && periodLen < 15) periodLengths.push(periodLen);
-      }
+    const sp = [...periods].sort((a, b) => a.startDate.localeCompare(b.startDate));
+    const cl: number[] = [], pl: number[] = [];
+    for (let i = 1; i < sp.length; i++) {
+      if (sp[i].endDate) { const c = daysBetween(parseDate(sp[i - 1].startDate), parseDate(sp[i].startDate)); if (c > 15 && c < 50) cl.push(c); }
+      if (sp[i].endDate) { const p = daysBetween(parseDate(sp[i].startDate), parseDate(sp[i].endDate!)) + 1; if (p > 0 && p < 15) pl.push(p); }
     }
-
-    const avgCycle = cycleLengths.length > 0
-      ? Math.round(cycleLengths.reduce((a, b) => a + b, 0) / cycleLengths.length)
-      : (profile?.cycleLength || 28);
-    const avgPeriod = periodLengths.length > 0
-      ? Math.round(periodLengths.reduce((a, b) => a + b, 0) / periodLengths.length)
-      : (profile?.periodLength || 5);
-
-    return {
-      avgCycle,
-      avgPeriod,
-      totalCycles: sortedPeriods.length,
-      cycleLengths,
-      periodLengths,
-    };
+    return { avgCycle: cl.length > 0 ? Math.round(cl.reduce((a, b) => a + b, 0) / cl.length) : (profile?.cycleLength || 28), avgPeriod: pl.length > 0 ? Math.round(pl.reduce((a, b) => a + b, 0) / pl.length) : (profile?.periodLength || 5), totalCycles: sp.length, cycleLengths: cl, periodLengths: pl };
   }, [periods, profile]);
 
-  // ============ Render Helpers ============
   const cycleInfo = getCycleInfo();
   const phaseData = PHASE_INFO[cycleInfo.phase] || PHASE_INFO.follicular;
   const isCurrentMonth = calYear === today.getFullYear() && calMonth === today.getMonth() + 1;
   const calendarDays = generateCalendarDays();
 
-  // ============ RENDER ============
   return (
     <div className="min-h-screen bg-[#0f1419] text-[#f0ece4] flex flex-col overflow-hidden relative">
-      {/* Animated Background Blobs */}
+      {/* Background */}
       <div className="fixed inset-0 overflow-hidden pointer-events-none z-0">
-        <div className="absolute rounded-full opacity-30 blur-[80px]"
-          style={{
-            width: 300, height: 300,
-            background: `linear-gradient(135deg, ${phaseData.color}40, transparent)`,
-            top: -80, right: -80,
-            animation: 'blob-float 20s ease-in-out infinite',
-            transition: 'background 1s ease',
-          }} />
-        <div className="absolute rounded-full opacity-25 blur-[60px]"
-          style={{
-            width: 250, height: 250,
-            background: 'linear-gradient(135deg, #81b29a, transparent)',
-            bottom: 200, left: -80,
-            animation: 'blob-float 20s ease-in-out infinite',
-            animationDelay: '-7s',
-          }} />
-        <div className="absolute rounded-full opacity-20 blur-[50px]"
-          style={{
-            width: 180, height: 180,
-            background: 'linear-gradient(135deg, #d4a574, transparent)',
-            bottom: -40, right: -40,
-            animation: 'blob-float 20s ease-in-out infinite',
-            animationDelay: '-14s',
-          }} />
+        <div className="absolute rounded-full opacity-30 blur-[80px]" style={{ width: 300, height: 300, background: `linear-gradient(135deg, ${themeColor}40, transparent)`, top: -80, right: -80, animation: 'blob-float 20s ease-in-out infinite', transition: 'background 1s ease' }} />
+        <div className="absolute rounded-full opacity-25 blur-[60px]" style={{ width: 250, height: 250, background: 'linear-gradient(135deg, #81b29a, transparent)', bottom: 200, left: -80, animation: 'blob-float 20s ease-in-out infinite', animationDelay: '-7s' }} />
+        <div className="absolute rounded-full opacity-20 blur-[50px]" style={{ width: 180, height: 180, background: `linear-gradient(135deg, ${themeColor}80, transparent)`, bottom: -40, right: -40, animation: 'blob-float 20s ease-in-out infinite', animationDelay: '-14s' }} />
       </div>
 
-      {/* Main Content Area */}
+      {/* Main Content */}
       <main className="flex-1 relative z-10 overflow-y-auto overflow-x-hidden safe-top" style={{ paddingBottom: 90 }}>
         <AnimatePresence mode="wait">
-          {activeTab === 'home' && (
-            <HomeTab
-              today={today}
-              cycleInfo={cycleInfo}
-              cycleStats={cycleStats}
-              records={records}
-              dailyTipIndex={dailyTipIndex}
-              setDailyTipIndex={setDailyTipIndex}
-              setActiveTab={setActiveTab}
-              setLogTab={setLogTab}
-              ringAnimated={ringAnimated}
-            />
-          )}
-
-          {activeTab === 'calendar' && (
-            <CalendarTab
-              calYear={calYear}
-              calMonth={calMonth}
-              setCalYear={setCalYear}
-              setCalMonth={setCalMonth}
-              isCurrentMonth={isCurrentMonth}
-              today={today}
-              calendarDays={calendarDays}
-              periods={periods}
-              setActionSheet={setActionSheet}
-            />
-          )}
-
-          {activeTab === 'log' && (
-            <LogTab
-              today={today}
-              logTab={logTab}
-              setLogTab={setLogTab}
-              currentFlow={currentFlow}
-              setCurrentFlow={setCurrentFlow}
-              currentMood={currentMood}
-              setCurrentMood={setCurrentMood}
-              selectedSymptoms={selectedSymptoms}
-              setSelectedSymptoms={setSelectedSymptoms}
-              customSymptoms={customSymptoms}
-              noteText={noteText}
-              setNoteText={setNoteText}
-              records={records}
-              saveRecord={saveRecord}
-              setSymptomSheetOpen={setSymptomSheetOpen}
-              setDeleteConfirm={setDeleteConfirm}
-              cycleInfo={cycleInfo}
-            />
-          )}
-
-          {activeTab === 'profile' && (
-            <ProfileTab
-              profile={profile}
-              records={records}
-              periods={periods}
-              cycleStats={cycleStats}
-              settings={settings}
-              cycleInfo={cycleInfo}
-              setProfileEditOpen={setProfileEditOpen}
-              setEditName={setEditName}
-              setEditAvatar={setEditAvatar}
-              setEditCycleLength={setEditCycleLength}
-              setEditPeriodLength={setEditPeriodLength}
-              toggleSetting={toggleSetting}
-              exportCSV={exportCSV}
-              setFeedbackOpen={setFeedbackOpen}
-              toast={toast}
-            />
-          )}
+          {activeTab === 'home' && <HomeTab today={today} cycleInfo={cycleInfo} cycleStats={cycleStats} records={records} dailyTipIndex={dailyTipIndex} setDailyTipIndex={setDailyTipIndex} setActiveTab={setActiveTab} setLogTab={setLogTab} ringAnimated={ringAnimated} />}
+          {activeTab === 'calendar' && <CalendarTab calYear={calYear} calMonth={calMonth} setCalYear={setCalYear} setCalMonth={setCalMonth} isCurrentMonth={isCurrentMonth} today={today} calendarDays={calendarDays} periods={periods} setActionSheet={setActionSheet} />}
+          {activeTab === 'log' && <LogTab today={today} logTab={logTab} setLogTab={setLogTab} currentFlow={currentFlow} setCurrentFlow={setCurrentFlow} currentMood={currentMood} setCurrentMood={setCurrentMood} selectedSymptoms={selectedSymptoms} setSelectedSymptoms={setSelectedSymptoms} customSymptoms={customSymptoms} noteText={noteText} setNoteText={setNoteText} records={records} saveRecord={saveRecord} saveRecordForDate={saveRecordForDate} updateRecord={updateRecord} setSymptomSheetOpen={setSymptomSheetOpen} setDeleteConfirm={setDeleteConfirm} cycleInfo={cycleInfo} editingDate={editingDate} setEditingDate={setEditingDate} selectedDate={selectedDate} setSelectedDate={setSelectedDate} />}
+          {activeTab === 'profile' && <ProfileTab profile={profile} records={records} periods={periods} cycleStats={cycleStats} settings={settings} cycleInfo={cycleInfo} setProfileEditOpen={setProfileEditOpen} setEditName={setEditName} setEditAvatar={setEditAvatar} setEditCycleLength={setEditCycleLength} setEditPeriodLength={setEditPeriodLength} toggleSetting={toggleSetting} exportCSV={exportCSV} setFeedbackOpen={setFeedbackOpen} toast={toast} resetData={resetData} themeColor={themeColor} setThemeColor={setThemeColor} />}
         </AnimatePresence>
       </main>
 
-      {/* ============ Bottom Navigation ============ */}
-      <nav className="fixed bottom-0 left-0 right-0 z-50 safe-bottom"
-        style={{ background: 'linear-gradient(to top, #0f1419 80%, transparent)' }}>
+      {/* Bottom Navigation */}
+      <nav className="fixed bottom-0 left-0 right-0 z-50 safe-bottom" style={{ background: 'linear-gradient(to top, #0f1419 80%, transparent)' }}>
         <div className="flex justify-around items-center pb-5 pt-2">
           {[
-            { page: 'home' as TabPage, icon: Home, label: '首页' },
-            { page: 'calendar' as TabPage, icon: Calendar, label: '日历' },
+            { page: 'home' as TabPage, icon: Home, label: t('tab_home') },
+            { page: 'calendar' as TabPage, icon: Calendar, label: t('tab_calendar') },
           ].map(item => (
-            <button
-              key={item.page}
-              className="flex flex-col items-center gap-1 px-4 py-2 rounded-2xl transition-all"
-              style={{ background: activeTab === item.page ? 'rgba(255,255,255,0.05)' : 'transparent' }}
-              onClick={() => setActiveTab(item.page)}
-            >
-              <item.icon size={22} style={{ color: activeTab === item.page ? '#e07a5f' : '#6b7280' }} />
-              <span className="text-[11px] font-medium" style={{ color: activeTab === item.page ? '#e07a5f' : '#6b7280' }}>
-                {item.label}
-              </span>
+            <button key={item.page} className="flex flex-col items-center gap-1 px-4 py-2 rounded-2xl transition-all" style={{ background: activeTab === item.page ? 'rgba(255,255,255,0.05)' : 'transparent' }} onClick={() => setActiveTab(item.page)}>
+              <item.icon size={22} style={{ color: activeTab === item.page ? themeColor : '#6b7280' }} />
+              <span className="text-[11px] font-medium" style={{ color: activeTab === item.page ? themeColor : '#6b7280' }}>{item.label}</span>
             </button>
           ))}
-
-          {/* FAB Button */}
-          <motion.button
-            className="w-14 h-14 rounded-full flex items-center justify-center -mt-5"
-            style={{
-              background: 'linear-gradient(135deg, #e07a5f, #d4a574)',
-              boxShadow: '0 8px 24px rgba(224,122,95,0.35)',
-            }}
-            whileTap={{ scale: 0.9 }}
-            whileHover={{ scale: 1.05 }}
-            onClick={() => {
-              const todayStr = formatDateStr(new Date());
-              setActionSheet({ open: true, dateStr: todayStr, day: new Date().getDate() });
-            }}
-          >
+          <motion.button className="w-14 h-14 rounded-full flex items-center justify-center -mt-5" style={{ background: `linear-gradient(135deg, ${themeColor}, ${themeColor}cc)`, boxShadow: `0 8px 24px ${themeColor}59` }} whileTap={{ scale: 0.9 }} whileHover={{ scale: 1.05 }} onClick={() => { const todayStr = formatDateStr(new Date()); setActionSheet({ open: true, dateStr: todayStr, day: new Date().getDate() }); }}>
             <Plus size={26} style={{ color: '#0f1419', strokeWidth: 2.5 }} />
           </motion.button>
-
           {[
-            { page: 'log' as TabPage, icon: FileText, label: '记录' },
-            { page: 'profile' as TabPage, icon: User, label: '我的' },
+            { page: 'log' as TabPage, icon: FileText, label: t('tab_log') },
+            { page: 'profile' as TabPage, icon: User, label: t('tab_profile') },
           ].map(item => (
-            <button
-              key={item.page}
-              className="flex flex-col items-center gap-1 px-4 py-2 rounded-2xl transition-all"
-              style={{ background: activeTab === item.page ? 'rgba(255,255,255,0.05)' : 'transparent' }}
-              onClick={() => setActiveTab(item.page)}
-            >
-              <item.icon size={22} style={{ color: activeTab === item.page ? '#e07a5f' : '#6b7280' }} />
-              <span className="text-[11px] font-medium" style={{ color: activeTab === item.page ? '#e07a5f' : '#6b7280' }}>
-                {item.label}
-              </span>
+            <button key={item.page} className="flex flex-col items-center gap-1 px-4 py-2 rounded-2xl transition-all" style={{ background: activeTab === item.page ? 'rgba(255,255,255,0.05)' : 'transparent' }} onClick={() => setActiveTab(item.page)}>
+              <item.icon size={22} style={{ color: activeTab === item.page ? themeColor : '#6b7280' }} />
+              <span className="text-[11px] font-medium" style={{ color: activeTab === item.page ? themeColor : '#6b7280' }}>{item.label}</span>
             </button>
           ))}
         </div>
       </nav>
 
-      {/* ============ Action Sheet ============ */}
-      <ActionSheet
-        open={actionSheet.open}
-        dateStr={actionSheet.dateStr}
-        day={actionSheet.day}
-        calMonth={calMonth}
-        setActionSheet={setActionSheet}
-        periods={periods}
-        hasActivePeriod={hasActivePeriod}
-        getPeriodInfo={getPeriodInfo}
-        startPeriod={startPeriod}
-        endPeriod={endPeriod}
-        updateStart={updateStart}
-        cancelActivePeriod={cancelActivePeriod}
-        extendPeriod={extendPeriod}
-        fetchPeriods={fetchPeriods}
-        toast={toast}
-      />
+      {/* Action Sheet */}
+      <ActionSheet open={actionSheet.open} dateStr={actionSheet.dateStr} day={actionSheet.day} calMonth={calMonth} setActionSheet={setActionSheet} periods={periods} hasActivePeriod={hasActivePeriod} getPeriodInfo={getPeriodInfo} startPeriod={startPeriod} endPeriod={endPeriod} updateStart={updateStart} cancelActivePeriod={cancelActivePeriod} extendPeriod={extendPeriod} fetchPeriods={fetchPeriods} toast={toast} />
 
-      {/* ============ Add Symptom Sheet ============ */}
-      <SymptomSheet
-        open={symptomSheetOpen}
-        newSymptom={newSymptom}
-        setNewSymptom={setNewSymptom}
-        setSymptomSheetOpen={setSymptomSheetOpen}
-        setCustomSymptoms={setCustomSymptoms}
-        toast={toast}
-      />
+      {/* Symptom Sheet */}
+      <SymptomSheet open={symptomSheetOpen} newSymptom={newSymptom} setNewSymptom={setNewSymptom} setSymptomSheetOpen={setSymptomSheetOpen} setCustomSymptoms={setCustomSymptoms} toast={toast} />
 
-      {/* ============ Loading Overlay ============ */}
+      {/* Loading Overlay */}
       <AnimatePresence>
         {!isLoaded && (
-          <motion.div
-            initial={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            transition={{ duration: 0.5 }}
-            className="fixed inset-0 z-[300] flex items-center justify-center"
-            style={{ background: '#0f1419' }}
-          >
-            <motion.div
-              className="text-center"
-              initial={{ scale: 0.8, opacity: 0 }}
-              animate={{ scale: 1, opacity: 1 }}
-              transition={{ duration: 0.5 }}
-            >
-              <motion.div
-                className="w-20 h-20 rounded-full mx-auto mb-4 flex items-center justify-center"
-                style={{ background: 'linear-gradient(135deg, #e07a5f, #81b29a)' }}
-                animate={{ scale: [1, 1.05, 1] }}
-                transition={{ duration: 2, repeat: Infinity, ease: 'easeInOut' }}
-              >
+          <motion.div initial={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.5 }} className="fixed inset-0 z-[300] flex items-center justify-center" style={{ background: '#0f1419' }}>
+            <motion.div className="text-center" initial={{ scale: 0.8, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} transition={{ duration: 0.5 }}>
+              <motion.div className="w-20 h-20 rounded-full mx-auto mb-4 flex items-center justify-center" style={{ background: `linear-gradient(135deg, ${themeColor}, #81b29a)` }} animate={{ scale: [1, 1.05, 1] }} transition={{ duration: 2, repeat: Infinity, ease: 'easeInOut' }}>
                 <span className="text-3xl font-light" style={{ fontFamily: 'Georgia, serif', color: '#0f1419' }}>L</span>
               </motion.div>
               <p className="text-xl font-light" style={{ fontFamily: 'Georgia, serif' }}>Luna</p>
               <p className="text-sm mt-1" style={{ color: '#6b7280' }}>经期追踪</p>
-              <motion.div
-                className="w-16 h-1 rounded-full mx-auto mt-4"
-                style={{ background: 'linear-gradient(90deg, #e07a5f, #81b29a)' }}
-                animate={{ scaleX: [0.5, 1, 0.5] }}
-                transition={{ duration: 1.5, repeat: Infinity, ease: 'easeInOut' }}
-              />
+              <motion.div className="w-16 h-1 rounded-full mx-auto mt-4" style={{ background: `linear-gradient(90deg, ${themeColor}, #81b29a)` }} animate={{ scaleX: [0.5, 1, 0.5] }} transition={{ duration: 1.5, repeat: Infinity, ease: 'easeInOut' }} />
             </motion.div>
           </motion.div>
         )}
       </AnimatePresence>
 
-      {/* ============ Profile Edit Sheet ============ */}
-      <ProfileEditSheet
-        open={profileEditOpen}
-        editName={editName}
-        setEditName={setEditName}
-        editAvatar={editAvatar}
-        setEditAvatar={setEditAvatar}
-        editCycleLength={editCycleLength}
-        setEditCycleLength={setEditCycleLength}
-        editPeriodLength={editPeriodLength}
-        setEditPeriodLength={setEditPeriodLength}
-        setProfileEditOpen={setProfileEditOpen}
-        saveProfile={saveProfile}
-        handleAvatarUpload={handleAvatarUpload}
-        fileInputRef={fileInputRef}
-      />
+      {/* Profile Edit Sheet */}
+      <ProfileEditSheet open={profileEditOpen} editName={editName} setEditName={setEditName} editAvatar={editAvatar} setEditAvatar={setEditAvatar} editCycleLength={editCycleLength} setEditCycleLength={setEditCycleLength} editPeriodLength={editPeriodLength} setEditPeriodLength={setEditPeriodLength} setProfileEditOpen={setProfileEditOpen} saveProfile={saveProfile} handleAvatarUpload={handleAvatarUpload} fileInputRef={fileInputRef} />
 
-      {/* ============ Delete Confirmation Dialog ============ */}
-      <DeleteConfirmDialog
-        open={deleteConfirm.open}
-        recordId={deleteConfirm.recordId}
-        date={deleteConfirm.date}
-        setDeleteConfirm={setDeleteConfirm}
-        deleteRecord={deleteRecord}
-      />
+      {/* Delete Confirmation */}
+      <DeleteConfirmDialog open={deleteConfirm.open} recordId={deleteConfirm.recordId} date={deleteConfirm.date} setDeleteConfirm={setDeleteConfirm} deleteRecord={deleteRecord} />
 
-      {/* ============ Feedback Sheet ============ */}
-      <FeedbackSheet
-        open={feedbackOpen}
-        feedbackCategory={feedbackCategory}
-        setFeedbackCategory={setFeedbackCategory}
-        feedbackContent={feedbackContent}
-        setFeedbackContent={setFeedbackContent}
-        feedbackContact={feedbackContact}
-        setFeedbackContact={setFeedbackContact}
-        feedbackSubmitting={feedbackSubmitting}
-        setFeedbackOpen={setFeedbackOpen}
-        submitFeedback={submitFeedback}
-      />
+      {/* Feedback Sheet */}
+      <FeedbackSheet open={feedbackOpen} feedbackCategory={feedbackCategory} setFeedbackCategory={setFeedbackCategory} feedbackContent={feedbackContent} setFeedbackContent={setFeedbackContent} feedbackContact={feedbackContact} setFeedbackContact={setFeedbackContact} feedbackSubmitting={feedbackSubmitting} setFeedbackOpen={setFeedbackOpen} submitFeedback={submitFeedback} />
     </div>
   );
 }
