@@ -3,7 +3,6 @@
 import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Camera, X } from 'lucide-react';
-import { useToast } from '@/hooks/use-toast';
 import ImageCropDialog from './ImageCropDialog';
 
 interface ProfileEditSheetProps {
@@ -29,13 +28,11 @@ export default function ProfileEditSheet({
   // Crop dialog state
   const [cropOpen, setCropOpen] = useState(false);
   const [cropImageSrc, setCropImageSrc] = useState('');
-  const { toast } = useToast();
 
   // Intercept file selection to open crop dialog
   const onFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
-    if (file.size > 2 * 1024 * 1024) { toast({ description: '图片大小不能超过2MB' }); return; }
     const reader = new FileReader();
     reader.onload = (ev) => {
       const dataUrl = ev.target?.result as string;
