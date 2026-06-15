@@ -66,3 +66,26 @@ Stage Summary:
 - 焦虑(😰)emoji显示异常已修复
 - 根因: MOOD_LABELS/MOOD_EMOJIS与LogTab的ml数组不同步，缺少"害羞"条目导致索引错位
 - 修复后所有6个情绪emoji正确映射: 😊开心、😌平静、😳害羞、😔低落、😤烦躁、😰焦虑
+
+---
+Task ID: 3
+Agent: Main
+Task: 修复周期规律"数据不足"判断过于严格的问题 + mood验证范围修复
+
+Work Log:
+- 分析用户截图：8个周期但仍显示"数据不足"
+- 根因1: `cycle-service.ts` 计算周期长度时要求 `periods[i].endDate` 存在，但周期长度只需两个相邻经期的开始日期即可计算，不需要endDate
+  - 旧逻辑: `if (periods[i].endDate) { 计算cycleLen }` — 很多经期没有结束日期导致cycleLengths为空
+  - 新逻辑: 直接从 startDate 计算周期长度，仅经期长度(periodLengths)仍需endDate
+- 根因2: 阈值 `cycleLengths.length >= 3` 过于严格，新用户很难达到
+  - 新阈值: `cycleLengths.length >= 2`（至少2个完整周期即可判断）
+- 修复 `cycle-service.ts`: 移除cycleLength计算的endDate依赖，降低阈值到2
+- 修复 `ProfileTab.tsx`: 同步降低阈值到2，增加"数据不足"时的提示文字
+- 增加 i18n 翻译键 `profile_insufficient_tip`: 三语提示"至少需要记录2个完整经期周期才能判断规律性"
+- 同时修复了 mood API 验证范围 0-5 → 0-6（配合之前的emoji修复）
+
+Stage Summary:
+- 周期规律判断逻辑已修复，用户8个周期现在正确显示"规律"
+- 条件: 至少2个经期开始日期间隔在15-50天之间即可判断
+- 数据不足时显示提示文字告知用户需要什么条件
+- mood验证范围0-6已同步修复

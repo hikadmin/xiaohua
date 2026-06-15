@@ -114,7 +114,7 @@ export default function ProfileTab({
   const [firstPin, setFirstPin] = useState('');
 
   const cycleReg = (() => {
-    if (cycleStats.cycleLengths.length < 3) return t('profile_insufficient');
+    if (cycleStats.cycleLengths.length < 2) return t('profile_insufficient');
     const avg = cycleStats.avgCycle;
     const v = cycleStats.cycleLengths.reduce((s, l) => s + Math.pow(l - avg, 2), 0) / cycleStats.cycleLengths.length;
     return Math.sqrt(v) <= 4 ? t('profile_regular') : t('profile_irregular');
@@ -165,8 +165,13 @@ export default function ProfileTab({
         <div className="rounded-[20px] p-5 mb-4" style={{ background: '#232b35', border: '1px solid rgba(255,255,255,0.08)' }}>
           <p className="text-sm font-medium mb-4">{t('profile_health')}</p>
           <div className="space-y-4">
-            {[{ l: t('profile_avg_cycle'), v: `${cycleStats.avgCycle} ${t('common_days')}`, i: <TrendingUp size={16} style={{ color: '#81b29a' }} /> }, { l: t('profile_avg_period'), v: `${cycleStats.avgPeriod} ${t('common_days')}`, i: <Droplets size={16} style={{ color: '#e07a5f' }} /> }, { l: t('profile_last_period'), v: periods.length > 0 ? formatShortDate([...periods].sort((a, b) => b.startDate.localeCompare(a.startDate))[0].startDate) : t('profile_no_record'), i: <Calendar size={16} style={{ color: '#d4a574' }} /> }, { l: t('profile_cycle_regular'), v: cycleReg, i: <Check size={16} style={{ color: '#81b29a' }} /> }].map((item, i) => (
-              <div key={i} className="flex justify-between items-center"><div className="flex items-center gap-2">{item.i}<span className="text-sm" style={{ color: '#a8a29e' }}>{item.l}</span></div><span className="text-sm font-medium">{item.v}</span></div>
+            {[{ l: t('profile_avg_cycle'), v: `${cycleStats.avgCycle} ${t('common_days')}`, i: <TrendingUp size={16} style={{ color: '#81b29a' }} /> }, { l: t('profile_avg_period'), v: `${cycleStats.avgPeriod} ${t('common_days')}`, i: <Droplets size={16} style={{ color: '#e07a5f' }} /> }, { l: t('profile_last_period'), v: periods.length > 0 ? formatShortDate([...periods].sort((a, b) => b.startDate.localeCompare(a.startDate))[0].startDate) : t('profile_no_record'), i: <Calendar size={16} style={{ color: '#d4a574' }} /> }, { l: t('profile_cycle_regular'), v: cycleReg, i: <Check size={16} style={{ color: cycleReg === t('profile_insufficient') ? '#6b7280' : '#81b29a' }} /> }].map((item, i) => (
+              <div key={i}>
+                <div className="flex justify-between items-center"><div className="flex items-center gap-2">{item.i}<span className="text-sm" style={{ color: '#a8a29e' }}>{item.l}</span></div><span className="text-sm font-medium" style={{ color: item.v === t('profile_insufficient') ? '#6b7280' : '#f0ece4' }}>{item.v}</span></div>
+                {item.l === t('profile_cycle_regular') && item.v === t('profile_insufficient') && (
+                  <p className="text-[11px] mt-1 ml-6" style={{ color: '#6b7280' }}>{t('profile_insufficient_tip')}</p>
+                )}
+              </div>
             ))}
           </div>
         </div>
