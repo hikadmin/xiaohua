@@ -41,7 +41,7 @@ export default function FeedbackSheet({
           exit={{ y: '100%' }}
           transition={{ type: 'spring', damping: 25, stiffness: 300 }}
           className="absolute bottom-0 left-0 right-0 rounded-t-3xl p-5 pb-8"
-          style={{ background: '#1a2027', maxHeight: '85vh', overflowY: 'auto' }}
+          style={{ background: '#1a2027', maxHeight: '85dvh', overflowY: 'auto', paddingBottom: 'max(2rem, calc(env(safe-area-inset-bottom, 0px) + 1rem))' }}
           onClick={e => e.stopPropagation()}
         >
           <div className="w-9 h-1 rounded-full mx-auto mb-4 opacity-50" style={{ background: '#6b7280' }} />

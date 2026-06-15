@@ -148,8 +148,8 @@ export default function LockSetupSheet({
         >
           <div className="absolute inset-0 bg-black/60" onClick={handleClose} />
           <motion.div
-            className="relative w-full max-w-md rounded-t-[24px] p-6 pb-10 max-h-[90vh] overflow-y-auto"
-            style={{ background: '#1a2027', border: '1px solid rgba(255,255,255,0.08)' }}
+            className="relative w-full max-w-md rounded-t-[24px] p-6 overflow-y-auto"
+            style={{ background: '#1a2027', border: '1px solid rgba(255,255,255,0.08)', maxHeight: '90dvh', paddingBottom: 'max(2.5rem, calc(env(safe-area-inset-bottom, 0px) + 1.5rem))' }}
             initial={{ y: 400 }}
             animate={{ y: 0 }}
             exit={{ y: 400 }}

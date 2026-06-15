@@ -86,6 +86,9 @@ export default function LunaApp() {
   const [notifications, setNotifications] = useState<LunaNotification[]>([]);
   const [notificationPanelOpen, setNotificationPanelOpen] = useState(false);
 
+  // Profile sheet open state (to hide nav bar)
+  const [profileSheetOpen, setProfileSheetOpen] = useState(false);
+
   // Daily tip state
   const [dailyTipIndex, setDailyTipIndex] = useState(() => {
     const t = new Date();
@@ -487,12 +490,12 @@ export default function LunaApp() {
           {activeTab === 'home' && <HomeTab today={today} cycleInfo={cycleInfo} cycleStats={cycleStats} records={records} dailyTipIndex={dailyTipIndex} setDailyTipIndex={setDailyTipIndex} setActiveTab={setActiveTab} setLogTab={setLogTab} ringAnimated={ringAnimated} notificationCount={notifications.length} onOpenNotification={() => setNotificationPanelOpen(true)} />}
           {activeTab === 'calendar' && <CalendarTab calYear={calYear} calMonth={calMonth} setCalYear={setCalYear} setCalMonth={setCalMonth} isCurrentMonth={isCurrentMonth} today={today} calendarDays={calendarDays} periods={periods} setActionSheet={setActionSheet} />}
           {activeTab === 'log' && <LogTab today={today} logTab={logTab} setLogTab={setLogTab} currentFlow={currentFlow} setCurrentFlow={setCurrentFlow} currentMood={currentMood} setCurrentMood={setCurrentMood} selectedSymptoms={selectedSymptoms} setSelectedSymptoms={setSelectedSymptoms} customSymptoms={customSymptoms} noteText={noteText} setNoteText={setNoteText} records={records} saveRecord={saveRecord} saveRecordForDate={saveRecordForDate} updateRecord={updateRecord} setSymptomSheetOpen={setSymptomSheetOpen} setDeleteConfirm={setDeleteConfirm} cycleInfo={cycleInfo} editingDate={editingDate} setEditingDate={setEditingDate} selectedDate={selectedDate} setSelectedDate={setSelectedDate} />}
-          {activeTab === 'profile' && <ProfileTab profile={profile} records={records} periods={periods} cycleStats={cycleStats} settings={settings} cycleInfo={cycleInfo} setProfileEditOpen={setProfileEditOpen} setEditName={setEditName} setEditAvatar={setEditAvatar} setEditCycleLength={setEditCycleLength} setEditPeriodLength={setEditPeriodLength} toggleSetting={toggleSetting} exportCSV={exportCSV} setFeedbackOpen={setFeedbackOpen} toast={toast} resetData={resetData} themeColor={themeColor} setThemeColor={setThemeColor} wallpaper={wallpaper} setWallpaper={setWallpaper} themeScope={themeScope} setThemeScope={setThemeScope} />}
+          {activeTab === 'profile' && <ProfileTab profile={profile} records={records} periods={periods} cycleStats={cycleStats} settings={settings} cycleInfo={cycleInfo} setProfileEditOpen={setProfileEditOpen} setEditName={setEditName} setEditAvatar={setEditAvatar} setEditCycleLength={setEditCycleLength} setEditPeriodLength={setEditPeriodLength} toggleSetting={toggleSetting} exportCSV={exportCSV} setFeedbackOpen={setFeedbackOpen} toast={toast} resetData={resetData} themeColor={themeColor} setThemeColor={setThemeColor} wallpaper={wallpaper} setWallpaper={setWallpaper} themeScope={themeScope} setThemeScope={setThemeScope} onSheetOpenChange={setProfileSheetOpen} />}
         </AnimatePresence>
       </main>
 
       {/* Bottom Navigation */}
-      <nav className="fixed bottom-0 left-0 right-0 z-50 safe-bottom" style={{ background: 'linear-gradient(to top, #0f1419 80%, transparent)' }}>
+      <nav className="fixed bottom-0 left-0 right-0 z-50 safe-bottom transition-transform duration-300" style={{ background: 'linear-gradient(to top, #0f1419 80%, transparent)', transform: (profileSheetOpen || actionSheet.open || profileEditOpen || feedbackOpen || notificationPanelOpen || symptomSheetOpen) ? 'translateY(100%)' : 'translateY(0)' }}>
         <div className="flex justify-around items-center pb-5 pt-2">
           {[
             { page: 'home' as TabPage, icon: Home, label: t('tab_home') },

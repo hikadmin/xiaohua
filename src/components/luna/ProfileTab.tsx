@@ -57,6 +57,7 @@ interface ProfileTabProps {
   setWallpaper: (wp: string) => void;
   themeScope: 'local' | 'global';
   setThemeScope: (scope: 'local' | 'global') => void;
+  onSheetOpenChange?: (open: boolean) => void;
 }
 
 function ResetDataDialog({ open, onClose, onConfirm }: { open: boolean; onClose: () => void; onConfirm: () => void }) {
@@ -103,10 +104,23 @@ function BottomSheet({ open, onClose, title, children, footer }: { open: boolean
     <AnimatePresence>{open && (
       <motion.div className="fixed inset-0 z-[200] flex items-end justify-center" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
         <div className="absolute inset-0 bg-black/50" onClick={onClose} />
-        <motion.div className="relative w-full max-w-md rounded-t-[24px] max-h-[85vh] flex flex-col" style={{ background: '#1a2027', border: '1px solid rgba(255,255,255,0.08)', paddingBottom: 'max(3.5rem, calc(env(safe-area-inset-bottom, 0px) + 1.5rem))' }} initial={{ y: 300 }} animate={{ y: 0 }} exit={{ y: 300 }} transition={{ type: 'spring', damping: 25, stiffness: 300 }}>
+        <motion.div
+          className="relative w-full max-w-md rounded-t-[24px] flex flex-col"
+          style={{
+            background: '#1a2027',
+            border: '1px solid rgba(255,255,255,0.08)',
+            maxHeight: '85dvh',
+            paddingBottom: 'max(3.5rem, calc(env(safe-area-inset-bottom, 0px) + 1.5rem))',
+          }}
+          initial={{ y: 300 }}
+          animate={{ y: 0 }}
+          exit={{ y: 300 }}
+          transition={{ type: 'spring', damping: 25, stiffness: 300 }}
+        >
+          {/* Fallback for browsers without dvh support */}
           <div className="w-10 h-1 rounded-full mx-auto mb-4 mt-5 flex-shrink-0" style={{ background: 'rgba(255,255,255,0.1)' }} />
           <p className="text-lg font-medium text-center mb-4 px-6 flex-shrink-0">{title}</p>
-          <div className="flex-1 overflow-y-auto px-6 overscroll-contain" style={{ WebkitOverflowScrolling: 'touch' }}>
+          <div className="flex-1 overflow-y-auto px-6 overscroll-contain min-h-0" style={{ WebkitOverflowScrolling: 'touch' }}>
             {children}
           </div>
           {footer && (
@@ -124,7 +138,7 @@ export default function ProfileTab({
   profile, records, periods, cycleStats, settings, cycleInfo,
   setProfileEditOpen, setEditName, setEditAvatar, setEditCycleLength, setEditPeriodLength,
   toggleSetting, exportCSV, setFeedbackOpen, toast, resetData, themeColor, setThemeColor,
-  wallpaper, setWallpaper, themeScope, setThemeScope,
+  wallpaper, setWallpaper, themeScope, setThemeScope, onSheetOpenChange,
 }: ProfileTabProps) {
   const { t, locale, setLocale } = useI18n();
   const [resetOpen, setResetOpen] = useState(false);
@@ -134,6 +148,11 @@ export default function ProfileTab({
 
   // Wallpaper state
   const [wallpaperOpen, setWallpaperOpen] = useState(false);
+
+  // Track if any sheet is open to hide nav bar
+  const anySheetOpen = langOpen || themeOpen || wallpaperOpen || lockOpen;
+  useEffect(() => { onSheetOpenChange?.(anySheetOpen); }, [anySheetOpen, onSheetOpenChange]);
+
   const [wallpaperImageSrc, setWallpaperImageSrc] = useState('');
   const [cropOpen, setCropOpen] = useState(false);
   const wallpaperFileRef = useRef<HTMLInputElement>(null);

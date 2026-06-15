@@ -446,3 +446,48 @@ Stage Summary:
 - "移除壁纸"按钮始终固定在底部，不会被滚动或截断
 - 预设壁纸改为水平滚动，窄屏体验更好
 - 兼容 iPhone SE / 小屏Android / 标准手机 / 大屏手机
+
+---
+Task ID: 10
+Agent: Main
+Task: 修复自定义壁纸和语言弹窗显示不全 — 兼容所有手机型号及浏览器打开
+
+Work Log:
+- 使用 VLM 分析用户截图，发现两个核心问题：
+  1. 底部弹窗（语言/壁纸）被底部导航栏遮挡，内容截断
+  2. 通过网站浏览器打开时，浏览器工具栏进一步减少可视区域
+- 根因分析：
+  - BottomSheet 使用 `max-height: 85vh` 但浏览器 `vh` 不包含浏览器工具栏
+  - 底部导航栏(z-50)始终可见，与弹窗(z-200)内容重叠
+  - 移动浏览器(Chrome/Safari)有自己的地址栏和底部工具栏
+- 修复方案（3层防护）：
+  1. **dvh 替代 vh**: 所有底部弹窗改用 `dvh`(dynamic viewport height)替代 `vh`
+     - dvh 动态响应浏览器工具栏的显示/隐藏
+     - 添加 CSS @supports fallback 兼容不支持 dvh 的浏览器
+  2. **底部导航栏自动隐藏**: 当任何底部弹窗打开时，导航栏 translateY(100%) 隐藏
+     - ProfileTab 新增 `onSheetOpenChange` 回调通知 page.tsx
+     - page.tsx 监听所有弹窗状态(profileSheetOpen/actionSheet/profileEditOpen/feedbackOpen/notificationPanelOpen/symptomSheetOpen)
+     - 隐藏使用 CSS transition 平滑动画(300ms)
+  3. **safe-area-inset-bottom**: 所有弹窗底部 padding 使用 `max(Xrem, env(safe-area-inset-bottom) + Yrem)` 兼容全面屏/刘海屏
+- 更新的文件：
+  - `ProfileTab.tsx`: BottomSheet 用 dvh + flex 布局 + min-h-0; 新增 onSheetOpenChange prop
+  - `page.tsx`: 新增 profileSheetOpen 状态; 导航栏条件隐藏; 传递 onSheetOpenChange
+  - `ActionSheet.tsx`: 80vh → 80dvh + safe-area padding
+  - `FeedbackSheet.tsx`: 85vh → 85dvh + safe-area padding
+  - `ProfileEditSheet.tsx`: 85vh → 85dvh + safe-area padding
+  - `LockSetupSheet.tsx`: 90vh → 90dvh + safe-area padding
+  - `NotificationPanel.tsx`: 75vh → 75dvh
+  - `globals.css`: 添加 dvh fallback 规则
+- agent-browser 4种屏幕尺寸验证：
+  - 360x640 (小屏Android): ✅ 语言3选项全可见，导航栏隐藏/恢复正常
+  - 375x667 (iPhone SE): ✅ 所有弹窗内容完整，导航栏正常隐藏
+  - 393x852 (iPhone 15 Pro): ✅ 布局舒适，所有功能正常
+  - 壁纸弹窗: ✅ 选择图片/预设壁纸/移除壁纸全部可见
+- lint 通过，dev server 无报错
+
+Stage Summary:
+- 所有底部弹窗全面兼容：手机PWA + 网站浏览器打开
+- dvh 解决浏览器工具栏占用空间的问题
+- 导航栏自动隐藏消除弹窗与导航栏的重叠
+- safe-area-inset-bottom 兼容全面屏手机
+- 6个弹窗组件全部更新为 dvh + safe-area

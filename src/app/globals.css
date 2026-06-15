@@ -154,3 +154,10 @@
 .safe-top {
   padding-top: env(safe-area-inset-top, 0px);
 }
+
+/* dvh fallback for older browsers */
+@supports not (max-height: 1dvh) {
+  .dvh-fallback {
+    max-height: 85vh !important;
+  }
+}

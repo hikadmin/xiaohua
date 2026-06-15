@@ -180,7 +180,7 @@ export default function NotificationPanel({
             exit={{ y: '100%' }}
             transition={{ type: 'spring', damping: 25, stiffness: 300 }}
             className="absolute bottom-0 left-0 right-0 rounded-t-3xl flex flex-col"
-            style={{ background: '#1a2027', maxHeight: '75vh' }}
+            style={{ background: '#1a2027', maxHeight: '75dvh' }}
             onClick={e => e.stopPropagation()}
           >
             {/* Drag Handle */}
