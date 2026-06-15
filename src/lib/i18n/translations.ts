@@ -145,7 +145,7 @@ const translations = {
     lock_enter_old_pin: '请输入当前PIN码', lock_status_enabled: '应用锁已启用', lock_status_disabled: '应用锁未启用',
     lock_enabled_title: 'PIN码保护已开启', lock_enabled_desc: '每次打开应用需验证PIN码',
     lock_change_pin_desc: '修改解锁PIN码', lock_turn_off_desc: '关闭后将不再需要PIN码验证',
-    lock_security_note: 'PIN码使用SHA-256加密存储于本地，保护您的隐私安全。Android端打包后功能完整可用。',
+    lock_security_note: 'PIN码使用SHA-256加密存储于本地，保护您的隐私安全。',
   },
   en: {
     tab_home: 'Home', tab_calendar: 'Calendar', tab_log: 'Record', tab_profile: 'Me',
@@ -267,7 +267,7 @@ const translations = {
     lock_enter_old_pin: 'Enter current PIN', lock_status_enabled: 'App lock enabled', lock_status_disabled: 'App lock disabled',
     lock_enabled_title: 'PIN protection is on', lock_enabled_desc: 'PIN verification required on each app launch',
     lock_change_pin_desc: 'Change your unlock PIN', lock_turn_off_desc: 'PIN will no longer be required',
-    lock_security_note: 'PIN is encrypted with SHA-256 and stored locally to protect your privacy. Fully functional after Android packaging.',
+    lock_security_note: 'PIN is encrypted with SHA-256 and stored locally to protect your privacy.',
   },
   ko: {
     tab_home: '홈', tab_calendar: '달력', tab_log: '기록', tab_profile: '나',
@@ -389,7 +389,7 @@ const translations = {
     lock_enter_old_pin: '현재 PIN을 입력하세요', lock_status_enabled: '앱 잠금 활성화', lock_status_disabled: '앱 잠금 비활성화',
     lock_enabled_title: 'PIN 보호가 켜져 있습니다', lock_enabled_desc: '앱 실행 시 PIN 확인이 필요합니다',
     lock_change_pin_desc: '잠금 해제 PIN 변경', lock_turn_off_desc: 'PIN이 더 이상 필요하지 않습니다',
-    lock_security_note: 'PIN은 SHA-256으로 암호화되어 로컬에 저장되어 개인정보를 보호합니다. Android 패키징 후 완전히 사용 가능합니다.',
+    lock_security_note: 'PIN은 SHA-256으로 암호화되어 로컬에 저장되어 개인정보를 보호합니다.',
   },
 } as const;
 
