@@ -131,6 +131,10 @@ const translations = {
     wallpaper_remove: '移除壁纸', wallpaper_set: '壁纸已设置', wallpaper_removed: '壁纸已移除',
     // Theme scope
     theme_scope: '生效范围', theme_scope_local: '仅当前', theme_scope_global: '全局',
+    // Export
+    export_share_success: '数据已分享 📤', export_download_success: '数据导出成功 📁',
+    // Notification permission
+    notif_permission_denied: '通知权限被拒绝，请在系统设置中开启', notif_permission_required: '需要通知权限才能发送提醒',
     // Lock screen
     lock_enter_pin: '请输入PIN码', lock_unlock: '解锁',
     lock_wrong_pin_remaining: 'PIN码错误，还可尝试{0}次', lock_too_many_attempts: '尝试次数过多，请稍后再试',
@@ -247,6 +251,10 @@ const translations = {
     wallpaper_remove: 'Remove Wallpaper', wallpaper_set: 'Wallpaper set', wallpaper_removed: 'Wallpaper removed',
     // Theme scope
     theme_scope: 'Apply Scope', theme_scope_local: 'Current Only', theme_scope_global: 'Global',
+    // Export
+    export_share_success: 'Data shared 📤', export_download_success: 'Data exported 📁',
+    // Notification permission
+    notif_permission_denied: 'Notification permission denied. Please enable in system settings.', notif_permission_required: 'Notification permission required for reminders',
     // Lock screen
     lock_enter_pin: 'Enter PIN', lock_unlock: 'Unlock',
     lock_wrong_pin_remaining: 'Wrong PIN, {0} attempts left', lock_too_many_attempts: 'Too many attempts, please try later',
@@ -363,6 +371,10 @@ const translations = {
     wallpaper_remove: '배경 제거', wallpaper_set: '배경이 설정되었습니다', wallpaper_removed: '배경이 제거되었습니다',
     // Theme scope
     theme_scope: '적용 범위', theme_scope_local: '현재만', theme_scope_global: '전체',
+    // Export
+    export_share_success: '데이터 공유됨 📤', export_download_success: '데이터 내보내기 완료 📁',
+    // Notification permission
+    notif_permission_denied: '알림 권한이 거부되었습니다. 시스템 설정에서 활성화해주세요.', notif_permission_required: '알림을 보내려면 권한이 필요합니다',
     // Lock screen
     lock_enter_pin: 'PIN을 입력하세요', lock_unlock: '잠금 해제',
     lock_wrong_pin_remaining: '잘못된 PIN, {0}회 남음', lock_too_many_attempts: '시도 횟수 초과, 나중에 다시 시도하세요',

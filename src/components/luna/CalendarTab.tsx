@@ -42,13 +42,13 @@ export default function CalendarTab({
       {/* Month Navigation */}
       <div className="flex justify-between items-center mb-4">
         <button className="w-10 h-10 rounded-xl flex items-center justify-center transition-all active:scale-90"
-          style={{ background: '#232b35' }}
+          style={{ background: 'var(--luna-card)' }}
           onClick={() => {
             let m = calMonth - 1; let y = calYear;
             if (m < 1) { m = 12; y--; }
             setCalMonth(m); setCalYear(y);
           }}>
-          <ChevronLeft size={20} style={{ color: '#a8a29e' }} />
+          <ChevronLeft size={20} style={{ color: 'var(--luna-text-secondary)' }} />
         </button>
         <div className="flex items-center gap-3">
           <p className="text-xl font-light" style={{ fontFamily: 'Georgia, serif' }}>
@@ -63,20 +63,20 @@ export default function CalendarTab({
           )}
         </div>
         <button className="w-10 h-10 rounded-xl flex items-center justify-center transition-all active:scale-90"
-          style={{ background: '#232b35' }}
+          style={{ background: 'var(--luna-card)' }}
           onClick={() => {
             let m = calMonth + 1; let y = calYear;
             if (m > 12) { m = 1; y++; }
             setCalMonth(m); setCalYear(y);
           }}>
-          <ChevronRight size={20} style={{ color: '#a8a29e' }} />
+          <ChevronRight size={20} style={{ color: 'var(--luna-text-secondary)' }} />
         </button>
       </div>
 
       {/* Weekday Headers */}
       <div className="grid grid-cols-7 gap-1 mb-2">
         {WEEKDAY_SHORT_KEYS.map((wk, i) => (
-          <div key={i} className="text-center text-xs py-2 font-medium" style={{ color: i === 0 || i === 6 ? '#e07a5f80' : '#6b7280' }}>{t(wk)}</div>
+          <div key={i} className="text-center text-xs py-2 font-medium" style={{ color: i === 0 || i === 6 ? '#e07a5f80' : 'var(--luna-text-muted)' }}>{t(wk)}</div>
         ))}
       </div>
 
@@ -88,7 +88,7 @@ export default function CalendarTab({
           }
 
           let bgStyle: React.CSSProperties = {};
-          let textColor = '#f0ece4';
+          let textColor = 'var(--luna-text)';
           let borderRadius = '12px';
           let extraClass = '';
 
@@ -161,7 +161,7 @@ export default function CalendarTab({
       </div>
 
       {/* Legend */}
-      <div className="rounded-[20px] p-5" style={{ background: '#232b35', border: '1px solid rgba(255,255,255,0.08)' }}>
+      <div className="rounded-[20px] p-5" style={{ background: 'var(--luna-card)', border: '1px solid var(--luna-card-border)' }}>
         <p className="text-sm font-medium mb-4">{t('calendar_legend')}</p>
         <div className="space-y-3">
           {[
@@ -170,14 +170,14 @@ export default function CalendarTab({
             { color: '#d4a574', bg: 'rgba(212,165,116,0.25)', border: '2px solid #d4a574', label: t('calendar_fertile_window'), desc: t('calendar_fertile_desc') },
           ].map((item, i) => (
             <div key={i} className="flex items-center gap-3 p-3 rounded-xl transition-all"
-              style={{ background: '#1a2027' }}>
+              style={{ background: 'var(--luna-surface)' }}>
               <div className="w-8 h-8 rounded-[10px] flex items-center justify-center flex-shrink-0"
                 style={{ background: item.bg, border: item.border }}>
                 <div className="w-2.5 h-2.5 rounded-full" style={{ background: item.color }} />
               </div>
               <div className="flex-1">
                 <p className="text-sm font-medium">{item.label}</p>
-                <p className="text-xs" style={{ color: '#6b7280' }}>{item.desc}</p>
+                <p className="text-xs" style={{ color: 'var(--luna-text-muted)' }}>{item.desc}</p>
               </div>
             </div>
           ))}
@@ -186,7 +186,7 @@ export default function CalendarTab({
 
       {/* Cycle History Summary */}
       {periods.length > 1 && (
-        <div className="rounded-[20px] p-5 mt-4" style={{ background: '#232b35', border: '1px solid rgba(255,255,255,0.08)' }}>
+        <div className="rounded-[20px] p-5 mt-4" style={{ background: 'var(--luna-card)', border: '1px solid var(--luna-card-border)' }}>
           <p className="text-sm font-medium mb-4">{t('calendar_cycle_history')}</p>
           {[...periods].sort((a, b) => b.startDate.localeCompare(a.startDate)).slice(0, 5).map(period => {
             const startD = parseDate(period.startDate);
@@ -207,7 +207,7 @@ export default function CalendarTab({
                     }
                   </p>
                 </div>
-                <span className="text-xs px-2 py-1 rounded-md" style={{ background: 'rgba(255,255,255,0.05)', color: '#a8a29e' }}>
+                <span className="text-xs px-2 py-1 rounded-md" style={{ background: 'rgba(255,255,255,0.05)', color: 'var(--luna-text-secondary)' }}>
                   {len !== null ? t('calendar_n_days', len) : t('calendar_ongoing')}
                 </span>
               </div>

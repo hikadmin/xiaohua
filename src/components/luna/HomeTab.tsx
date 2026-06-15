@@ -85,15 +85,15 @@ export default function HomeTab({
       <StaggerIn delay={0.05}>
         <div className="flex justify-between items-center mb-4">
           <div>
-            <p className="text-sm" style={{ color: '#a8a29e' }}>{t('home_today')}</p>
+            <p className="text-sm" style={{ color: 'var(--luna-text-secondary)' }}>{t('home_today')}</p>
             <p className="text-2xl font-light" style={{ fontFamily: 'Georgia, serif' }}>
               {formatLocalDateFull(today)}
             </p>
           </div>
           <button className="w-10 h-10 rounded-full flex items-center justify-center transition-all hover:scale-105 active:scale-95 relative"
-            style={{ background: '#232b35', border: '1px solid rgba(255,255,255,0.08)' }}
+            style={{ background: 'var(--luna-card)', border: '1px solid var(--luna-card-border)' }}
             onClick={onOpenNotification}>
-            <Bell size={18} style={{ color: '#a8a29e' }} />
+            <Bell size={18} style={{ color: 'var(--luna-text-secondary)' }} />
             {notificationCount > 0 && (
               <span className="absolute -top-1 -right-1 min-w-[18px] h-[18px] rounded-full flex items-center justify-center text-[10px] font-bold px-1" style={{ background: '#ef4444', color: '#fff' }}>
                 {notificationCount > 9 ? '9+' : notificationCount}
@@ -107,7 +107,7 @@ export default function HomeTab({
       <StaggerIn delay={0.1}>
         <div className="rounded-[20px] p-5 mb-4 transition-all"
           style={{
-            background: `linear-gradient(135deg, ${phaseData.color}10, #232b35)`,
+            background: `linear-gradient(135deg, ${phaseData.color}10, var(--luna-card))`,
             border: `1px solid ${phaseData.color}30`,
           }}>
           <div className="flex items-center gap-3 mb-3">
@@ -119,7 +119,7 @@ export default function HomeTab({
             </span>
           </div>
           <p className="text-lg font-light mb-2">{t(PHASE_DESC_KEYS[cycleInfo.phase] || 'phase_follicular_desc')}</p>
-          <p className="text-sm" style={{ color: '#a8a29e' }}>{t(PHASE_TIP_KEYS[cycleInfo.phase] || 'phase_follicular_tip')}</p>
+          <p className="text-sm" style={{ color: 'var(--luna-text-secondary)' }}>{t(PHASE_TIP_KEYS[cycleInfo.phase] || 'phase_follicular_tip')}</p>
         </div>
       </StaggerIn>
 
@@ -162,7 +162,7 @@ export default function HomeTab({
             </svg>
             {/* Center Content */}
             <div className="absolute inset-[25px] rounded-full flex flex-col items-center justify-center">
-              <p className="text-xs mb-0.5" style={{ color: '#6b7280' }}>{t('home_next_period_label')}</p>
+              <p className="text-xs mb-0.5" style={{ color: 'var(--luna-text-muted)' }}>{t('home_next_period_label')}</p>
               <motion.p
                 className="text-4xl font-light"
                 style={{ fontFamily: 'Georgia, serif' }}
@@ -173,7 +173,7 @@ export default function HomeTab({
               >
                 {cycleInfo.daysUntilNext}
               </motion.p>
-              <p className="text-sm" style={{ color: '#a8a29e' }}>{t('home_days_after')}</p>
+              <p className="text-sm" style={{ color: 'var(--luna-text-secondary)' }}>{t('home_days_after')}</p>
             </div>
           </div>
         </div>
@@ -182,24 +182,24 @@ export default function HomeTab({
       {/* Stats Grid */}
       <StaggerIn delay={0.3}>
         <div className="grid grid-cols-2 gap-3">
-          <div className="rounded-[20px] p-4" style={{ background: '#232b35', border: '1px solid rgba(255,255,255,0.08)' }}>
+          <div className="rounded-[20px] p-4" style={{ background: 'var(--luna-card)', border: '1px solid var(--luna-card-border)' }}>
             <div className="flex items-center gap-2 mb-2">
               <Activity size={14} style={{ color: '#81b29a' }} />
-              <p className="text-xs" style={{ color: '#6b7280' }}>{t('home_cycle_length')}</p>
+              <p className="text-xs" style={{ color: 'var(--luna-text-muted)' }}>{t('home_cycle_length')}</p>
             </div>
             <p className="text-2xl font-light" style={{ fontFamily: 'Georgia, serif' }}>
               {cycleStats.avgCycle}
-              <span className="text-sm ml-1" style={{ color: '#a8a29e' }}>{t('common_days')}</span>
+              <span className="text-sm ml-1" style={{ color: 'var(--luna-text-secondary)' }}>{t('common_days')}</span>
             </p>
           </div>
-          <div className="rounded-[20px] p-4" style={{ background: '#232b35', border: '1px solid rgba(255,255,255,0.08)' }}>
+          <div className="rounded-[20px] p-4" style={{ background: 'var(--luna-card)', border: '1px solid var(--luna-card-border)' }}>
             <div className="flex items-center gap-2 mb-2">
               <Droplets size={14} style={{ color: '#e07a5f' }} />
-              <p className="text-xs" style={{ color: '#6b7280' }}>{t('home_period_length')}</p>
+              <p className="text-xs" style={{ color: 'var(--luna-text-muted)' }}>{t('home_period_length')}</p>
             </div>
             <p className="text-2xl font-light" style={{ fontFamily: 'Georgia, serif' }}>
               {cycleStats.avgPeriod}
-              <span className="text-sm ml-1" style={{ color: '#a8a29e' }}>{t('common_days')}</span>
+              <span className="text-sm ml-1" style={{ color: 'var(--luna-text-secondary)' }}>{t('common_days')}</span>
             </p>
           </div>
         </div>
@@ -207,7 +207,7 @@ export default function HomeTab({
 
       {/* Cycle Phase Timeline */}
       <StaggerIn delay={0.35}>
-        <div className="rounded-[20px] p-5 mt-4" style={{ background: '#232b35', border: '1px solid rgba(255,255,255,0.08)' }}>
+        <div className="rounded-[20px] p-5 mt-4" style={{ background: 'var(--luna-card)', border: '1px solid var(--luna-card-border)' }}>
           <p className="text-sm font-medium mb-4">{t('home_phase_timeline')}</p>
           <div className="flex gap-1 h-3 rounded-full overflow-hidden mb-3">
             {/* Period phase */}
@@ -243,11 +243,11 @@ export default function HomeTab({
                 boxShadow: cycleInfo.phase === 'luteal' ? '0 0 8px #f2cc8f80' : 'none',
               }} />
           </div>
-          <div className="flex justify-between text-xs" style={{ color: '#6b7280' }}>
-            <span style={{ color: cycleInfo.phase === 'period' ? '#e07a5f' : '#6b7280' }}>{t('phase_period')}</span>
-            <span style={{ color: cycleInfo.phase === 'follicular' ? '#81b29a' : '#6b7280' }}>{t('phase_follicular')}</span>
-            <span style={{ color: cycleInfo.phase === 'ovulation' ? '#d4a574' : '#6b7280' }}>{t('phase_ovulation')}</span>
-            <span style={{ color: cycleInfo.phase === 'luteal' ? '#f2cc8f' : '#6b7280' }}>{t('phase_luteal')}</span>
+          <div className="flex justify-between text-xs" style={{ color: 'var(--luna-text-muted)' }}>
+            <span style={{ color: cycleInfo.phase === 'period' ? '#e07a5f' : 'var(--luna-text-muted)' }}>{t('phase_period')}</span>
+            <span style={{ color: cycleInfo.phase === 'follicular' ? '#81b29a' : 'var(--luna-text-muted)' }}>{t('phase_follicular')}</span>
+            <span style={{ color: cycleInfo.phase === 'ovulation' ? '#d4a574' : 'var(--luna-text-muted)' }}>{t('phase_ovulation')}</span>
+            <span style={{ color: cycleInfo.phase === 'luteal' ? '#f2cc8f' : 'var(--luna-text-muted)' }}>{t('phase_luteal')}</span>
           </div>
         </div>
       </StaggerIn>
@@ -255,7 +255,7 @@ export default function HomeTab({
       {/* Recent Records */}
       {records.length > 0 && (
         <StaggerIn delay={0.4}>
-          <div className="mt-4 rounded-[20px] p-5" style={{ background: '#232b35', border: '1px solid rgba(255,255,255,0.08)' }}>
+          <div className="mt-4 rounded-[20px] p-5" style={{ background: 'var(--luna-card)', border: '1px solid var(--luna-card-border)' }}>
             <div className="flex justify-between items-center mb-3">
               <p className="text-sm font-medium">{t('home_recent_records')}</p>
               <button className="text-xs px-3 py-1 rounded-full transition-all hover:scale-105"
@@ -285,13 +285,13 @@ export default function HomeTab({
                         </span>
                       ))}
                       {symptoms.length > 2 && (
-                        <span className="text-[11px] px-1.5 py-0.5" style={{ color: '#6b7280' }}>
+                        <span className="text-[11px] px-1.5 py-0.5" style={{ color: 'var(--luna-text-muted)' }}>
                           +{symptoms.length - 2}
                         </span>
                       )}
                     </div>
                   </div>
-                  <span className="text-xs flex-shrink-0" style={{ color: '#6b7280' }}>
+                  <span className="text-xs flex-shrink-0" style={{ color: 'var(--luna-text-muted)' }}>
                     {flowLabel}
                   </span>
                 </div>
@@ -305,7 +305,7 @@ export default function HomeTab({
       <StaggerIn delay={0.45}>
         <div className="mt-4 rounded-[20px] p-5 relative overflow-hidden"
           style={{
-            background: `linear-gradient(135deg, ${phaseData.color}15, #232b3580)`,
+            background: `linear-gradient(135deg, ${phaseData.color}15, var(--luna-card))`,
             border: `1px solid ${phaseData.color}20`,
             backdropFilter: 'blur(20px)',
           }}>
@@ -320,7 +320,7 @@ export default function HomeTab({
               <p className="text-sm font-medium mb-1">{t('home_daily_tip')}</p>
               <motion.p
                 className="text-sm leading-relaxed"
-                style={{ color: '#a8a29e' }}
+                style={{ color: 'var(--luna-text-secondary)' }}
                 key={dailyTipIndex}
                 initial={{ opacity: 0, y: 5 }}
                 animate={{ opacity: 1, y: 0 }}
@@ -332,7 +332,7 @@ export default function HomeTab({
             <button className="flex-shrink-0 w-8 h-8 rounded-lg flex items-center justify-center transition-all hover:scale-110 active:scale-95"
               style={{ background: 'rgba(255,255,255,0.05)' }}
               onClick={() => setDailyTipIndex(prev => (prev + 1) % 5)}>
-              <ArrowRight size={14} style={{ color: '#a8a29e' }} />
+              <ArrowRight size={14} style={{ color: 'var(--luna-text-secondary)' }} />
             </button>
           </div>
         </div>
@@ -341,10 +341,10 @@ export default function HomeTab({
       {/* Cycle Trend Mini Chart */}
       {cycleStats.cycleLengths.length > 0 && (
         <StaggerIn delay={0.5}>
-          <div className="mt-4 rounded-[20px] p-5" style={{ background: '#232b35', border: '1px solid rgba(255,255,255,0.08)' }}>
+          <div className="mt-4 rounded-[20px] p-5" style={{ background: 'var(--luna-card)', border: '1px solid var(--luna-card-border)' }}>
             <div className="flex justify-between items-center mb-4">
               <p className="text-sm font-medium">{t('home_trend')}</p>
-              <span className="text-xs" style={{ color: '#6b7280' }}>{t('home_recent_n_cycles', Math.min(cycleStats.cycleLengths.length, 6))}</span>
+              <span className="text-xs" style={{ color: 'var(--luna-text-muted)' }}>{t('home_recent_n_cycles', Math.min(cycleStats.cycleLengths.length, 6))}</span>
             </div>
             <div className="flex items-end gap-2 h-20">
               {cycleStats.cycleLengths.slice(-6).map((len, i) => {
@@ -358,7 +358,7 @@ export default function HomeTab({
                     initial={{ height: 0, opacity: 0 }}
                     animate={{ height: 'auto', opacity: 1 }}
                     transition={{ delay: 0.1 * i, duration: 0.4 }}>
-                    <span className="text-[10px]" style={{ color: '#6b7280' }}>{len}</span>
+                    <span className="text-[10px]" style={{ color: 'var(--luna-text-muted)' }}>{len}</span>
                     <motion.div
                       className="w-full rounded-t-md"
                       style={{
@@ -377,10 +377,10 @@ export default function HomeTab({
               })}
             </div>
             <div className="flex items-center justify-between mt-2 pt-2" style={{ borderTop: '1px solid rgba(255,255,255,0.04)' }}>
-              <span className="text-[11px]" style={{ color: '#6b7280' }}>{t('home_avg_format', cycleStats.avgCycle)}</span>
+              <span className="text-[11px]" style={{ color: 'var(--luna-text-muted)' }}>{t('home_avg_format', cycleStats.avgCycle)}</span>
               <div className="flex items-center gap-1">
                 <div className="w-2 h-2 rounded-full" style={{ background: '#e07a5f' }} />
-                <span className="text-[11px]" style={{ color: '#6b7280' }}>{t('home_recent_label')}</span>
+                <span className="text-[11px]" style={{ color: 'var(--luna-text-muted)' }}>{t('home_recent_label')}</span>
               </div>
             </div>
           </div>

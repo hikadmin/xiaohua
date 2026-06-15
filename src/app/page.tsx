@@ -5,6 +5,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { Home, Calendar, FileText, User, Plus } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { useI18n } from '@/lib/i18n';
+import { useTheme } from 'next-themes';
 import {
   type Period, type DailyRecord, type UserProfile, type Setting, type TabPage,
   type CycleInfo, type CycleStats, type CalendarDay, type PeriodInfoResult,
@@ -30,6 +31,7 @@ import {
 // ============ Main Component ============
 export default function LunaApp() {
   const { t } = useI18n();
+  const { setTheme } = useTheme();
   const [activeTab, setActiveTab] = useState<TabPage>('home');
   const [periods, setPeriods] = useState<Period[]>([]);
   const [records, setRecords] = useState<DailyRecord[]>([]);
@@ -101,8 +103,7 @@ export default function LunaApp() {
   // Wallpaper state
   const [wallpaper, setWallpaperState] = useState('');
 
-  // Theme scope state
-  const [themeScope, setThemeScopeState] = useState<'local' | 'global'>('global');
+
 
   // App lock state
   const [isUnlocked, setIsUnlocked] = useState(false);
@@ -116,10 +117,7 @@ export default function LunaApp() {
       const savedWp = localStorage.getItem('luna_wallpaper');
       if (savedWp) setWallpaperState(savedWp);
     } catch {}
-    try {
-      const savedScope = localStorage.getItem('luna_theme_scope');
-      if (savedScope === 'local' || savedScope === 'global') setThemeScopeState(savedScope);
-    } catch {}
+
   }, []);
 
   const setThemeColor = useCallback((color: string) => {
@@ -132,19 +130,16 @@ export default function LunaApp() {
     try { if (wp) localStorage.setItem('luna_wallpaper', wp); else localStorage.removeItem('luna_wallpaper'); } catch {}
   }, []);
 
-  const setThemeScope = useCallback((scope: 'local' | 'global') => {
-    setThemeScopeState(scope);
-    try { localStorage.setItem('luna_theme_scope', scope); } catch {}
-  }, []);
-
-  // Apply theme color as CSS custom property when scope is global
+  // Apply theme color as CSS custom property globally
   useEffect(() => {
-    if (themeScope === 'global') {
-      document.documentElement.style.setProperty('--theme-color', themeColor);
-    } else {
-      document.documentElement.style.removeProperty('--theme-color');
-    }
-  }, [themeScope, themeColor]);
+    document.documentElement.style.setProperty('--theme-color', themeColor);
+  }, [themeColor]);
+
+  // Sync dark_mode setting with next-themes
+  useEffect(() => {
+    const darkMode = settings.find(s => s.key === 'dark_mode')?.value === 'true';
+    setTheme(darkMode ? 'dark' : 'light');
+  }, [settings, setTheme]);
 
   // Check if app lock should be shown
   const shouldShowLockScreen = (() => {
@@ -211,6 +206,29 @@ export default function LunaApp() {
   }, [seedData, fetchPeriods, fetchRecords, fetchProfile, fetchSettings]);
 
   // ============ Notification Logic ============
+  // Request notification permission
+  const requestNotificationPermission = useCallback(async (): Promise<boolean> => {
+    if (typeof window === 'undefined' || !('Notification' in window)) return false;
+    if (Notification.permission === 'granted') return true;
+    if (Notification.permission === 'denied') return false;
+    const result = await Notification.requestPermission();
+    return result === 'granted';
+  }, []);
+
+  // Show a browser notification
+  const showNotification = useCallback((title: string, body: string, tag: string) => {
+    if (typeof window === 'undefined' || !('Notification' in window) || Notification.permission !== 'granted') return;
+    try {
+      new Notification(title, {
+        body,
+        icon: '/icons/icon-192x192.png',
+        badge: '/icons/icon-152x152.png',
+        tag,
+        requireInteraction: false,
+      });
+    } catch {}
+  }, []);
+
   // Load notifications from localStorage on mount
   useEffect(() => {
     try {
@@ -235,8 +253,12 @@ export default function LunaApp() {
     const ci = getCycleInfo();
     const todayStr = formatDateStr(new Date());
 
+    const periodReminder = settings.find(s => s.key === 'period_reminder')?.value === 'true';
+    const recordReminder = settings.find(s => s.key === 'record_reminder')?.value === 'true';
+    const ovulationReminder = settings.find(s => s.key === 'ovulation_reminder')?.value === 'true';
+
     // 1. Period reminder: if period is predicted within 1-3 days
-    if (ci.daysUntilNext >= 1 && ci.daysUntilNext <= 3) {
+    if (periodReminder && ci.daysUntilNext >= 1 && ci.daysUntilNext <= 3) {
       const existing = notifications.find(n => n.type === 'period' && n.message.includes(String(ci.daysUntilNext)));
       if (!existing) {
         newNotifs.push({
@@ -247,11 +269,13 @@ export default function LunaApp() {
           timestamp: Date.now(),
         });
       }
+      // Browser notification
+      showNotification(t('notif_period_coming'), `${ci.daysUntilNext}${t('notif_period_days')}`, 'period-reminder');
     }
 
     // 2. Record reminder: if no record for today
     const todayRecord = records.find(r => r.date === todayStr);
-    if (!todayRecord) {
+    if (recordReminder && !todayRecord) {
       const existing = notifications.find(n => n.type === 'record' && n.id.startsWith('record-'));
       if (!existing) {
         newNotifs.push({
@@ -262,11 +286,13 @@ export default function LunaApp() {
           timestamp: Date.now() - 3600000, // 1 hour ago
         });
       }
+      // Browser notification
+      showNotification(t('notif_record_today'), t('notif_record_today'), 'record-reminder');
     }
 
     // 3. Ovulation reminder: if in fertile window
     const fertileDays = getFertileDays();
-    if (fertileDays.includes(todayStr)) {
+    if (ovulationReminder && fertileDays.includes(todayStr)) {
       const existing = notifications.find(n => n.type === 'ovulation');
       if (!existing) {
         newNotifs.push({
@@ -277,6 +303,8 @@ export default function LunaApp() {
           timestamp: Date.now() - 7200000, // 2 hours ago
         });
       }
+      // Browser notification
+      showNotification(t('notif_fertile'), t('notif_fertile'), 'ovulation-reminder');
     }
 
     if (newNotifs.length > 0) {
@@ -287,7 +315,7 @@ export default function LunaApp() {
         return [...newNotifs, ...filtered];
       });
     }
-  }, [isLoaded, periods, records, profile]);
+  }, [isLoaded, periods, records, profile, settings]);
 
   const deleteNotification = useCallback((id: string) => {
     setNotifications(prev => prev.filter(n => n.id !== id));
@@ -396,7 +424,7 @@ export default function LunaApp() {
 
   async function toggleSetting(key: string, currentValue: string) {
     const nv = currentValue === 'true' ? 'false' : 'true';
-    try { await settingsApi.update({ key, value: nv }); await fetchSettings(); } catch (error) { if (error instanceof ApiError) toast({ description: error.message }); }
+    try { await settingsApi.update({ key, value: nv }); await fetchSettings(); if (key === 'dark_mode') { setTheme(nv === 'true' ? 'dark' : 'light'); } } catch (error) { if (error instanceof ApiError) toast({ description: error.message }); }
   }
 
   async function saveProfile() {
@@ -415,8 +443,51 @@ export default function LunaApp() {
     try { await recordsApi.deleteByDate(deleteConfirm.date); setDeleteConfirm({ open: false, recordId: '', date: '' }); await fetchRecords(); toast({ description: t('log_record_deleted') }); } catch (error) { if (error instanceof ApiError) toast({ description: error.message }); }
   }
 
+  function generateCSVFromRecords(records: any[]): string {
+    const headers = ['日期', '流量', '情绪', '症状', '备注'];
+    const rows = records.map(r => [
+      r.date,
+      r.flow ?? '',
+      r.mood ?? '',
+      r.symptoms ? (Array.isArray(r.symptoms) ? r.symptoms.join(';') : r.symptoms) : '',
+      r.note ?? ''
+    ]);
+    return [headers.join(','), ...rows.map(r => r.join(','))].join('\n');
+  }
+
   async function exportCSV() {
-    try { const data = await exportApi.getData(); const BOM = '\uFEFF'; const blob = new Blob([BOM + data.csvContent], { type: 'text/csv;charset=utf-8;' }); const url = URL.createObjectURL(blob); const a = document.createElement('a'); a.href = url; a.download = `luna_records_${formatDateStr(new Date())}.csv`; a.click(); URL.revokeObjectURL(url); toast({ description: '数据导出成功 📁' }); } catch (error) { if (error instanceof ApiError) toast({ description: error.message }); }
+    try {
+      const data = await exportApi.getData();
+      const BOM = '\uFEFF';
+      const csvContent = data.csvContent || generateCSVFromRecords(data.records);
+      const blob = new Blob([BOM + csvContent], { type: 'text/csv;charset=utf-8;' });
+
+      // Try Web Share API first (can share to WeChat, etc.)
+      if (navigator.share && navigator.canShare) {
+        const file = new File([blob], `luna_records_${formatDateStr(new Date())}.csv`, { type: 'text/csv' });
+        const shareData = { files: [file], title: 'Luna 经期数据' };
+        if (navigator.canShare(shareData)) {
+          try {
+            await navigator.share(shareData);
+            toast({ description: t('export_share_success') });
+            return;
+          } catch {
+            // User cancelled, fall through to download
+          }
+        }
+      }
+
+      // Fallback: download file
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `luna_records_${formatDateStr(new Date())}.csv`;
+      a.click();
+      URL.revokeObjectURL(url);
+      toast({ description: t('export_download_success') });
+    } catch (error) {
+      if (error instanceof ApiError) toast({ description: error.message });
+    }
   }
 
   async function resetData() {
@@ -468,12 +539,12 @@ export default function LunaApp() {
   const calendarDays = generateCalendarDays();
 
   return (
-    <div className="min-h-screen bg-[#0f1419] text-[#f0ece4] flex flex-col overflow-hidden relative">
+    <div className="min-h-screen text-[var(--luna-text)] flex flex-col overflow-hidden relative" style={{ background: 'var(--luna-bg)' }}>
       {/* Wallpaper Background */}
       {wallpaper && (
         <div className="fixed inset-0 z-0">
           <img src={wallpaper} alt="" className="w-full h-full object-cover" />
-          <div className="absolute inset-0" style={{ background: 'rgba(15,20,25,0.75)' }} />
+          <div className="absolute inset-0" style={{ background: 'var(--luna-overlay)' }} />
         </div>
       )}
 
@@ -490,32 +561,32 @@ export default function LunaApp() {
           {activeTab === 'home' && <HomeTab today={today} cycleInfo={cycleInfo} cycleStats={cycleStats} records={records} dailyTipIndex={dailyTipIndex} setDailyTipIndex={setDailyTipIndex} setActiveTab={setActiveTab} setLogTab={setLogTab} ringAnimated={ringAnimated} notificationCount={notifications.length} onOpenNotification={() => setNotificationPanelOpen(true)} />}
           {activeTab === 'calendar' && <CalendarTab calYear={calYear} calMonth={calMonth} setCalYear={setCalYear} setCalMonth={setCalMonth} isCurrentMonth={isCurrentMonth} today={today} calendarDays={calendarDays} periods={periods} setActionSheet={setActionSheet} />}
           {activeTab === 'log' && <LogTab today={today} logTab={logTab} setLogTab={setLogTab} currentFlow={currentFlow} setCurrentFlow={setCurrentFlow} currentMood={currentMood} setCurrentMood={setCurrentMood} selectedSymptoms={selectedSymptoms} setSelectedSymptoms={setSelectedSymptoms} customSymptoms={customSymptoms} noteText={noteText} setNoteText={setNoteText} records={records} saveRecord={saveRecord} saveRecordForDate={saveRecordForDate} updateRecord={updateRecord} setSymptomSheetOpen={setSymptomSheetOpen} setDeleteConfirm={setDeleteConfirm} cycleInfo={cycleInfo} editingDate={editingDate} setEditingDate={setEditingDate} selectedDate={selectedDate} setSelectedDate={setSelectedDate} />}
-          {activeTab === 'profile' && <ProfileTab profile={profile} records={records} periods={periods} cycleStats={cycleStats} settings={settings} cycleInfo={cycleInfo} setProfileEditOpen={setProfileEditOpen} setEditName={setEditName} setEditAvatar={setEditAvatar} setEditCycleLength={setEditCycleLength} setEditPeriodLength={setEditPeriodLength} toggleSetting={toggleSetting} exportCSV={exportCSV} setFeedbackOpen={setFeedbackOpen} toast={toast} resetData={resetData} themeColor={themeColor} setThemeColor={setThemeColor} wallpaper={wallpaper} setWallpaper={setWallpaper} themeScope={themeScope} setThemeScope={setThemeScope} onSheetOpenChange={setProfileSheetOpen} />}
+          {activeTab === 'profile' && <ProfileTab profile={profile} records={records} periods={periods} cycleStats={cycleStats} settings={settings} cycleInfo={cycleInfo} setProfileEditOpen={setProfileEditOpen} setEditName={setEditName} setEditAvatar={setEditAvatar} setEditCycleLength={setEditCycleLength} setEditPeriodLength={setEditPeriodLength} toggleSetting={toggleSetting} exportCSV={exportCSV} setFeedbackOpen={setFeedbackOpen} toast={toast} resetData={resetData} themeColor={themeColor} setThemeColor={setThemeColor} wallpaper={wallpaper} setWallpaper={setWallpaper} requestNotificationPermission={requestNotificationPermission} onSheetOpenChange={setProfileSheetOpen} />}
         </AnimatePresence>
       </main>
 
       {/* Bottom Navigation */}
-      <nav className="fixed bottom-0 left-0 right-0 z-50 safe-bottom transition-transform duration-300" style={{ background: 'linear-gradient(to top, #0f1419 80%, transparent)', transform: (profileSheetOpen || actionSheet.open || profileEditOpen || feedbackOpen || notificationPanelOpen || symptomSheetOpen) ? 'translateY(100%)' : 'translateY(0)' }}>
+      <nav className="fixed bottom-0 left-0 right-0 z-50 safe-bottom transition-transform duration-300" style={{ background: `linear-gradient(to top, var(--luna-bg) 80%, transparent)`, transform: (profileSheetOpen || actionSheet.open || profileEditOpen || feedbackOpen || notificationPanelOpen || symptomSheetOpen) ? 'translateY(100%)' : 'translateY(0)' }}>
         <div className="flex justify-around items-center pb-5 pt-2">
           {[
             { page: 'home' as TabPage, icon: Home, label: t('tab_home') },
             { page: 'calendar' as TabPage, icon: Calendar, label: t('tab_calendar') },
           ].map(item => (
             <button key={item.page} className="flex flex-col items-center gap-1 px-4 py-2 rounded-2xl transition-all" style={{ background: activeTab === item.page ? 'rgba(255,255,255,0.05)' : 'transparent' }} onClick={() => setActiveTab(item.page)}>
-              <item.icon size={22} style={{ color: activeTab === item.page ? themeColor : '#6b7280' }} />
-              <span className="text-[11px] font-medium" style={{ color: activeTab === item.page ? themeColor : '#6b7280' }}>{item.label}</span>
+              <item.icon size={22} style={{ color: activeTab === item.page ? themeColor : 'var(--luna-text-muted)' }} />
+              <span className="text-[11px] font-medium" style={{ color: activeTab === item.page ? themeColor : 'var(--luna-text-muted)' }}>{item.label}</span>
             </button>
           ))}
           <motion.button className="w-14 h-14 rounded-full flex items-center justify-center -mt-5" style={{ background: `linear-gradient(135deg, ${themeColor}, ${themeColor}cc)`, boxShadow: `0 8px 24px ${themeColor}59` }} whileTap={{ scale: 0.9 }} whileHover={{ scale: 1.05 }} onClick={() => { const todayStr = formatDateStr(new Date()); setActionSheet({ open: true, dateStr: todayStr, day: new Date().getDate() }); }}>
-            <Plus size={26} style={{ color: '#0f1419', strokeWidth: 2.5 }} />
+            <Plus size={26} style={{ color: 'var(--luna-text)', strokeWidth: 2.5 }} />
           </motion.button>
           {[
             { page: 'log' as TabPage, icon: FileText, label: t('tab_log') },
             { page: 'profile' as TabPage, icon: User, label: t('tab_profile') },
           ].map(item => (
             <button key={item.page} className="flex flex-col items-center gap-1 px-4 py-2 rounded-2xl transition-all" style={{ background: activeTab === item.page ? 'rgba(255,255,255,0.05)' : 'transparent' }} onClick={() => setActiveTab(item.page)}>
-              <item.icon size={22} style={{ color: activeTab === item.page ? themeColor : '#6b7280' }} />
-              <span className="text-[11px] font-medium" style={{ color: activeTab === item.page ? themeColor : '#6b7280' }}>{item.label}</span>
+              <item.icon size={22} style={{ color: activeTab === item.page ? themeColor : 'var(--luna-text-muted)' }} />
+              <span className="text-[11px] font-medium" style={{ color: activeTab === item.page ? themeColor : 'var(--luna-text-muted)' }}>{item.label}</span>
             </button>
           ))}
         </div>
@@ -530,13 +601,13 @@ export default function LunaApp() {
       {/* Loading Overlay */}
       <AnimatePresence>
         {!isLoaded && (
-          <motion.div initial={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.5 }} className="fixed inset-0 z-[300] flex items-center justify-center" style={{ background: '#0f1419' }}>
+          <motion.div initial={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.5 }} className="fixed inset-0 z-[300] flex items-center justify-center" style={{ background: 'var(--luna-bg)' }}>
             <motion.div className="text-center" initial={{ scale: 0.8, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} transition={{ duration: 0.5 }}>
               <motion.div className="w-20 h-20 rounded-full mx-auto mb-4 flex items-center justify-center" style={{ background: `linear-gradient(135deg, ${themeColor}, #81b29a)` }} animate={{ scale: [1, 1.05, 1] }} transition={{ duration: 2, repeat: Infinity, ease: 'easeInOut' }}>
-                <span className="text-3xl font-light" style={{ fontFamily: 'Georgia, serif', color: '#0f1419' }}>L</span>
+                <span className="text-3xl font-light" style={{ fontFamily: 'Georgia, serif', color: 'var(--luna-text)' }}>L</span>
               </motion.div>
               <p className="text-xl font-light" style={{ fontFamily: 'Georgia, serif' }}>Luna</p>
-              <p className="text-sm mt-1" style={{ color: '#6b7280' }}>经期追踪</p>
+              <p className="text-sm mt-1" style={{ color: 'var(--luna-text-muted)' }}>经期追踪</p>
               <motion.div className="w-16 h-1 rounded-full mx-auto mt-4" style={{ background: `linear-gradient(90deg, ${themeColor}, #81b29a)` }} animate={{ scaleX: [0.5, 1, 0.5] }} transition={{ duration: 1.5, repeat: Infinity, ease: 'easeInOut' }} />
             </motion.div>
           </motion.div>
