@@ -34,7 +34,7 @@ export async function POST(request: NextRequest) {
     }
 
     if (data.mood !== undefined) {
-      const moodError = validateIntRange(data.mood as number, 0, 5, 'mood')
+      const moodError = validateIntRange(data.mood as number, 0, 6, 'mood')
       if (moodError) return badRequest(moodError)
     }
 
