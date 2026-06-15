@@ -388,3 +388,28 @@ Stage Summary:
 - i18n 三语支持（14个新翻译键）
 - agent-browser 验证：启用→锁屏→解锁→关闭 全流程通过
 - lint 通过，dev server 无报错
+
+---
+Task ID: 8
+Agent: Main
+Task: 修复自定义壁纸底部弹窗"移除壁纸"按钮显示不全的问题
+
+Work Log:
+- 使用 VLM 分析用户上传截图，确认"移除壁纸"按钮在底部弹窗中被截断
+- 根因分析: 预设壁纸缩略图使用 `aspect-[9/16]` 导致高度过大，加上 BottomSheet 底部padding不足(pb-10)
+- 修复 `ProfileTab.tsx`:
+  - 预设壁纸缩略图 aspect-ratio 从 `aspect-[9/16]` 改为 `aspect-[3/4]`（更短更紧凑）
+  - BottomSheet 底部padding从 `p-6 pb-10` 改为 `px-6 pt-6 pb-14`（增加底部空间）
+  - 移除壁纸按钮添加 `mt-2` 间距，避免与上方预设壁纸区域过于紧凑
+- 使用 agent-browser 验证：
+  - 预设壁纸缩略图确认 aspect 3:4，高度约97px（之前约130px+）
+  - "移除壁纸"按钮设置壁纸后完全可见，无截断
+  - BottomSheet 内容无需滚动即可完整显示（scrollHeight = clientHeight）
+  - 所有5个预设壁纸正常显示在grid布局中
+- lint 通过，dev server 无报错
+
+Stage Summary:
+- 自定义壁纸弹窗"移除壁纸"按钮显示不全问题已修复
+- 预设壁纸缩略图比例从9:16调整为3:4，节省纵向空间
+- BottomSheet底部padding从40px增加到56px
+- agent-browser验证：所有元素完整显示，按钮不再被截断

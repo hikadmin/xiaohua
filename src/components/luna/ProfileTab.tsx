@@ -103,7 +103,7 @@ function BottomSheet({ open, onClose, title, children }: { open: boolean; onClos
     <AnimatePresence>{open && (
       <motion.div className="fixed inset-0 z-[200] flex items-end justify-center" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
         <div className="absolute inset-0 bg-black/50" onClick={onClose} />
-        <motion.div className="relative w-full max-w-md rounded-t-[24px] p-6 pb-10 max-h-[85vh] overflow-y-auto" style={{ background: '#1a2027', border: '1px solid rgba(255,255,255,0.08)' }} initial={{ y: 300 }} animate={{ y: 0 }} exit={{ y: 300 }} transition={{ type: 'spring', damping: 25, stiffness: 300 }}>
+        <motion.div className="relative w-full max-w-md rounded-t-[24px] px-6 pt-6 pb-14 max-h-[85vh] overflow-y-auto" style={{ background: '#1a2027', border: '1px solid rgba(255,255,255,0.08)' }} initial={{ y: 300 }} animate={{ y: 0 }} exit={{ y: 300 }} transition={{ type: 'spring', damping: 25, stiffness: 300 }}>
           <div className="w-10 h-1 rounded-full mx-auto mb-4" style={{ background: 'rgba(255,255,255,0.1)' }} />
           <p className="text-lg font-medium text-center mb-4">{title}</p>
           {children}
@@ -451,7 +451,7 @@ export default function ProfileTab({
         <p className="text-xs mb-3" style={{ color: '#6b7280' }}>{t('wallpaper_preset')}</p>
         <div className="grid grid-cols-5 gap-2 mb-4">
           {PRESET_WALLPAPERS.map((pw, i) => (
-            <button key={i} className="relative rounded-xl overflow-hidden aspect-[9/16] transition-all active:scale-95" style={{ background: pw.gradient, border: wallpaper && i === 0 ? '2px solid #e07a5f' : '1px solid rgba(255,255,255,0.06)' }} onClick={() => selectPresetWallpaper(pw.gradient)}>
+            <button key={i} className="relative rounded-xl overflow-hidden aspect-[3/4] transition-all active:scale-95" style={{ background: pw.gradient, border: wallpaper && i === 0 ? '2px solid #e07a5f' : '1px solid rgba(255,255,255,0.06)' }} onClick={() => selectPresetWallpaper(pw.gradient)}>
               <div className="absolute inset-0 flex items-end justify-center pb-1">
                 <span className="text-[9px] font-medium text-white drop-shadow-lg">{pw.name}</span>
               </div>
@@ -461,7 +461,7 @@ export default function ProfileTab({
 
         {/* Remove Wallpaper */}
         {wallpaper && (
-          <button className="w-full flex items-center gap-3 p-4 rounded-2xl transition-all active:scale-[0.98]" style={{ background: 'rgba(239,68,68,0.08)', border: '1.5px solid rgba(239,68,68,0.15)' }} onClick={removeWallpaper}>
+          <button className="w-full flex items-center gap-3 p-4 rounded-2xl transition-all active:scale-[0.98] mt-2" style={{ background: 'rgba(239,68,68,0.08)', border: '1.5px solid rgba(239,68,68,0.15)' }} onClick={removeWallpaper}>
             <div className="w-10 h-10 rounded-xl flex items-center justify-center" style={{ background: 'rgba(239,68,68,0.15)' }}><Trash2 size={20} style={{ color: '#ef4444' }} /></div>
             <span className="text-[15px] font-medium" style={{ color: '#ef4444' }}>{t('wallpaper_remove')}</span>
           </button>
