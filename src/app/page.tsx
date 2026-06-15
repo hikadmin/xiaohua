@@ -20,6 +20,8 @@ import ProfileEditSheet from '@/components/luna/ProfileEditSheet';
 import DeleteConfirmDialog from '@/components/luna/DeleteConfirmDialog';
 import FeedbackSheet from '@/components/luna/FeedbackSheet';
 import NotificationPanel, { type LunaNotification } from '@/components/luna/NotificationPanel';
+import LockScreen from '@/components/luna/LockScreen';
+import { isPinSet, isAppLockEnabled } from '@/lib/lock-utils';
 import {
   periodsApi, recordsApi, profileApi, settingsApi, feedbackApi, seedApi, exportApi,
   ApiError,
@@ -100,8 +102,6 @@ export default function LunaApp() {
   const [themeScope, setThemeScopeState] = useState<'local' | 'global'>('global');
 
   // App lock state
-  const [lockScreenPin, setLockScreenPin] = useState('');
-  const [lockScreenShake, setLockScreenShake] = useState(false);
   const [isUnlocked, setIsUnlocked] = useState(false);
 
   useEffect(() => {
@@ -147,37 +147,18 @@ export default function LunaApp() {
   const shouldShowLockScreen = (() => {
     if (isUnlocked) return false;
     try {
-      const appLock = localStorage.getItem('luna_app_lock');
-      const pin = localStorage.getItem('luna_pin');
-      // Check settings as well
+      const hasPin = isPinSet();
       const hasLockSetting = settings.find(s => s.key === 'app_lock')?.value === 'true';
-      return (hasLockSetting || appLock === 'true') && pin;
+      const localStorageEnabled = isAppLockEnabled();
+      return (hasLockSetting || localStorageEnabled) && hasPin;
     } catch {
       return false;
     }
   })();
 
-  const handleLockScreenPin = (d: string) => {
-    if (lockScreenPin.length < 4) {
-      const np = lockScreenPin + d;
-      setLockScreenPin(np);
-      if (np.length === 4) {
-        try {
-          const savedPin = localStorage.getItem('luna_pin');
-          if (savedPin && np === savedPin) {
-            setIsUnlocked(true);
-          } else {
-            // Wrong PIN
-            setLockScreenShake(true);
-            setTimeout(() => { setLockScreenShake(false); setLockScreenPin(''); }, 600);
-            toast({ description: t('lock_wrong_pin') });
-          }
-        } catch {
-          setLockScreenPin('');
-        }
-      }
-    }
-  };
+  const handleUnlock = useCallback(() => {
+    setIsUnlocked(true);
+  }, []);
 
   const { toast } = useToast();
 
@@ -574,47 +555,7 @@ export default function LunaApp() {
       {/* App Lock Screen */}
       <AnimatePresence>
         {shouldShowLockScreen && (
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            transition={{ duration: 0.3 }}
-            className="fixed inset-0 z-[400] flex flex-col items-center justify-center"
-            style={{ background: '#0f1419' }}
-          >
-            <motion.div
-              className="text-center mb-8"
-              initial={{ scale: 0.8, opacity: 0 }}
-              animate={{ scale: 1, opacity: 1, x: lockScreenShake ? [0, -10, 10, -10, 10, 0] : 0 }}
-              transition={{ duration: lockScreenShake ? 0.5 : 0.5 }}
-            >
-              {/* Luna Logo */}
-              <div className="w-20 h-20 rounded-full mx-auto mb-4 flex items-center justify-center" style={{ background: `linear-gradient(135deg, ${themeColor}, #81b29a)` }}>
-                <span className="text-3xl font-light" style={{ fontFamily: 'Georgia, serif', color: '#0f1419' }}>L</span>
-              </div>
-              <p className="text-xl font-light mb-1" style={{ fontFamily: 'Georgia, serif' }}>Luna</p>
-              <p className="text-sm" style={{ color: '#6b7280' }}>{t('lock_enter_pin')}</p>
-            </motion.div>
-
-            {/* PIN dots */}
-            <div className="flex justify-center gap-4 mb-8">
-              {[0,1,2,3].map(i => (
-                <div key={i} className="w-4 h-4 rounded-full transition-all duration-200" style={{ background: i < lockScreenPin.length ? '#e07a5f' : 'rgba(255,255,255,0.1)' }} />
-              ))}
-            </div>
-
-            {/* Number pad */}
-            <div className="grid grid-cols-3 gap-3 w-64 mx-auto">
-              {[1,2,3,4,5,6,7,8,9].map(d => (
-                <button key={d} className="py-3.5 rounded-xl text-lg font-medium active:scale-95 transition-transform" style={{ background: '#232b35', color: '#f0ece4' }} onClick={() => handleLockScreenPin(String(d))}>{d}</button>
-              ))}
-              <div />
-              <button className="py-3.5 rounded-xl text-lg font-medium active:scale-95 transition-transform" style={{ background: '#232b35', color: '#f0ece4' }} onClick={() => handleLockScreenPin('0')}>0</button>
-              <button className="py-3.5 rounded-xl text-sm font-medium active:scale-95 transition-transform" style={{ background: '#232b35', color: '#6b7280' }} onClick={() => setLockScreenPin(lockScreenPin.slice(0, -1))}>←</button>
-            </div>
-
-            <p className="text-xs mt-8" style={{ color: '#6b7280' }}>{t('lock_unlock')}</p>
-          </motion.div>
+          <LockScreen themeColor={themeColor} onUnlock={handleUnlock} />
         )}
       </AnimatePresence>
     </div>

@@ -15,6 +15,7 @@ import {
   type CycleStats, type CycleInfo,
 } from './shared';
 import ImageCropDialog from './ImageCropDialog';
+import LockSetupSheet from './LockSetupSheet';
 
 const THEME_COLORS = [
   { name: '暖橙', primary: '#e07a5f', secondary: '#d4a574' },
@@ -123,9 +124,6 @@ export default function ProfileTab({
   const [langOpen, setLangOpen] = useState(false);
   const [themeOpen, setThemeOpen] = useState(false);
   const [lockOpen, setLockOpen] = useState(false);
-  const [pin, setPin] = useState('');
-  const [pinStep, setPinStep] = useState<'set'|'confirm'>('set');
-  const [firstPin, setFirstPin] = useState('');
 
   // Wallpaper state
   const [wallpaperOpen, setWallpaperOpen] = useState(false);
@@ -288,23 +286,6 @@ export default function ProfileTab({
     toast({ description: t('wallpaper_removed') });
   };
 
-  const handlePin = (d: string) => {
-    if (pin.length < 4) {
-      const np = pin + d;
-      setPin(np);
-      if (np.length === 4) {
-        if (pinStep === 'set') { setFirstPin(np); setPin(''); setPinStep('confirm'); }
-        else {
-          if (np === firstPin) {
-            try { localStorage.setItem('luna_pin', np); } catch {}
-            toggleSetting('app_lock', settings.find(s => s.key === 'app_lock')?.value || 'false');
-            toast({ description: t('lock_pin_set') }); setPin(''); setFirstPin(''); setPinStep('set'); setLockOpen(false);
-          } else { toast({ description: t('lock_wrong_pin') }); setPin(''); setFirstPin(''); setPinStep('set'); }
-        }
-      }
-    }
-  };
-
   const appLockOn = settings.find(s => s.key === 'app_lock')?.value === 'true';
 
   return (
@@ -361,11 +342,11 @@ export default function ProfileTab({
       <StaggerIn delay={0.2}>
         <div className="rounded-[20px] p-5 mb-4" style={{ background: '#232b35', border: '1px solid rgba(255,255,255,0.08)' }}>
           <p className="text-sm font-medium mb-3">{t('profile_privacy')}</p>
-          {[{ icon: Shield, l: t('profile_app_lock'), d: t('profile_app_lock_desc'), fn: () => setLockOpen(true) }, { icon: Eye, l: t('profile_privacy_mode'), d: t('profile_privacy_mode_desc'), fn: () => toast({ description: '隐私模式开发中' }) }, { icon: Lock, l: t('profile_data_encryption'), d: t('profile_data_encryption_desc'), fn: () => toast({ description: '数据加密开发中' }) }].map((item, i) => (
+          {[{ icon: Shield, l: t('profile_app_lock'), d: appLockOn ? t('lock_status_enabled') : t('lock_status_disabled'), fn: () => setLockOpen(true), active: appLockOn }, { icon: Eye, l: t('profile_privacy_mode'), d: t('profile_privacy_mode_desc'), fn: () => toast({ description: '隐私模式开发中' }), active: false }, { icon: Lock, l: t('profile_data_encryption'), d: t('profile_data_encryption_desc'), fn: () => toast({ description: '数据加密开发中' }), active: false }].map((item, i) => (
             <div key={i} className="flex items-center gap-3.5 py-3.5 cursor-pointer active:scale-[0.98]" onClick={item.fn}>
-              <div className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0" style={{ background: '#1a2027' }}><item.icon size={20} style={{ color: '#a8a29e' }} /></div>
-              <div className="flex-1"><p className="text-[15px] font-medium">{item.l}</p><p className="text-xs" style={{ color: '#6b7280' }}>{item.d}</p></div>
-              <ChevronRight size={20} style={{ color: '#6b7280' }} />
+              <div className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0" style={{ background: item.active ? 'rgba(129,178,154,0.12)' : '#1a2027' }}><item.icon size={20} style={{ color: item.active ? '#81b29a' : '#a8a29e' }} /></div>
+              <div className="flex-1"><p className="text-[15px] font-medium">{item.l}</p><p className="text-xs" style={{ color: item.active ? '#81b29a' : '#6b7280' }}>{item.d}</p></div>
+              {item.active ? <div className="w-2 h-2 rounded-full" style={{ background: '#81b29a' }} /> : <ChevronRight size={20} style={{ color: '#6b7280' }} />}
             </div>
           ))}
         </div>
@@ -497,21 +478,13 @@ export default function ProfileTab({
         aspectRatio={9 / 16}
       />
 
-      <BottomSheet open={lockOpen} onClose={() => { setLockOpen(false); setPin(''); setFirstPin(''); setPinStep('set'); }} title={t('lock_title')}>
-        <div className="text-center mb-4">
-          <p className="text-xs" style={{ color: '#6b7280' }}>{pinStep === 'set' ? t('lock_set_pin') : t('lock_confirm_pin')}</p>
-        </div>
-        <div className="flex justify-center gap-4 mb-6">
-          {[0,1,2,3].map(i => <div key={i} className="w-4 h-4 rounded-full transition-all" style={{ background: i < pin.length ? '#e07a5f' : 'rgba(255,255,255,0.1)' }} />)}
-        </div>
-        <div className="grid grid-cols-3 gap-3 mb-4">
-          {[1,2,3,4,5,6,7,8,9].map(d => <button key={d} className="py-3.5 rounded-xl text-lg font-medium active:scale-95" style={{ background: '#232b35', color: '#f0ece4' }} onClick={() => handlePin(String(d))}>{d}</button>)}
-          <div />
-          <button className="py-3.5 rounded-xl text-lg font-medium active:scale-95" style={{ background: '#232b35', color: '#f0ece4' }} onClick={() => handlePin('0')}>0</button>
-          <button className="py-3.5 rounded-xl text-sm font-medium active:scale-95" style={{ background: '#232b35', color: '#6b7280' }} onClick={() => setPin(pin.slice(0, -1))}>←</button>
-        </div>
-        {appLockOn && <button className="w-full py-3 rounded-xl text-sm font-medium" style={{ background: 'rgba(239,68,68,0.1)', color: '#ef4444' }} onClick={() => { try { localStorage.removeItem('luna_pin'); } catch {} toggleSetting('app_lock', 'true'); toast({ description: t('lock_disabled') }); setLockOpen(false); }}>{t('lock_turn_off')}</button>}
-      </BottomSheet>
+      <LockSetupSheet
+        open={lockOpen}
+        onClose={() => setLockOpen(false)}
+        isLockEnabled={appLockOn}
+        toggleAppLock={(currentValue: string) => toggleSetting('app_lock', currentValue)}
+        themeColor={themeColor}
+      />
     </motion.div>
   );
 }

@@ -323,3 +323,68 @@ Stage Summary:
 - i18n 三语支持：无量/None/없음
 - 所有相关文件已更新：shared.tsx, LogTab.tsx, HomeTab.tsx, translations.ts
 - lint 通过，dev server 无报错
+
+---
+Task ID: 7
+Agent: Main
+Task: 应用锁全面改造 — 支持Android端打包，完善启用/关闭/修改PIN流程
+
+Work Log:
+- 创建 `src/lib/lock-utils.ts` — PIN加密存储和防暴力破解工具库
+  - SHA-256 哈希 + 随机盐值存储PIN（不再明文存储）
+  - 防暴力破解：5次失败后锁定，锁定时间递增（30s → 60s → 120s...）
+  - API: savePin(), verifyPin(), isPinSet(), removePin(), recordFailedAttempt(), resetFailedAttempts(), getLockoutRemaining(), getRemainingAttempts(), formatLockoutTime()
+  - 所有数据存储在localStorage，兼容Android WebView/PWA
+- 创建 `src/components/luna/PinPad.tsx` — 可复用PIN数字键盘组件
+  - 圆角大按钮数字键盘（1-9, 0, 退格）
+  - PIN圆点指示器（带发光动画）
+  - 支持shake动画、禁用状态、自定义主题色
+  - 支持生物识别按钮位置（预留Android指纹/Face ID）
+- 创建 `src/components/luna/LockScreen.tsx` — 独立锁屏组件
+  - 全屏锁屏覆盖层（z-[400]）
+  - Luna品牌Logo + 主题色渐变
+  - 防暴力破解：错误5次后倒计时锁定
+  - 错误提示：显示剩余尝试次数
+  - 锁定倒计时：MM:SS格式显示
+  - 使用 PinPad 共享组件
+- 创建 `src/components/luna/LockSetupSheet.tsx` — 锁设置底部弹窗
+  - 启用流程：设置PIN → 确认PIN → 自动启用
+  - 管理界面：显示启用状态卡片 + 修改PIN + 关闭应用锁
+  - 修改PIN流程：验证旧PIN → 设置新PIN → 确认新PIN
+  - 两步进度指示器（设置→确认）
+  - 安全提示说明
+- 更新 `src/components/luna/ProfileTab.tsx`
+  - 替换旧的内联PIN设置为 LockSetupSheet 组件
+  - 隐私区域：应用锁行显示启用/禁用状态（绿色圆点 vs 箭头）
+  - 图标颜色跟随状态变化
+  - 移除旧的 pin/pinStep/firstPin/handlePin 代码
+- 更新 `src/app/page.tsx`
+  - 替换旧的内联锁屏为 LockScreen 组件
+  - 使用 lock-utils 的 isPinSet() 和 isAppLockEnabled()
+  - 移除 lockScreenPin/lockScreenShake/handleLockScreenPin 代码
+  - 简化为 handleUnlock callback
+- 更新 `src/lib/i18n/translations.ts` — 新增14个i18n键（3语）
+  - lock_wrong_pin_remaining: 错误提示带剩余次数
+  - lock_too_many_attempts: 次数过多提示
+  - lock_try_again_later / lock_locked_out: 锁定状态
+  - lock_attempts_remaining: 剩余次数提示
+  - lock_pin_mismatch: 两次输入不一致
+  - lock_enter_old_pin: 验证旧PIN
+  - lock_status_enabled / lock_status_disabled: 状态描述
+  - lock_enabled_title / lock_enabled_desc: 启用状态卡片
+  - lock_change_pin_desc / lock_turn_off_desc: 按钮描述
+  - lock_security_note: 安全说明
+
+Stage Summary:
+- 应用锁全面改造完成，所有组件独立化、可复用
+- PIN存储安全性：SHA-256 + 随机盐值（不再明文）
+- 防暴力破解：5次失败后倒计时锁定，时间递增
+- 启用/关闭/修改PIN流程完整：
+  - 启用：设置→确认→自动开启
+  - 修改：验证旧PIN→设置新PIN→确认
+  - 关闭：一键关闭+清除PIN
+- Android兼容：所有存储使用localStorage，WebView/PWA可用
+- ProfileTab显示锁状态（绿色圆点=已启用）
+- i18n 三语支持（14个新翻译键）
+- agent-browser 验证：启用→锁屏→解锁→关闭 全流程通过
+- lint 通过，dev server 无报错
