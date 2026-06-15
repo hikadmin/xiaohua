@@ -58,12 +58,12 @@ export default function ProfileEditSheet({
     setCropImageSrc('');
   };
 
-  if (!open) return null;
-
   return (
     <>
       <AnimatePresence>
+        {open && (
         <motion.div
+          key="profile-edit-sheet"
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
@@ -77,10 +77,10 @@ export default function ProfileEditSheet({
             exit={{ y: '100%' }}
             transition={{ type: 'spring', damping: 25, stiffness: 300 }}
             className="absolute bottom-0 left-0 right-0 rounded-t-3xl p-5 pb-8"
-            style={{ background: '#1a2027', maxHeight: '85dvh', overflowY: 'auto', paddingBottom: 'max(2rem, calc(env(safe-area-inset-bottom, 0px) + 1rem))' }}
+            style={{ background: 'var(--luna-surface)', maxHeight: '85dvh', overflowY: 'auto', paddingBottom: 'max(2rem, calc(env(safe-area-inset-bottom, 0px) + 1rem))' }}
             onClick={e => e.stopPropagation()}
           >
-            <div className="w-9 h-1 rounded-full mx-auto mb-4 opacity-50" style={{ background: '#6b7280' }} />
+            <div className="w-9 h-1 rounded-full mx-auto mb-4 opacity-50" style={{ background: 'var(--luna-text-muted)' }} />
             <div className="text-center mb-5"><span className="text-lg font-medium">编辑个人资料</span></div>
 
             {/* Avatar Upload */}
@@ -125,7 +125,7 @@ export default function ProfileEditSheet({
               <label className="text-sm mb-2 block" style={{ color: '#a8a29e' }}>昵称</label>
               <input type="text"
                 className="w-full rounded-xl p-3 text-sm outline-none transition-all"
-                style={{ background: '#232b35', border: '1.5px solid rgba(255,255,255,0.06)', color: '#f0ece4' }}
+                style={{ background: 'var(--luna-card)', border: '1.5px solid rgba(255,255,255,0.06)', color: '#f0ece4' }}
                 placeholder="输入昵称..."
                 value={editName}
                 onChange={e => setEditName(e.target.value)}
@@ -139,7 +139,7 @@ export default function ProfileEditSheet({
               <label className="text-sm mb-2 block" style={{ color: '#a8a29e' }}>周期长度</label>
               <div className="flex items-center gap-4">
                 <button className="w-12 h-12 rounded-xl flex items-center justify-center transition-all active:scale-90"
-                  style={{ background: '#232b35', border: '1px solid rgba(255,255,255,0.08)' }}
+                  style={{ background: 'var(--luna-card)', border: '1px solid rgba(255,255,255,0.08)' }}
                   onClick={() => setEditCycleLength(prev => Math.max(15, prev - 1))}>
                   <span style={{ color: '#a8a29e', fontSize: 20 }}>-</span>
                 </button>
@@ -148,14 +148,14 @@ export default function ProfileEditSheet({
                   <span className="text-sm ml-1" style={{ color: '#a8a29e' }}>天</span>
                 </div>
                 <button className="w-12 h-12 rounded-xl flex items-center justify-center transition-all active:scale-90"
-                  style={{ background: '#232b35', border: '1px solid rgba(255,255,255,0.08)' }}
+                  style={{ background: 'var(--luna-card)', border: '1px solid rgba(255,255,255,0.08)' }}
                   onClick={() => setEditCycleLength(prev => Math.min(45, prev + 1))}>
                   <span style={{ color: '#a8a29e', fontSize: 20 }}>+</span>
                 </button>
               </div>
               <div className="flex justify-between mt-2 px-1">
-                <span className="text-[11px]" style={{ color: '#6b7280' }}>15天</span>
-                <span className="text-[11px]" style={{ color: '#6b7280' }}>45天</span>
+                <span className="text-[11px]" style={{ color: 'var(--luna-text-muted)' }}>15天</span>
+                <span className="text-[11px]" style={{ color: 'var(--luna-text-muted)' }}>45天</span>
               </div>
             </div>
 
@@ -164,7 +164,7 @@ export default function ProfileEditSheet({
               <label className="text-sm mb-2 block" style={{ color: '#a8a29e' }}>经期长度</label>
               <div className="flex items-center gap-4">
                 <button className="w-12 h-12 rounded-xl flex items-center justify-center transition-all active:scale-90"
-                  style={{ background: '#232b35', border: '1px solid rgba(255,255,255,0.08)' }}
+                  style={{ background: 'var(--luna-card)', border: '1px solid rgba(255,255,255,0.08)' }}
                   onClick={() => setEditPeriodLength(prev => Math.max(1, prev - 1))}>
                   <span style={{ color: '#a8a29e', fontSize: 20 }}>-</span>
                 </button>
@@ -173,14 +173,14 @@ export default function ProfileEditSheet({
                   <span className="text-sm ml-1" style={{ color: '#a8a29e' }}>天</span>
                 </div>
                 <button className="w-12 h-12 rounded-xl flex items-center justify-center transition-all active:scale-90"
-                  style={{ background: '#232b35', border: '1px solid rgba(255,255,255,0.08)' }}
+                  style={{ background: 'var(--luna-card)', border: '1px solid rgba(255,255,255,0.08)' }}
                   onClick={() => setEditPeriodLength(prev => Math.min(10, prev + 1))}>
                   <span style={{ color: '#a8a29e', fontSize: 20 }}>+</span>
                 </button>
               </div>
               <div className="flex justify-between mt-2 px-1">
-                <span className="text-[11px]" style={{ color: '#6b7280' }}>1天</span>
-                <span className="text-[11px]" style={{ color: '#6b7280' }}>10天</span>
+                <span className="text-[11px]" style={{ color: 'var(--luna-text-muted)' }}>1天</span>
+                <span className="text-[11px]" style={{ color: 'var(--luna-text-muted)' }}>10天</span>
               </div>
             </div>
 
@@ -192,12 +192,13 @@ export default function ProfileEditSheet({
               保存
             </motion.button>
             <div className="text-center py-4 cursor-pointer transition-colors"
-              style={{ color: '#6b7280' }}
+              style={{ color: 'var(--luna-text-muted)' }}
               onClick={() => setProfileEditOpen(false)}>
               取消
             </div>
           </motion.div>
         </motion.div>
+        )}
       </AnimatePresence>
 
       {/* Image Crop Dialog */}

@@ -220,7 +220,7 @@ export default function LogTab({
           </div>
 
           <motion.button className="w-full py-4 rounded-2xl font-medium text-lg" style={{ background: 'linear-gradient(135deg, #e07a5f, #d4a574)', color: '#0f1419' }} whileTap={{ scale: 0.97 }} onClick={handleSave}>
-            {editingDate ? t('log_record_updated') : t('log_save')}
+            {editingDate ? t('log_save_edit') : t('log_save')}
           </motion.button>
         </>
       ) : (

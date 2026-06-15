@@ -63,12 +63,12 @@ function ResetDataDialog({ open, onClose, onConfirm }: { open: boolean; onClose:
   const { t } = useI18n();
   const [confirmText, setConfirmText] = useState('');
   const [step, setStep] = useState(1);
-  if (!open) return null;
   const ok = confirmText === t('reset_confirm_text');
   return (
-    <motion.div className="fixed inset-0 z-[200] flex items-center justify-center px-6" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
-      <div className="absolute inset-0 bg-black/60" onClick={onClose} />
-      <motion.div className="relative w-full max-w-sm rounded-[24px] p-6" style={{ background: 'var(--luna-surface)', border: '1px solid var(--luna-card-border)' }} initial={{ scale: 0.9, opacity: 0 }} animate={{ scale: 1, opacity: 1 }}>
+    <AnimatePresence>
+      {open && (
+    <motion.div key="reset-data-dialog" className="fixed inset-0 z-[200] flex items-center justify-center px-6" style={{ background: 'rgba(0,0,0,0.6)' }} initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={onClose}>
+      <motion.div className="relative w-full max-w-sm rounded-[24px] p-6" style={{ background: 'var(--luna-surface)', border: '1px solid var(--luna-card-border)' }} initial={{ scale: 0.9, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} onClick={e => e.stopPropagation()}>
         <div className="text-center mb-4">
           <div className="w-14 h-14 rounded-full mx-auto mb-3 flex items-center justify-center" style={{ background: 'rgba(239,68,68,0.15)' }}><AlertTriangle size={28} style={{ color: '#ef4444' }} /></div>
           <p className="text-lg font-medium">{t('reset_title')}</p>
@@ -94,15 +94,16 @@ function ResetDataDialog({ open, onClose, onConfirm }: { open: boolean; onClose:
         )}
       </motion.div>
     </motion.div>
+    )}
+    </AnimatePresence>
   );
 }
 
 function BottomSheet({ open, onClose, title, children, footer }: { open: boolean; onClose: () => void; title: string; children: React.ReactNode; footer?: React.ReactNode }) {
-  if (!open) return null;
   return (
     <AnimatePresence>{open && (
-      <motion.div className="fixed inset-0 z-[200] flex items-end justify-center" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
-        <div className="absolute inset-0" style={{ background: 'var(--luna-overlay)' }} onClick={onClose} />
+      <motion.div key="bottom-sheet" className="fixed inset-0 z-[200] flex items-end justify-center" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={onClose}>
+        <div className="absolute inset-0" style={{ background: 'var(--luna-overlay)' }} />
         <motion.div
           className="relative w-full max-w-md rounded-t-[24px] flex flex-col"
           style={{
@@ -115,6 +116,7 @@ function BottomSheet({ open, onClose, title, children, footer }: { open: boolean
           animate={{ y: 0 }}
           exit={{ y: 300 }}
           transition={{ type: 'spring', damping: 25, stiffness: 300 }}
+          onClick={e => e.stopPropagation()}
         >
           {/* Fallback for browsers without dvh support */}
           <div className="w-10 h-1 rounded-full mx-auto mb-4 mt-5 flex-shrink-0" style={{ background: 'var(--luna-card-border)' }} />

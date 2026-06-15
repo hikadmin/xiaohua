@@ -141,19 +141,22 @@ export default function LockSetupSheet({
     <AnimatePresence>
       {open && (
         <motion.div
+          key="lock-setup-sheet"
           className="fixed inset-0 z-[200] flex items-end justify-center"
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
+          onClick={handleClose}
         >
-          <div className="absolute inset-0 bg-black/60" onClick={handleClose} />
+          <div className="absolute inset-0" style={{ background: 'var(--luna-overlay)' }} />
           <motion.div
             className="relative w-full max-w-md rounded-t-[24px] p-6 overflow-y-auto"
-            style={{ background: '#1a2027', border: '1px solid rgba(255,255,255,0.08)', maxHeight: '90dvh', paddingBottom: 'max(2.5rem, calc(env(safe-area-inset-bottom, 0px) + 1.5rem))' }}
+            style={{ background: 'var(--luna-surface)', border: '1px solid var(--luna-card-border)', maxHeight: '90dvh', paddingBottom: 'max(2.5rem, calc(env(safe-area-inset-bottom, 0px) + 1.5rem))' }}
             initial={{ y: 400 }}
             animate={{ y: 0 }}
             exit={{ y: 400 }}
             transition={{ type: 'spring', damping: 25, stiffness: 300 }}
+            onClick={e => e.stopPropagation()}
           >
             {/* Handle */}
             <div className="w-10 h-1 rounded-full mx-auto mb-5" style={{ background: 'rgba(255,255,255,0.1)' }} />

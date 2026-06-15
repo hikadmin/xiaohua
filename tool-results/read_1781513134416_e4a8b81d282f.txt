@@ -1,0 +1,511 @@
+     1→'use client';
+     2→
+     3→import React, { useState, useRef, useEffect } from 'react';
+     4→import { motion, AnimatePresence } from 'framer-motion';
+     5→import {
+     6→  Calendar, TrendingUp, Droplets, Check, Bell, Clock, Crosshair,
+     7→  Shield, Eye, Lock, Moon, Sun, Download, Cloud, RotateCcw,
+     8→  Globe, Info, MessageSquare, ChevronRight, Target,
+     9→  Trash2, Palette, Share2, AlertTriangle, Image as ImageIcon,
+    10→} from 'lucide-react';
+    11→import { useI18n, LOCALE_NAMES, type Locale } from '@/lib/i18n';
+    12→import {
+    13→  StaggerIn, formatShortDate,
+    14→  type DailyRecord, type UserProfile, type Setting, type Period,
+    15→  type CycleStats, type CycleInfo,
+    16→} from './shared';
+    17→import ImageCropDialog from './ImageCropDialog';
+    18→import LockSetupSheet from './LockSetupSheet';
+    19→
+    20→const THEME_COLORS = [
+    21→  { name: '暖橙', primary: '#e07a5f', secondary: '#d4a574' },
+    22→  { name: '薄荷绿', primary: '#81b29a', secondary: '#6dab8e' },
+    23→  { name: '樱花粉', primary: '#e8a0bf', secondary: '#d4869f' },
+    24→  { name: '星空紫', primary: '#9b8ec4', secondary: '#8577b0' },
+    25→  { name: '海洋蓝', primary: '#5b9bd5', secondary: '#4a8bc4' },
+    26→  { name: '日落金', primary: '#d4a574', secondary: '#c49464' },
+    27→];
+    28→
+    29→const PRESET_WALLPAPERS = [
+    30→  { name: '日落暖光', gradient: 'linear-gradient(135deg, #ff6b35, #f7931e, #ffcc02)' },
+    31→  { name: '海洋深蓝', gradient: 'linear-gradient(135deg, #0f3460, #16537e, #1a8a8a)' },
+    32→  { name: '森林绿意', gradient: 'linear-gradient(135deg, #134e5e, #1a6b3c, #2ecc71)' },
+    33→  { name: '夜空星河', gradient: 'linear-gradient(135deg, #0f0c29, #302b63, #24243e)' },
+    34→  { name: '樱花粉黛', gradient: 'linear-gradient(135deg, #ee9ca7, #ffdde1, #f8b4c8)' },
+    35→];
+    36→
+    37→interface ProfileTabProps {
+    38→  profile: UserProfile | null;
+    39→  records: DailyRecord[];
+    40→  periods: Period[];
+    41→  cycleStats: CycleStats;
+    42→  settings: Setting[];
+    43→  cycleInfo: CycleInfo;
+    44→  setProfileEditOpen: React.Dispatch<React.SetStateAction<boolean>>;
+    45→  setEditName: React.Dispatch<React.SetStateAction<string>>;
+    46→  setEditAvatar: React.Dispatch<React.SetStateAction<string>>;
+    47→  setEditCycleLength: React.Dispatch<React.SetStateAction<number>>;
+    48→  setEditPeriodLength: React.Dispatch<React.SetStateAction<number>>;
+    49→  toggleSetting: (key: string, currentValue: string) => void;
+    50→  exportCSV: () => void;
+    51→  setFeedbackOpen: React.Dispatch<React.SetStateAction<boolean>>;
+    52→  toast: (opts: { description: string }) => void;
+    53→  resetData: () => void;
+    54→  themeColor: string;
+    55→  setThemeColor: (color: string) => void;
+    56→  wallpaper: string;
+    57→  setWallpaper: (wp: string) => void;
+    58→  requestNotificationPermission: () => Promise<boolean>;
+    59→  onSheetOpenChange?: (open: boolean) => void;
+    60→}
+    61→
+    62→function ResetDataDialog({ open, onClose, onConfirm }: { open: boolean; onClose: () => void; onConfirm: () => void }) {
+    63→  const { t } = useI18n();
+    64→  const [confirmText, setConfirmText] = useState('');
+    65→  const [step, setStep] = useState(1);
+    66→  if (!open) return null;
+    67→  const ok = confirmText === t('reset_confirm_text');
+    68→  return (
+    69→    <motion.div className="fixed inset-0 z-[200] flex items-center justify-center px-6" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
+    70→      <div className="absolute inset-0 bg-black/60" onClick={onClose} />
+    71→      <motion.div className="relative w-full max-w-sm rounded-[24px] p-6" style={{ background: 'var(--luna-surface)', border: '1px solid var(--luna-card-border)' }} initial={{ scale: 0.9, opacity: 0 }} animate={{ scale: 1, opacity: 1 }}>
+    72→        <div className="text-center mb-4">
+    73→          <div className="w-14 h-14 rounded-full mx-auto mb-3 flex items-center justify-center" style={{ background: 'rgba(239,68,68,0.15)' }}><AlertTriangle size={28} style={{ color: '#ef4444' }} /></div>
+    74→          <p className="text-lg font-medium">{t('reset_title')}</p>
+    75→        </div>
+    76→        {step === 1 ? (
+    77→          <>
+    78→            <p className="text-sm text-center mb-4" style={{ color: 'var(--luna-text-secondary)' }}>{t('reset_warning')}</p>
+    79→            <div className="flex gap-3">
+    80→              <button className="flex-1 py-3 rounded-xl text-sm font-medium" style={{ background: 'rgba(255,255,255,0.05)', color: 'var(--luna-text)' }} onClick={onClose}>{t('reset_cancel')}</button>
+    81→              <button className="flex-1 py-3 rounded-xl text-sm font-medium" style={{ background: 'rgba(239,68,68,0.2)', color: '#ef4444' }} onClick={() => setStep(2)}>{t('log_confirm')}</button>
+    82→            </div>
+    83→          </>
+    84→        ) : (
+    85→          <>
+    86→            <p className="text-sm text-center mb-3" style={{ color: '#ef4444' }}>{t('reset_confirm')}</p>
+    87→            <p className="text-xs text-center mb-3" style={{ color: 'var(--luna-text-muted)' }}>{t('reset_input_hint')}</p>
+    88→            <input type="text" className="w-full px-4 py-3 rounded-xl text-sm text-center outline-none mb-4" style={{ background: 'var(--luna-bg)', border: `1.5px solid var(--luna-card-border)`, color: 'var(--luna-text)' }} placeholder={t('reset_confirm_text')} value={confirmText} onChange={e => setConfirmText(e.target.value)} />
+    89→            <div className="flex gap-3">
+    90→              <button className="flex-1 py-3 rounded-xl text-sm font-medium" style={{ background: 'rgba(255,255,255,0.05)', color: 'var(--luna-text)' }} onClick={() => { setStep(1); setConfirmText(''); }}>{t('reset_cancel')}</button>
+    91→              <button className="flex-1 py-3 rounded-xl text-sm font-medium transition-all" style={{ background: ok ? '#ef4444' : 'rgba(239,68,68,0.1)', color: ok ? '#fff' : 'var(--luna-text-muted)', cursor: ok ? 'pointer' : 'not-allowed' }} onClick={() => { if (ok) { onConfirm(); setStep(1); setConfirmText(''); } }}>{t('reset_button')}</button>
+    92→            </div>
+    93→          </>
+    94→        )}
+    95→      </motion.div>
+    96→    </motion.div>
+    97→  );
+    98→}
+    99→
+   100→function BottomSheet({ open, onClose, title, children, footer }: { open: boolean; onClose: () => void; title: string; children: React.ReactNode; footer?: React.ReactNode }) {
+   101→  return (
+   102→    <AnimatePresence>{open && (
+   103→      <motion.div key="bottom-sheet" className="fixed inset-0 z-[200] flex items-end justify-center" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={onClose}>
+   104→        <div className="absolute inset-0" style={{ background: 'var(--luna-overlay)' }} />
+   105→        <motion.div
+   106→          className="relative w-full max-w-md rounded-t-[24px] flex flex-col"
+   107→          style={{
+   108→            background: 'var(--luna-surface)',
+   109→            border: '1px solid var(--luna-card-border)',
+   110→            maxHeight: '85dvh',
+   111→            paddingBottom: 'max(3.5rem, calc(env(safe-area-inset-bottom, 0px) + 1.5rem))',
+   112→          }}
+   113→          initial={{ y: 300 }}
+   114→          animate={{ y: 0 }}
+   115→          exit={{ y: 300 }}
+   116→          transition={{ type: 'spring', damping: 25, stiffness: 300 }}
+   117→          onClick={e => e.stopPropagation()}
+   118→        >
+   119→          {/* Fallback for browsers without dvh support */}
+   120→          <div className="w-10 h-1 rounded-full mx-auto mb-4 mt-5 flex-shrink-0" style={{ background: 'var(--luna-card-border)' }} />
+   121→          <p className="text-lg font-medium text-center mb-4 px-6 flex-shrink-0">{title}</p>
+   122→          <div className="flex-1 overflow-y-auto px-6 overscroll-contain min-h-0" style={{ WebkitOverflowScrolling: 'touch' }}>
+   123→            {children}
+   124→          </div>
+   125→          {footer && (
+   126→            <div className="flex-shrink-0 px-6 pt-3" style={{ borderTop: '1px solid var(--luna-card-border)' }}>
+   127→              {footer}
+   128→            </div>
+   129→          )}
+   130→        </motion.div>
+   131→      </motion.div>
+   132→    )}</AnimatePresence>
+   133→  );
+   134→}
+   135→
+   136→export default function ProfileTab({
+   137→  profile, records, periods, cycleStats, settings, cycleInfo,
+   138→  setProfileEditOpen, setEditName, setEditAvatar, setEditCycleLength, setEditPeriodLength,
+   139→  toggleSetting, exportCSV, setFeedbackOpen, toast, resetData, themeColor, setThemeColor,
+   140→  wallpaper, setWallpaper, requestNotificationPermission, onSheetOpenChange,
+   141→}: ProfileTabProps) {
+   142→  const { t, locale, setLocale } = useI18n();
+   143→  const [resetOpen, setResetOpen] = useState(false);
+   144→  const [langOpen, setLangOpen] = useState(false);
+   145→  const [themeOpen, setThemeOpen] = useState(false);
+   146→  const [lockOpen, setLockOpen] = useState(false);
+   147→
+   148→  // Wallpaper state
+   149→  const [wallpaperOpen, setWallpaperOpen] = useState(false);
+   150→
+   151→  // Track if any sheet is open to hide nav bar
+   152→  const anySheetOpen = langOpen || themeOpen || wallpaperOpen || lockOpen;
+   153→  useEffect(() => { onSheetOpenChange?.(anySheetOpen); }, [anySheetOpen, onSheetOpenChange]);
+   154→
+   155→  const [wallpaperImageSrc, setWallpaperImageSrc] = useState('');
+   156→  const [cropOpen, setCropOpen] = useState(false);
+   157→  const wallpaperFileRef = useRef<HTMLInputElement>(null);
+   158→
+   159→  const cycleReg = (() => {
+   160→    if (cycleStats.cycleLengths.length < 2) return t('profile_insufficient');
+   161→    const avg = cycleStats.avgCycle;
+   162→    const v = cycleStats.cycleLengths.reduce((s, l) => s + Math.pow(l - avg, 2), 0) / cycleStats.cycleLengths.length;
+   163→    return Math.sqrt(v) <= 4 ? t('profile_regular') : t('profile_irregular');
+   164→  })();
+   165→
+   166→  // Task 6: Enhanced WeChat share
+   167→  const shareWeChat = async () => {
+   168→    // Try native share first (works well on mobile, includes WeChat option)
+   169→    if (navigator.share) {
+   170→      try {
+   171→        await navigator.share({
+   172→          title: 'Luna',
+   173→          text: '我在使用 Luna 经期追踪应用，推荐给你！',
+   174→          url: window.location.href,
+   175→        });
+   176→        return;
+   177→      } catch {
+   178→        // User cancelled or share failed, fallback
+   179→      }
+   180→    }
+   181→
+   182→    // Fallback: generate share image via canvas and copy link
+   183→    try {
+   184→      const canvas = document.createElement('canvas');
+   185→      canvas.width = 600;
+   186→      canvas.height = 400;
+   187→      const ctx = canvas.getContext('2d');
+   188→      if (!ctx) throw new Error('No canvas');
+   189→
+   190→      // Background
+   191→      const bgGrad = ctx.createLinearGradient(0, 0, 600, 400);
+   192→      bgGrad.addColorStop(0, '#1a2027');
+   193→      bgGrad.addColorStop(1, '#0f1419');
+   194→      ctx.fillStyle = bgGrad;
+   195→      ctx.fillRect(0, 0, 600, 400);
+   196→
+   197→      // Accent circle
+   198→      const accentGrad = ctx.createRadialGradient(300, 140, 10, 300, 140, 80);
+   199→      accentGrad.addColorStop(0, themeColor);
+   200→      accentGrad.addColorStop(1, 'transparent');
+   201→      ctx.fillStyle = accentGrad;
+   202→      ctx.fillRect(0, 0, 600, 400);
+   203→
+   204→      // Logo circle
+   205→      ctx.beginPath();
+   206→      ctx.arc(300, 130, 40, 0, Math.PI * 2);
+   207→      const logoGrad = ctx.createLinearGradient(260, 90, 340, 170);
+   208→      logoGrad.addColorStop(0, themeColor);
+   209→      logoGrad.addColorStop(1, '#81b29a');
+   210→      ctx.fillStyle = logoGrad;
+   211→      ctx.fill();
+   212→
+   213→      // Logo text
+   214→      ctx.fillStyle = '#0f1419';
+   215→      ctx.font = 'bold 32px Georgia, serif';
+   216→      ctx.textAlign = 'center';
+   217→      ctx.textBaseline = 'middle';
+   218→      ctx.fillText('L', 300, 132);
+   219→
+   220→      // App name
+   221→      ctx.fillStyle = '#f0ece4';
+   222→      ctx.font = '28px Georgia, serif';
+   223→      ctx.fillText('Luna', 300, 200);
+   224→
+   225→      // Description
+   226→      ctx.fillStyle = '#a8a29e';
+   227→      ctx.font = '16px sans-serif';
+   228→      ctx.fillText('经期追踪 · 周期管理 · 健康记录', 300, 240);
+   229→
+   230→      // URL
+   231→      ctx.fillStyle = themeColor;
+   232→      ctx.font = '14px sans-serif';
+   233→      ctx.fillText(window.location.host, 300, 300);
+   234→
+   235→      // Copy link to clipboard
+   236→      await navigator.clipboard.writeText(`${window.location.href} - Luna 经期追踪`);
+   237→      toast({ description: '链接已复制，可分享给好友 📋' });
+   238→    } catch {
+   239→      toast({ description: '分享功能暂不可用' });
+   240→    }
+   241→  };
+   242→
+   243→  // Wallpaper: handle file selection
+   244→  const handleWallpaperFile = (e: React.ChangeEvent<HTMLInputElement>) => {
+   245→    const file = e.target.files?.[0];
+   246→    if (!file) return;
+   247→    if (file.size > 5 * 1024 * 1024) {
+   248→      toast({ description: '图片大小不能超过5MB' });
+   249→      return;
+   250→    }
+   251→    const reader = new FileReader();
+   252→    reader.onload = () => {
+   253→      setWallpaperImageSrc(reader.result as string);
+   254→      setCropOpen(true);
+   255→    };
+   256→    reader.readAsDataURL(file);
+   257→    // Reset input so same file can be re-selected
+   258→    e.target.value = '';
+   259→  };
+   260→
+   261→  const handleCropComplete = (croppedBase64: string) => {
+   262→    setWallpaper(croppedBase64);
+   263→    setCropOpen(false);
+   264→    setWallpaperImageSrc('');
+   265→    setWallpaperOpen(false);
+   266→    toast({ description: t('wallpaper_set') });
+   267→  };
+   268→
+   269→  const handleCropCancel = () => {
+   270→    setCropOpen(false);
+   271→    setWallpaperImageSrc('');
+   272→  };
+   273→
+   274→  const selectPresetWallpaper = (gradient: string) => {
+   275→    // Create a small canvas to convert gradient to base64
+   276→    const canvas = document.createElement('canvas');
+   277→    canvas.width = 360;
+   278→    canvas.height = 640;
+   279→    const ctx = canvas.getContext('2d');
+   280→    if (!ctx) return;
+   281→
+   282→    // Parse gradient colors from the string
+   283→    const colorMatches = gradient.match(/#[0-9a-fA-F]{6}/g);
+   284→    if (!colorMatches || colorMatches.length < 2) return;
+   285→
+   286→    const grad = ctx.createLinearGradient(0, 0, 360, 640);
+   287→    colorMatches.forEach((color, i) => {
+   288→      grad.addColorStop(i / (colorMatches.length - 1), color);
+   289→    });
+   290→    ctx.fillStyle = grad;
+   291→    ctx.fillRect(0, 0, 360, 640);
+   292→
+   293→    const base64 = canvas.toDataURL('image/jpeg', 0.85);
+   294→    setWallpaper(base64);
+   295→    setWallpaperOpen(false);
+   296→    toast({ description: t('wallpaper_set') });
+   297→  };
+   298→
+   299→  const removeWallpaper = () => {
+   300→    setWallpaper('');
+   301→    setWallpaperOpen(false);
+   302→    toast({ description: t('wallpaper_removed') });
+   303→  };
+   304→
+   305→  const appLockOn = settings.find(s => s.key === 'app_lock')?.value === 'true';
+   306→
+   307→  return (
+   308→    <motion.div key="profile" initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -20 }} transition={{ duration: 0.3 }} className="px-5 pt-12 pb-6">
+   309→      {/* User */}
+   310→      <StaggerIn delay={0.05}>
+   311→        <div className="flex items-center gap-4 mb-6">
+   312→          <div className="relative w-16 h-16 rounded-full flex items-center justify-center overflow-hidden" style={{ background: profile?.avatar ? 'transparent' : 'linear-gradient(135deg, #e07a5f, #81b29a)' }}>
+   313→            {profile?.avatar ? <img src={profile.avatar} alt="Avatar" className="w-full h-full object-cover" /> : <span className="text-2xl font-light" style={{ fontFamily: 'Georgia, serif', color: 'var(--luna-text)' }}>{profile?.name?.charAt(0) || 'L'}</span>}
+   314→          </div>
+   315→          <div className="flex-1">
+   316→            <p className="text-xl font-light" style={{ fontFamily: 'Georgia, serif' }}>{profile?.name || 'Luna'}</p>
+   317→            <p className="text-sm" style={{ color: 'var(--luna-text-secondary)' }}>{t('profile_recorded_days')} {records.length} {t('common_days')} · {cycleStats.totalCycles} {t('profile_cycles')}</p>
+   318→          </div>
+   319→          <button className="w-10 h-10 rounded-xl flex items-center justify-center hover:scale-105 active:scale-95" style={{ background: 'var(--luna-card)', border: '1px solid var(--luna-card-border)' }} onClick={() => { setEditName(profile?.name || 'Luna'); setEditAvatar(profile?.avatar || ''); setEditCycleLength(profile?.cycleLength || 28); setEditPeriodLength(profile?.periodLength || 5); setProfileEditOpen(true); }}><Target size={16} style={{ color: 'var(--luna-text-secondary)' }} /></button>
+   320→        </div>
+   321→      </StaggerIn>
+   322→
+   323→      {/* Health */}
+   324→      <StaggerIn delay={0.1}>
+   325→        <div className="rounded-[20px] p-5 mb-4" style={{ background: 'var(--luna-card)', border: '1px solid var(--luna-card-border)' }}>
+   326→          <p className="text-sm font-medium mb-4">{t('profile_health')}</p>
+   327→          <div className="space-y-4">
+   328→            {[{ l: t('profile_avg_cycle'), v: `${cycleStats.avgCycle} ${t('common_days')}`, i: <TrendingUp size={16} style={{ color: '#81b29a' }} /> }, { l: t('profile_avg_period'), v: `${cycleStats.avgPeriod} ${t('common_days')}`, i: <Droplets size={16} style={{ color: '#e07a5f' }} /> }, { l: t('profile_last_period'), v: periods.length > 0 ? formatShortDate([...periods].sort((a, b) => b.startDate.localeCompare(a.startDate))[0].startDate) : t('profile_no_record'), i: <Calendar size={16} style={{ color: '#d4a574' }} /> }, { l: t('profile_cycle_regular'), v: cycleReg, i: <Check size={16} style={{ color: cycleReg === t('profile_insufficient') ? 'var(--luna-text-muted)' : '#81b29a' }} /> }].map((item, i) => (
+   329→              <div key={i}>
+   330→                <div className="flex justify-between items-center"><div className="flex items-center gap-2">{item.i}<span className="text-sm" style={{ color: 'var(--luna-text-secondary)' }}>{item.l}</span></div><span className="text-sm font-medium" style={{ color: item.v === t('profile_insufficient') ? 'var(--luna-text-muted)' : 'var(--luna-text)' }}>{item.v}</span></div>
+   331→                {item.l === t('profile_cycle_regular') && item.v === t('profile_insufficient') && (
+   332→                  <p className="text-[11px] mt-1 ml-6" style={{ color: 'var(--luna-text-muted)' }}>{t('profile_insufficient_tip')}</p>
+   333→                )}
+   334→              </div>
+   335→            ))}
+   336→          </div>
+   337→        </div>
+   338→      </StaggerIn>
+   339→
+   340→      {/* Reminders */}
+   341→      <StaggerIn delay={0.15}>
+   342→        <div className="rounded-[20px] p-5 mb-4" style={{ background: 'var(--luna-card)', border: '1px solid var(--luna-card-border)' }}>
+   343→          <p className="text-sm font-medium mb-3">{t('profile_notification')}</p>
+   344→          {[{ key: 'period_reminder', icon: Bell, l: t('profile_period_reminder'), d: t('profile_period_reminder_desc') }, { key: 'record_reminder', icon: Clock, l: t('profile_record_reminder'), d: t('profile_record_reminder_desc') }, { key: 'ovulation_reminder', icon: Crosshair, l: t('profile_ovulation_reminder'), d: t('profile_ovulation_reminder_desc') }].map(item => {
+   345→            const s = settings.find(s => s.key === item.key); const on = s?.value === 'true';
+   346→            return (
+   347→              <div key={item.key} className="flex items-center gap-3.5 py-3.5 cursor-pointer active:scale-[0.98]" onClick={async () => {
+   348→                const isTurningOn = (s?.value || 'false') === 'false';
+   349→                if (isTurningOn) {
+   350→                  const granted = await requestNotificationPermission();
+   351→                  if (!granted) {
+   352→                    toast({ description: t('notif_permission_denied') });
+   353→                    return;
+   354→                  }
+   355→                }
+   356→                toggleSetting(item.key, s?.value || 'false');
+   357→              }}>
+   358→                <div className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0" style={{ background: 'var(--luna-surface)' }}><item.icon size={20} style={{ color: 'var(--luna-text-secondary)' }} /></div>
+   359→                <div className="flex-1"><p className="text-[15px] font-medium" style={{ color: 'var(--luna-text)' }}>{item.l}</p><p className="text-xs" style={{ color: 'var(--luna-text-muted)' }}>{item.d}</p></div>
+   360→                <div className="w-12 h-7 rounded-full relative transition-all duration-300" style={{ background: on ? '#e07a5f' : 'var(--luna-surface)' }}><div className="absolute w-[22px] h-[22px] rounded-full top-[3px] transition-all duration-300" style={{ background: 'var(--luna-text)', left: on ? '23px' : '3px' }} /></div>
+   361→              </div>
+   362→            );
+   363→          })}
+   364→        </div>
+   365→      </StaggerIn>
+   366→
+   367→      {/* Privacy */}
+   368→      <StaggerIn delay={0.2}>
+   369→        <div className="rounded-[20px] p-5 mb-4" style={{ background: 'var(--luna-card)', border: '1px solid var(--luna-card-border)' }}>
+   370→          <p className="text-sm font-medium mb-3">{t('profile_privacy')}</p>
+   371→          {[{ icon: Shield, l: t('profile_app_lock'), d: appLockOn ? t('lock_status_enabled') : t('lock_status_disabled'), fn: () => setLockOpen(true), active: appLockOn }, { icon: Eye, l: t('profile_privacy_mode'), d: t('profile_privacy_mode_desc'), fn: () => toast({ description: '隐私模式开发中' }), active: false }, { icon: Lock, l: t('profile_data_encryption'), d: t('profile_data_encryption_desc'), fn: () => toast({ description: '数据加密开发中' }), active: false }].map((item, i) => (
+   372→            <div key={i} className="flex items-center gap-3.5 py-3.5 cursor-pointer active:scale-[0.98]" onClick={item.fn}>
+   373→              <div className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0" style={{ background: item.active ? 'rgba(129,178,154,0.12)' : 'var(--luna-surface)' }}><item.icon size={20} style={{ color: item.active ? '#81b29a' : 'var(--luna-text-secondary)' }} /></div>
+   374→              <div className="flex-1"><p className="text-[15px] font-medium">{item.l}</p><p className="text-xs" style={{ color: item.active ? '#81b29a' : 'var(--luna-text-muted)' }}>{item.d}</p></div>
+   375→              {item.active ? <div className="w-2 h-2 rounded-full" style={{ background: '#81b29a' }} /> : <ChevronRight size={20} style={{ color: 'var(--luna-text-muted)' }} />}
+   376→            </div>
+   377→          ))}
+   378→        </div>
+   379→      </StaggerIn>
+   380→
+   381→      {/* Appearance */}
+   382→      <StaggerIn delay={0.25}>
+   383→        <div className="rounded-[20px] p-5 mb-4" style={{ background: 'var(--luna-card)', border: '1px solid var(--luna-card-border)' }}>
+   384→          <p className="text-sm font-medium mb-3">{t('profile_appearance')}</p>
+   385→          {[{ icon: Moon, l: t('profile_dark_mode'), d: t('profile_dark_mode_desc'), toggle: true, tk: 'dark_mode' }, { icon: Palette, l: t('profile_theme_color'), d: t('profile_theme_color_desc'), fn: () => setThemeOpen(true) }, { icon: ImageIcon, l: t('wallpaper_title'), d: wallpaper ? t('wallpaper_set') : t('wallpaper_select'), fn: () => setWallpaperOpen(true) }].map((item, i) => {
+   386→            const s = item.tk ? settings.find(s => s.key === item.tk) : null; const on = s?.value === 'true';
+   387→            return (
+   388→              <div key={i} className="flex items-center gap-3.5 py-3.5 cursor-pointer active:scale-[0.98]" onClick={() => { if (item.tk) toggleSetting(item.tk, s?.value || 'false'); else item.fn?.(); }}>
+   389→                <div className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0" style={{ background: 'var(--luna-surface)' }}><item.icon size={20} style={{ color: 'var(--luna-text-secondary)' }} /></div>
+   390→                <div className="flex-1"><p className="text-[15px] font-medium">{item.l}</p><p className="text-xs" style={{ color: 'var(--luna-text-muted)' }}>{item.d}</p></div>
+   391→                {item.toggle ? <div className="w-12 h-7 rounded-full relative transition-all duration-300" style={{ background: on ? '#e07a5f' : 'var(--luna-surface)' }}><div className="absolute w-[22px] h-[22px] rounded-full top-[3px] transition-all duration-300" style={{ background: 'var(--luna-text)', left: on ? '23px' : '3px' }} /></div> : <ChevronRight size={20} style={{ color: 'var(--luna-text-muted)' }} />}
+   392→              </div>
+   393→            );
+   394→          })}
+   395→        </div>
+   396→      </StaggerIn>
+   397→
+   398→      {/* Data */}
+   399→      <StaggerIn delay={0.3}>
+   400→        <div className="rounded-[20px] p-5 mb-4" style={{ background: 'var(--luna-card)', border: '1px solid var(--luna-card-border)' }}>
+   401→          <p className="text-sm font-medium mb-3">{t('profile_data_management')}</p>
+   402→          {[{ icon: Download, l: t('profile_export_data'), d: t('profile_export_csv'), fn: exportCSV }, { icon: Share2, l: t('profile_export_wechat'), d: t('profile_export_wechat'), fn: shareWeChat }, { icon: Cloud, l: t('profile_cloud_sync'), d: t('profile_cloud_sync_desc'), fn: () => toast({ description: '云同步功能开发中' }) }, { icon: RotateCcw, l: t('profile_restore_data'), d: t('profile_restore_data_desc'), fn: () => toast({ description: '恢复数据功能开发中' }) }, { icon: Trash2, l: t('profile_reset_data'), d: t('profile_reset_data_desc'), fn: () => setResetOpen(true), danger: true }].map((item, i) => (
+   403→            <div key={i} className="flex items-center gap-3.5 py-3.5 cursor-pointer active:scale-[0.98]" onClick={item.fn}>
+   404→              <div className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0" style={{ background: 'var(--luna-surface)' }}><item.icon size={20} style={{ color: item.danger ? '#ef4444' : 'var(--luna-text-secondary)' }} /></div>
+   405→              <div className="flex-1"><p className="text-[15px] font-medium" style={{ color: item.danger ? '#ef4444' : 'var(--luna-text)' }}>{item.l}</p><p className="text-xs" style={{ color: 'var(--luna-text-muted)' }}>{item.d}</p></div>
+   406→              <ChevronRight size={20} style={{ color: item.danger ? '#ef4444' : 'var(--luna-text-muted)' }} />
+   407→            </div>
+   408→          ))}
+   409→        </div>
+   410→      </StaggerIn>
+   411→
+   412→      {/* Other */}
+   413→      <StaggerIn delay={0.35}>
+   414→        <div className="rounded-[20px] p-5 mb-4" style={{ background: 'var(--luna-card)', border: '1px solid var(--luna-card-border)' }}>
+   415→          <p className="text-sm font-medium mb-3">{t('profile_other')}</p>
+   416→          {[{ icon: Globe, l: t('profile_language'), d: LOCALE_NAMES[locale], fn: () => setLangOpen(true) }, { icon: Info, l: t('profile_about'), d: t('profile_version'), fn: () => toast({ description: 'Luna v2.0.0 🌙' }) }, { icon: MessageSquare, l: t('profile_feedback'), d: t('profile_feedback_desc'), fn: () => setFeedbackOpen(true) }].map((item, i) => (
+   417→            <div key={i} className="flex items-center gap-3.5 py-3.5 cursor-pointer active:scale-[0.98]" onClick={item.fn}>
+   418→              <div className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0" style={{ background: 'var(--luna-surface)' }}><item.icon size={20} style={{ color: 'var(--luna-text-secondary)' }} /></div>
+   419→              <div className="flex-1"><p className="text-[15px] font-medium">{item.l}</p><p className="text-xs" style={{ color: 'var(--luna-text-muted)' }}>{item.d}</p></div>
+   420→              <ChevronRight size={20} style={{ color: 'var(--luna-text-muted)' }} />
+   421→            </div>
+   422→          ))}
+   423→        </div>
+   424→      </StaggerIn>
+   425→
+   426→      <div className="mt-4 text-center mb-4">
+   427→        <p className="text-xs" style={{ color: 'var(--luna-text-muted)' }}>{t('profile_security_note1')}</p>
+   428→        <p className="text-xs mt-1" style={{ color: 'var(--luna-text-muted)' }}>{t('profile_security_note2')}</p>
+   429→      </div>
+   430→
+   431→      {/* Dialogs & Sheets */}
+   432→      <ResetDataDialog open={resetOpen} onClose={() => setResetOpen(false)} onConfirm={() => { resetData(); setResetOpen(false); }} />
+   433→
+   434→      <BottomSheet open={langOpen} onClose={() => setLangOpen(false)} title={t('profile_language')}>
+   435→        <div className="space-y-2">
+   436→          {(['zh', 'en', 'ko'] as Locale[]).map(loc => (
+   437→            <button key={loc} className="w-full flex items-center justify-between p-4 rounded-2xl transition-all active:scale-[0.98]" style={{ background: locale === loc ? 'rgba(224,122,95,0.15)' : 'var(--luna-card)', border: locale === loc ? '1.5px solid #e07a5f' : `1.5px solid var(--luna-card-border)` }} onClick={() => { setLocale(loc); setLangOpen(false); }}>
+   438→              <span className="text-[15px] font-medium">{LOCALE_NAMES[loc]}</span>
+   439→              {locale === loc && <Check size={18} style={{ color: '#e07a5f' }} />}
+   440→            </button>
+   441→          ))}
+   442→        </div>
+   443→      </BottomSheet>
+   444→
+   445→      {/* Theme Color Sheet */}
+   446→      <BottomSheet open={themeOpen} onClose={() => setThemeOpen(false)} title={t('theme_title')}>
+   447→        <p className="text-xs mb-3" style={{ color: 'var(--luna-text-muted)' }}>{t('theme_colors')}</p>
+   448→        <div className="grid grid-cols-3 gap-3">
+   449→          {THEME_COLORS.map(tc => (
+   450→            <button key={tc.primary} className="flex flex-col items-center gap-2 p-3 rounded-2xl transition-all" style={{ background: themeColor === tc.primary ? 'rgba(224,122,95,0.15)' : 'var(--luna-card)', border: themeColor === tc.primary ? '1.5px solid #e07a5f' : `1.5px solid var(--luna-card-border)` }} onClick={() => { setThemeColor(tc.primary); toast({ description: `${tc.name} ✨` }); }}>
+   451→              <div className="w-10 h-10 rounded-full" style={{ background: `linear-gradient(135deg, ${tc.primary}, ${tc.secondary})` }} />
+   452→              <span className="text-xs">{tc.name}</span>
+   453→            </button>
+   454→          ))}
+   455→        </div>
+   456→      </BottomSheet>
+   457→
+   458→      {/* Wallpaper Picker Sheet */}
+   459→      <BottomSheet
+   460→        open={wallpaperOpen}
+   461→        onClose={() => setWallpaperOpen(false)}
+   462→        title={t('wallpaper_title')}
+   463→        footer={wallpaper ? (
+   464→          <button className="w-full flex items-center justify-center gap-2 py-3.5 rounded-2xl transition-all active:scale-[0.98]" style={{ background: 'rgba(239,68,68,0.08)', border: '1.5px solid rgba(239,68,68,0.15)' }} onClick={removeWallpaper}>
+   465→            <Trash2 size={18} style={{ color: '#ef4444' }} />
+   466→            <span className="text-[15px] font-medium" style={{ color: '#ef4444' }}>{t('wallpaper_remove')}</span>
+   467→          </button>
+   468→        ) : undefined}
+   469→      >
+   470→        {/* Select Image from Gallery */}
+   471→        <input ref={wallpaperFileRef} type="file" accept="image/*" className="hidden" onChange={handleWallpaperFile} />
+   472→        <button className="w-full flex items-center gap-3 p-4 rounded-2xl mb-4 transition-all active:scale-[0.98]" style={{ background: 'var(--luna-card)', border: `1.5px solid var(--luna-card-border)` }} onClick={() => wallpaperFileRef.current?.click()}>
+   473→          <div className="w-10 h-10 rounded-xl flex items-center justify-center" style={{ background: 'rgba(224,122,95,0.15)' }}><ImageIcon size={20} style={{ color: '#e07a5f' }} /></div>
+   474→          <span className="text-[15px] font-medium">{t('wallpaper_select')}</span>
+   475→          <ChevronRight size={20} style={{ color: 'var(--luna-text-muted)', marginLeft: 'auto' }} />
+   476→        </button>
+   477→
+   478→        {/* Preset Wallpapers */}
+   479→        <p className="text-xs mb-3" style={{ color: 'var(--luna-text-muted)' }}>{t('wallpaper_preset')}</p>
+   480→        <div className="flex gap-2.5 overflow-x-auto pb-2 -mx-1 px-1" style={{ WebkitOverflowScrolling: 'touch', scrollbarWidth: 'none' }}>
+   481→          {PRESET_WALLPAPERS.map((pw, i) => (
+   482→            <button key={i} className="relative rounded-xl overflow-hidden flex-shrink-0 transition-all active:scale-95" style={{ width: '64px', height: '86px', background: pw.gradient, border: wallpaper && i === 0 ? '2px solid #e07a5f' : `1px solid var(--luna-card-border)` }} onClick={() => selectPresetWallpaper(pw.gradient)}>
+   483→              <div className="absolute inset-0 flex items-end justify-center pb-1">
+   484→                <span className="text-[9px] font-medium text-white drop-shadow-lg whitespace-nowrap">{pw.name}</span>
+   485→              </div>
+   486→            </button>
+   487→          ))}
+   488→        </div>
+   489→      </BottomSheet>
+   490→
+   491→      {/* Image Crop Dialog for Wallpaper */}
+   492→      <ImageCropDialog
+   493→        open={cropOpen}
+   494→        imageSrc={wallpaperImageSrc}
+   495→        onCropComplete={handleCropComplete}
+   496→        onCancel={handleCropCancel}
+   497→        cropShape="rect"
+   498→        aspectRatio={9 / 16}
+   499→      />
+   500→
+   501→      <LockSetupSheet
+   502→        open={lockOpen}
+   503→        onClose={() => setLockOpen(false)}
+   504→        isLockEnabled={appLockOn}
+   505→        toggleAppLock={(currentValue: string) => toggleSetting('app_lock', currentValue)}
+   506→        themeColor={themeColor}
+   507→      />
+   508→    </motion.div>
+   509→  );
+   510→}
+   511→

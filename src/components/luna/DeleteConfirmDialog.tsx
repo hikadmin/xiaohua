@@ -15,11 +15,11 @@ interface DeleteConfirmDialogProps {
 export default function DeleteConfirmDialog({
   open, recordId, date, setDeleteConfirm, deleteRecord,
 }: DeleteConfirmDialogProps) {
-  if (!open) return null;
-
   return (
     <AnimatePresence>
+      {open && (
       <motion.div
+        key="delete-confirm-dialog"
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
         exit={{ opacity: 0 }}
@@ -33,7 +33,7 @@ export default function DeleteConfirmDialog({
           exit={{ scale: 0.9, opacity: 0 }}
           transition={{ type: 'spring', damping: 25, stiffness: 300 }}
           className="w-full rounded-3xl p-6"
-          style={{ background: '#1a2027', border: '1px solid rgba(255,255,255,0.08)' }}
+          style={{ background: 'var(--luna-surface)', border: '1px solid rgba(255,255,255,0.08)' }}
           onClick={e => e.stopPropagation()}
         >
           <div className="w-14 h-14 rounded-2xl flex items-center justify-center mx-auto mb-4"
@@ -46,7 +46,7 @@ export default function DeleteConfirmDialog({
           </p>
           <div className="flex gap-3">
             <button className="flex-1 py-3 rounded-xl text-sm font-medium transition-all active:scale-95"
-              style={{ background: '#232b35', border: '1px solid rgba(255,255,255,0.08)', color: '#f0ece4' }}
+              style={{ background: 'var(--luna-card)', border: '1px solid rgba(255,255,255,0.08)', color: '#f0ece4' }}
               onClick={() => setDeleteConfirm({ open: false, recordId: '', date: '' })}>
               取消
             </button>
@@ -58,6 +58,7 @@ export default function DeleteConfirmDialog({
           </div>
         </motion.div>
       </motion.div>
+      )}
     </AnimatePresence>
   );
 }

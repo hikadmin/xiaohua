@@ -100,7 +100,7 @@ function NotificationItem({
       <motion.div
         className="relative flex items-center gap-3 p-4 rounded-2xl"
         style={{
-          background: '#232b35',
+          background: 'var(--luna-card)',
           border: '1px solid rgba(255,255,255,0.06)',
           x: swiped ? -80 : 0,
         }}
@@ -131,7 +131,7 @@ function NotificationItem({
           </p>
         </div>
         <div className="flex flex-col items-end gap-1 flex-shrink-0">
-          <span className="text-[10px]" style={{ color: '#6b7280' }}>
+          <span className="text-[10px]" style={{ color: 'var(--luna-text-muted)' }}>
             {getRelativeTime(notification.timestamp, t)}
           </span>
           <button
@@ -166,6 +166,7 @@ export default function NotificationPanel({
     <AnimatePresence>
       {open && (
         <motion.div
+          key="notification-panel"
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
@@ -180,11 +181,11 @@ export default function NotificationPanel({
             exit={{ y: '100%' }}
             transition={{ type: 'spring', damping: 25, stiffness: 300 }}
             className="absolute bottom-0 left-0 right-0 rounded-t-3xl flex flex-col"
-            style={{ background: '#1a2027', maxHeight: '75dvh' }}
+            style={{ background: 'var(--luna-surface)', maxHeight: '75dvh' }}
             onClick={e => e.stopPropagation()}
           >
             {/* Drag Handle */}
-            <div className="w-9 h-1 rounded-full mx-auto mt-3 mb-2 opacity-50" style={{ background: '#6b7280' }} />
+            <div className="w-9 h-1 rounded-full mx-auto mt-3 mb-2 opacity-50" style={{ background: 'var(--luna-text-muted)' }} />
 
             {/* Header */}
             <div className="flex items-center justify-between px-5 py-3 flex-shrink-0">
@@ -225,9 +226,9 @@ export default function NotificationPanel({
                     className="w-16 h-16 rounded-2xl flex items-center justify-center mb-4"
                     style={{ background: 'rgba(168,162,158,0.08)' }}
                   >
-                    <Bell size={28} style={{ color: '#6b7280' }} />
+                    <Bell size={28} style={{ color: 'var(--luna-text-muted)' }} />
                   </div>
-                  <p className="text-sm" style={{ color: '#6b7280' }}>
+                  <p className="text-sm" style={{ color: 'var(--luna-text-muted)' }}>
                     {t('notif_empty')}
                   </p>
                 </motion.div>

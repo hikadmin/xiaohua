@@ -16,11 +16,11 @@ interface SymptomSheetProps {
 export default function SymptomSheet({
   open, newSymptom, setNewSymptom, setSymptomSheetOpen, setCustomSymptoms, toast,
 }: SymptomSheetProps) {
-  if (!open) return null;
-
   return (
     <AnimatePresence>
+      {open && (
       <motion.div
+        key="symptom-sheet"
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
         exit={{ opacity: 0 }}
@@ -34,15 +34,15 @@ export default function SymptomSheet({
           exit={{ y: '100%' }}
           transition={{ type: 'spring', damping: 25, stiffness: 300 }}
           className="absolute bottom-0 left-0 right-0 rounded-t-3xl p-5 pb-8"
-          style={{ background: '#1a2027' }}
+          style={{ background: 'var(--luna-surface)' }}
           onClick={e => e.stopPropagation()}
         >
-          <div className="w-9 h-1 rounded-full mx-auto mb-4 opacity-50" style={{ background: '#6b7280' }} />
+          <div className="w-9 h-1 rounded-full mx-auto mb-4 opacity-50" style={{ background: 'var(--luna-text-muted)' }} />
           <div className="text-center mb-4"><span className="font-medium">添加自定义症状</span></div>
           <div className="mb-4">
             <input type="text"
               className="w-full rounded-xl p-3 text-sm outline-none transition-all"
-              style={{ background: '#232b35', border: '1.5px solid rgba(255,255,255,0.06)', color: '#f0ece4' }}
+              style={{ background: 'var(--luna-card)', border: '1.5px solid rgba(255,255,255,0.06)', color: '#f0ece4' }}
               placeholder="输入症状名称..."
               value={newSymptom}
               onChange={e => setNewSymptom(e.target.value)}
@@ -74,12 +74,13 @@ export default function SymptomSheet({
             添加
           </motion.button>
           <div className="text-center py-4 cursor-pointer transition-colors"
-            style={{ color: '#6b7280' }}
+            style={{ color: 'var(--luna-text-muted)' }}
             onClick={() => { setSymptomSheetOpen(false); setNewSymptom(''); }}>
             取消
           </div>
         </motion.div>
       </motion.div>
+      )}
     </AnimatePresence>
   );
 }

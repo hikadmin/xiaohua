@@ -547,3 +547,40 @@ Stage Summary:
   - 深色主题：深色背景(#0f1419)，浅色文字(#f0ece4)，暗色卡片(#232b35)
 - ✅ 提醒设置：开启提醒时自动请求通知权限，权限被拒时显示提示Toast
   - 无头浏览器中权限自动拒绝是预期行为，真实手机上正常
+
+---
+Task ID: 12
+Agent: Main
+Task: 修复经期来了标记功能 + 全面测试所有功能确保交付
+
+Work Log:
+- 用户报告"经期来了"标记功能无法使用
+- 使用 agent-browser 测试发现：功能本身正常，但 toast 显示原始 i18n key 而非翻译文本
+- 根因：6个 ActionSheet 相关 i18n key 在 translations.ts 中缺失
+  - action_period_started, action_period_ended, action_start_updated
+  - action_period_cancelled, action_period_extended, action_end_before_start
+- 修复：添加所有6个缺失的 i18n key（zh/en/ko 三语）
+- 全面 QA 测试发现3个额外 bug：
+  1. BottomSheet/LockSetupSheet 等组件使用 `if (!open) return null` 在 AnimatePresence 之前
+     - 导致退出动画无法播放，弹窗可能卡住无法关闭
+     - 修复：移除 early return，改用 `{open && (...)}` 包裹内容
+     - 添加 key prop 确保 AnimatePresence 正确追踪
+     - 将 overlay 点击从内层 div 移到外层 motion.div
+  2. 编辑记录时保存按钮显示 toast 文本"记录已更新 ✨"而非按钮文本
+     - 修复：新增 `log_save_edit` i18n key（更新记录/Update Record/기록 수정）
+  3. 多个底部弹窗组件仍使用硬编码颜色
+     - 修复：所有6个弹窗组件更新为使用 CSS 变量
+- 全面验证结果（31项测试，30项通过，1项已修复后通过）：
+  - ✅ 首页：周期信息、阶段显示、每日小贴士、通知铃铛
+  - ✅ 日历：网格显示、经期来了/走了、取消记录、回到今天
+  - ✅ 记录：保存记录、编辑记录、删除记录、历史查看
+  - ✅ 我的：深色模式切换、主题颜色(无范围切换)、语言切换、壁纸、应用锁、导出数据
+  - ✅ 所有弹窗点击遮罩可关闭（之前无法关闭的bug已修复）
+  - ✅ 所有 toast 消息显示正确翻译文本（无原始 i18n key）
+- lint 通过，dev server 无报错
+
+Stage Summary:
+- "经期来了"标记功能已修复：添加缺失的 i18n 翻译键
+- 底部弹窗关闭bug已修复：6个组件的 AnimatePresence 模式统一修正
+- 编辑记录按钮文本已修复：显示"更新记录"而非 toast 文本
+- 所有功能通过 QA 验证，可正常交付
