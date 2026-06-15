@@ -3,10 +3,14 @@
 import React from 'react';
 import { motion } from 'framer-motion';
 import { ChevronLeft, ChevronRight, Droplets } from 'lucide-react';
+import { useI18n } from '@/lib/i18n';
+import type { TKey } from '@/lib/i18n';
 import {
-  WEEKDAYS_SHORT, parseDate, daysBetween,
+  parseDate, daysBetween,
   type CalendarDay, type Period,
 } from './shared';
+
+const WEEKDAY_SHORT_KEYS: TKey[] = ['week_sun', 'week_mon', 'week_tue', 'week_wed', 'week_thu', 'week_fri', 'week_sat'];
 
 interface CalendarTabProps {
   calYear: number;
@@ -24,6 +28,8 @@ export default function CalendarTab({
   calYear, calMonth, setCalYear, setCalMonth,
   isCurrentMonth, today, calendarDays, periods, setActionSheet,
 }: CalendarTabProps) {
+  const { t } = useI18n();
+
   return (
     <motion.div
       key="calendar"
@@ -46,13 +52,13 @@ export default function CalendarTab({
         </button>
         <div className="flex items-center gap-3">
           <p className="text-xl font-light" style={{ fontFamily: 'Georgia, serif' }}>
-            {calYear}年{calMonth}月
+            {t('calendar_month_format', calYear, calMonth)}
           </p>
           {!isCurrentMonth && (
             <button className="text-xs px-3 py-1 rounded-full transition-all hover:scale-105"
               style={{ background: 'rgba(224,122,95,0.15)', color: '#e07a5f' }}
               onClick={() => { setCalYear(today.getFullYear()); setCalMonth(today.getMonth() + 1); }}>
-              回到今天
+              {t('calendar_back_today')}
             </button>
           )}
         </div>
@@ -69,8 +75,8 @@ export default function CalendarTab({
 
       {/* Weekday Headers */}
       <div className="grid grid-cols-7 gap-1 mb-2">
-        {WEEKDAYS_SHORT.map((d, i) => (
-          <div key={i} className="text-center text-xs py-2 font-medium" style={{ color: i === 0 || i === 6 ? '#e07a5f80' : '#6b7280' }}>{d}</div>
+        {WEEKDAY_SHORT_KEYS.map((wk, i) => (
+          <div key={i} className="text-center text-xs py-2 font-medium" style={{ color: i === 0 || i === 6 ? '#e07a5f80' : '#6b7280' }}>{t(wk)}</div>
         ))}
       </div>
 
@@ -156,12 +162,12 @@ export default function CalendarTab({
 
       {/* Legend */}
       <div className="rounded-[20px] p-5" style={{ background: '#232b35', border: '1px solid rgba(255,255,255,0.08)' }}>
-        <p className="text-sm font-medium mb-4">日历图例</p>
+        <p className="text-sm font-medium mb-4">{t('calendar_legend')}</p>
         <div className="space-y-3">
           {[
-            { color: '#e07a5f', bg: 'rgba(224,122,95,0.25)', border: '2px solid #e07a5f', label: '经期', desc: '点击日期可记录或取消' },
-            { color: '#81b29a', bg: 'transparent', border: '2px dashed #81b29a', label: '预测经期', desc: '根据周期推算的下次日期' },
-            { color: '#d4a574', bg: 'rgba(212,165,116,0.25)', border: '2px solid #d4a574', label: '易孕期', desc: '排卵期前后，受孕几率较高' },
+            { color: '#e07a5f', bg: 'rgba(224,122,95,0.25)', border: '2px solid #e07a5f', label: t('calendar_period_label'), desc: t('calendar_period_desc') },
+            { color: '#81b29a', bg: 'transparent', border: '2px dashed #81b29a', label: t('calendar_predicted_period'), desc: t('calendar_predicted_desc') },
+            { color: '#d4a574', bg: 'rgba(212,165,116,0.25)', border: '2px solid #d4a574', label: t('calendar_fertile_window'), desc: t('calendar_fertile_desc') },
           ].map((item, i) => (
             <div key={i} className="flex items-center gap-3 p-3 rounded-xl transition-all"
               style={{ background: '#1a2027' }}>
@@ -181,11 +187,11 @@ export default function CalendarTab({
       {/* Cycle History Summary */}
       {periods.length > 1 && (
         <div className="rounded-[20px] p-5 mt-4" style={{ background: '#232b35', border: '1px solid rgba(255,255,255,0.08)' }}>
-          <p className="text-sm font-medium mb-4">周期历史</p>
+          <p className="text-sm font-medium mb-4">{t('calendar_cycle_history')}</p>
           {[...periods].sort((a, b) => b.startDate.localeCompare(a.startDate)).slice(0, 5).map(period => {
             const startD = parseDate(period.startDate);
             const endD = period.endDate ? parseDate(period.endDate) : null;
-            const len = endD ? daysBetween(startD, endD) + 1 : '进行中';
+            const len = endD ? daysBetween(startD, endD) + 1 : null;
             return (
               <div key={period.id} className="flex items-center gap-3 py-2.5 border-b last:border-0"
                 style={{ borderColor: 'rgba(255,255,255,0.04)' }}>
@@ -194,10 +200,15 @@ export default function CalendarTab({
                   <Droplets size={14} style={{ color: '#e07a5f' }} />
                 </div>
                 <div className="flex-1">
-                  <p className="text-sm font-medium">{startD.getMonth() + 1}月{startD.getDate()}日 — {endD ? `${endD.getMonth() + 1}月${endD.getDate()}日` : '进行中'}</p>
+                  <p className="text-sm font-medium">
+                    {endD
+                      ? t('calendar_date_range', startD.getMonth() + 1, startD.getDate(), endD.getMonth() + 1, endD.getDate())
+                      : `${t('home_date_short', startD.getMonth() + 1, startD.getDate())} — ${t('calendar_ongoing')}`
+                    }
+                  </p>
                 </div>
                 <span className="text-xs px-2 py-1 rounded-md" style={{ background: 'rgba(255,255,255,0.05)', color: '#a8a29e' }}>
-                  {typeof len === 'number' ? `${len}天` : len}
+                  {len !== null ? t('calendar_n_days', len) : t('calendar_ongoing')}
                 </span>
               </div>
             );

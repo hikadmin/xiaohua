@@ -1,12 +1,12 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   Calendar, TrendingUp, Droplets, Check, Bell, Clock, Crosshair,
   Shield, Eye, Lock, Moon, Sun, Download, Cloud, RotateCcw,
   Globe, Info, MessageSquare, ChevronRight, Target,
-  Trash2, Palette, Share2, AlertTriangle,
+  Trash2, Palette, Share2, AlertTriangle, Image as ImageIcon,
 } from 'lucide-react';
 import { useI18n, LOCALE_NAMES, type Locale } from '@/lib/i18n';
 import {
@@ -14,6 +14,7 @@ import {
   type DailyRecord, type UserProfile, type Setting, type Period,
   type CycleStats, type CycleInfo,
 } from './shared';
+import ImageCropDialog from './ImageCropDialog';
 
 const THEME_COLORS = [
   { name: '暖橙', primary: '#e07a5f', secondary: '#d4a574' },
@@ -22,6 +23,14 @@ const THEME_COLORS = [
   { name: '星空紫', primary: '#9b8ec4', secondary: '#8577b0' },
   { name: '海洋蓝', primary: '#5b9bd5', secondary: '#4a8bc4' },
   { name: '日落金', primary: '#d4a574', secondary: '#c49464' },
+];
+
+const PRESET_WALLPAPERS = [
+  { name: '日落暖光', gradient: 'linear-gradient(135deg, #ff6b35, #f7931e, #ffcc02)' },
+  { name: '海洋深蓝', gradient: 'linear-gradient(135deg, #0f3460, #16537e, #1a8a8a)' },
+  { name: '森林绿意', gradient: 'linear-gradient(135deg, #134e5e, #1a6b3c, #2ecc71)' },
+  { name: '夜空星河', gradient: 'linear-gradient(135deg, #0f0c29, #302b63, #24243e)' },
+  { name: '樱花粉黛', gradient: 'linear-gradient(135deg, #ee9ca7, #ffdde1, #f8b4c8)' },
 ];
 
 interface ProfileTabProps {
@@ -43,6 +52,10 @@ interface ProfileTabProps {
   resetData: () => void;
   themeColor: string;
   setThemeColor: (color: string) => void;
+  wallpaper: string;
+  setWallpaper: (wp: string) => void;
+  themeScope: 'local' | 'global';
+  setThemeScope: (scope: 'local' | 'global') => void;
 }
 
 function ResetDataDialog({ open, onClose, onConfirm }: { open: boolean; onClose: () => void; onConfirm: () => void }) {
@@ -89,7 +102,7 @@ function BottomSheet({ open, onClose, title, children }: { open: boolean; onClos
     <AnimatePresence>{open && (
       <motion.div className="fixed inset-0 z-[200] flex items-end justify-center" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
         <div className="absolute inset-0 bg-black/50" onClick={onClose} />
-        <motion.div className="relative w-full max-w-md rounded-t-[24px] p-6 pb-10" style={{ background: '#1a2027', border: '1px solid rgba(255,255,255,0.08)' }} initial={{ y: 300 }} animate={{ y: 0 }} exit={{ y: 300 }} transition={{ type: 'spring', damping: 25, stiffness: 300 }}>
+        <motion.div className="relative w-full max-w-md rounded-t-[24px] p-6 pb-10 max-h-[85vh] overflow-y-auto" style={{ background: '#1a2027', border: '1px solid rgba(255,255,255,0.08)' }} initial={{ y: 300 }} animate={{ y: 0 }} exit={{ y: 300 }} transition={{ type: 'spring', damping: 25, stiffness: 300 }}>
           <div className="w-10 h-1 rounded-full mx-auto mb-4" style={{ background: 'rgba(255,255,255,0.1)' }} />
           <p className="text-lg font-medium text-center mb-4">{title}</p>
           {children}
@@ -103,6 +116,7 @@ export default function ProfileTab({
   profile, records, periods, cycleStats, settings, cycleInfo,
   setProfileEditOpen, setEditName, setEditAvatar, setEditCycleLength, setEditPeriodLength,
   toggleSetting, exportCSV, setFeedbackOpen, toast, resetData, themeColor, setThemeColor,
+  wallpaper, setWallpaper, themeScope, setThemeScope,
 }: ProfileTabProps) {
   const { t, locale, setLocale } = useI18n();
   const [resetOpen, setResetOpen] = useState(false);
@@ -113,6 +127,21 @@ export default function ProfileTab({
   const [pinStep, setPinStep] = useState<'set'|'confirm'>('set');
   const [firstPin, setFirstPin] = useState('');
 
+  // Wallpaper state
+  const [wallpaperOpen, setWallpaperOpen] = useState(false);
+  const [wallpaperImageSrc, setWallpaperImageSrc] = useState('');
+  const [cropOpen, setCropOpen] = useState(false);
+  const wallpaperFileRef = useRef<HTMLInputElement>(null);
+
+  // Apply theme scope effect
+  useEffect(() => {
+    if (themeScope === 'global') {
+      document.documentElement.style.setProperty('--theme-color', themeColor);
+    } else {
+      document.documentElement.style.removeProperty('--theme-color');
+    }
+  }, [themeScope, themeColor]);
+
   const cycleReg = (() => {
     if (cycleStats.cycleLengths.length < 2) return t('profile_insufficient');
     const avg = cycleStats.avgCycle;
@@ -120,9 +149,143 @@ export default function ProfileTab({
     return Math.sqrt(v) <= 4 ? t('profile_regular') : t('profile_irregular');
   })();
 
-  const shareWeChat = () => {
-    if (navigator.share) { navigator.share({ title: 'Luna', text: '我在使用 Luna 经期追踪应用，推荐给你！', url: window.location.href }).catch(() => {}); }
-    else { navigator.clipboard.writeText(`${window.location.href} - Luna 经期追踪`).then(() => toast({ description: '链接已复制，可分享给好友 📋' })).catch(() => toast({ description: '分享功能暂不可用' })); }
+  // Task 6: Enhanced WeChat share
+  const shareWeChat = async () => {
+    // Try native share first (works well on mobile, includes WeChat option)
+    if (navigator.share) {
+      try {
+        await navigator.share({
+          title: 'Luna',
+          text: '我在使用 Luna 经期追踪应用，推荐给你！',
+          url: window.location.href,
+        });
+        return;
+      } catch {
+        // User cancelled or share failed, fallback
+      }
+    }
+
+    // Fallback: generate share image via canvas and copy link
+    try {
+      const canvas = document.createElement('canvas');
+      canvas.width = 600;
+      canvas.height = 400;
+      const ctx = canvas.getContext('2d');
+      if (!ctx) throw new Error('No canvas');
+
+      // Background
+      const bgGrad = ctx.createLinearGradient(0, 0, 600, 400);
+      bgGrad.addColorStop(0, '#1a2027');
+      bgGrad.addColorStop(1, '#0f1419');
+      ctx.fillStyle = bgGrad;
+      ctx.fillRect(0, 0, 600, 400);
+
+      // Accent circle
+      const accentGrad = ctx.createRadialGradient(300, 140, 10, 300, 140, 80);
+      accentGrad.addColorStop(0, themeColor);
+      accentGrad.addColorStop(1, 'transparent');
+      ctx.fillStyle = accentGrad;
+      ctx.fillRect(0, 0, 600, 400);
+
+      // Logo circle
+      ctx.beginPath();
+      ctx.arc(300, 130, 40, 0, Math.PI * 2);
+      const logoGrad = ctx.createLinearGradient(260, 90, 340, 170);
+      logoGrad.addColorStop(0, themeColor);
+      logoGrad.addColorStop(1, '#81b29a');
+      ctx.fillStyle = logoGrad;
+      ctx.fill();
+
+      // Logo text
+      ctx.fillStyle = '#0f1419';
+      ctx.font = 'bold 32px Georgia, serif';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText('L', 300, 132);
+
+      // App name
+      ctx.fillStyle = '#f0ece4';
+      ctx.font = '28px Georgia, serif';
+      ctx.fillText('Luna', 300, 200);
+
+      // Description
+      ctx.fillStyle = '#a8a29e';
+      ctx.font = '16px sans-serif';
+      ctx.fillText('经期追踪 · 周期管理 · 健康记录', 300, 240);
+
+      // URL
+      ctx.fillStyle = themeColor;
+      ctx.font = '14px sans-serif';
+      ctx.fillText(window.location.host, 300, 300);
+
+      // Copy link to clipboard
+      await navigator.clipboard.writeText(`${window.location.href} - Luna 经期追踪`);
+      toast({ description: '链接已复制，可分享给好友 📋' });
+    } catch {
+      toast({ description: '分享功能暂不可用' });
+    }
+  };
+
+  // Wallpaper: handle file selection
+  const handleWallpaperFile = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (file.size > 5 * 1024 * 1024) {
+      toast({ description: '图片大小不能超过5MB' });
+      return;
+    }
+    const reader = new FileReader();
+    reader.onload = () => {
+      setWallpaperImageSrc(reader.result as string);
+      setCropOpen(true);
+    };
+    reader.readAsDataURL(file);
+    // Reset input so same file can be re-selected
+    e.target.value = '';
+  };
+
+  const handleCropComplete = (croppedBase64: string) => {
+    setWallpaper(croppedBase64);
+    setCropOpen(false);
+    setWallpaperImageSrc('');
+    setWallpaperOpen(false);
+    toast({ description: t('wallpaper_set') });
+  };
+
+  const handleCropCancel = () => {
+    setCropOpen(false);
+    setWallpaperImageSrc('');
+  };
+
+  const selectPresetWallpaper = (gradient: string) => {
+    // Create a small canvas to convert gradient to base64
+    const canvas = document.createElement('canvas');
+    canvas.width = 360;
+    canvas.height = 640;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+
+    // Parse gradient colors from the string
+    const colorMatches = gradient.match(/#[0-9a-fA-F]{6}/g);
+    if (!colorMatches || colorMatches.length < 2) return;
+
+    const grad = ctx.createLinearGradient(0, 0, 360, 640);
+    colorMatches.forEach((color, i) => {
+      grad.addColorStop(i / (colorMatches.length - 1), color);
+    });
+    ctx.fillStyle = grad;
+    ctx.fillRect(0, 0, 360, 640);
+
+    const base64 = canvas.toDataURL('image/jpeg', 0.85);
+    setWallpaper(base64);
+    setWallpaperOpen(false);
+    toast({ description: t('wallpaper_set') });
+  };
+
+  const removeWallpaper = () => {
+    setWallpaper('');
+    setWallpaperOpen(false);
+    toast({ description: t('wallpaper_removed') });
   };
 
   const handlePin = (d: string) => {
@@ -212,7 +375,7 @@ export default function ProfileTab({
       <StaggerIn delay={0.25}>
         <div className="rounded-[20px] p-5 mb-4" style={{ background: '#232b35', border: '1px solid rgba(255,255,255,0.08)' }}>
           <p className="text-sm font-medium mb-3">{t('profile_appearance')}</p>
-          {[{ icon: Moon, l: t('profile_dark_mode'), d: t('profile_dark_mode_desc'), toggle: true, tk: 'dark_mode' }, { icon: Palette, l: t('profile_theme_color'), d: t('profile_theme_color_desc'), fn: () => setThemeOpen(true) }].map((item, i) => {
+          {[{ icon: Moon, l: t('profile_dark_mode'), d: t('profile_dark_mode_desc'), toggle: true, tk: 'dark_mode' }, { icon: Palette, l: t('profile_theme_color'), d: t('profile_theme_color_desc'), fn: () => setThemeOpen(true) }, { icon: ImageIcon, l: t('wallpaper_title'), d: wallpaper ? t('wallpaper_set') : t('wallpaper_select'), fn: () => setWallpaperOpen(true) }].map((item, i) => {
             const s = item.tk ? settings.find(s => s.key === item.tk) : null; const on = s?.value === 'true';
             return (
               <div key={i} className="flex items-center gap-3.5 py-3.5 cursor-pointer active:scale-[0.98]" onClick={() => { if (item.tk) toggleSetting(item.tk, s?.value || 'false'); else item.fn?.(); }}>
@@ -272,7 +435,16 @@ export default function ProfileTab({
         </div>
       </BottomSheet>
 
+      {/* Theme Color Sheet with Scope Toggle */}
       <BottomSheet open={themeOpen} onClose={() => setThemeOpen(false)} title={t('theme_title')}>
+        {/* Scope Toggle */}
+        <div className="flex items-center justify-between mb-4 p-3 rounded-2xl" style={{ background: '#232b35' }}>
+          <span className="text-sm" style={{ color: '#a8a29e' }}>{t('theme_scope')}</span>
+          <div className="flex rounded-xl overflow-hidden" style={{ background: '#0f1419' }}>
+            <button className="px-4 py-2 text-xs font-medium transition-all" style={{ background: themeScope === 'local' ? themeColor : 'transparent', color: themeScope === 'local' ? '#0f1419' : '#6b7280' }} onClick={() => setThemeScope('local')}>{t('theme_scope_local')}</button>
+            <button className="px-4 py-2 text-xs font-medium transition-all" style={{ background: themeScope === 'global' ? themeColor : 'transparent', color: themeScope === 'global' ? '#0f1419' : '#6b7280' }} onClick={() => setThemeScope('global')}>{t('theme_scope_global')}</button>
+          </div>
+        </div>
         <p className="text-xs mb-3" style={{ color: '#6b7280' }}>{t('theme_colors')}</p>
         <div className="grid grid-cols-3 gap-3">
           {THEME_COLORS.map(tc => (
@@ -283,6 +455,47 @@ export default function ProfileTab({
           ))}
         </div>
       </BottomSheet>
+
+      {/* Wallpaper Picker Sheet */}
+      <BottomSheet open={wallpaperOpen} onClose={() => setWallpaperOpen(false)} title={t('wallpaper_title')}>
+        {/* Select Image from Gallery */}
+        <input ref={wallpaperFileRef} type="file" accept="image/*" className="hidden" onChange={handleWallpaperFile} />
+        <button className="w-full flex items-center gap-3 p-4 rounded-2xl mb-4 transition-all active:scale-[0.98]" style={{ background: '#232b35', border: '1.5px solid rgba(255,255,255,0.06)' }} onClick={() => wallpaperFileRef.current?.click()}>
+          <div className="w-10 h-10 rounded-xl flex items-center justify-center" style={{ background: 'rgba(224,122,95,0.15)' }}><ImageIcon size={20} style={{ color: '#e07a5f' }} /></div>
+          <span className="text-[15px] font-medium">{t('wallpaper_select')}</span>
+          <ChevronRight size={20} style={{ color: '#6b7280', marginLeft: 'auto' }} />
+        </button>
+
+        {/* Preset Wallpapers */}
+        <p className="text-xs mb-3" style={{ color: '#6b7280' }}>{t('wallpaper_preset')}</p>
+        <div className="grid grid-cols-5 gap-2 mb-4">
+          {PRESET_WALLPAPERS.map((pw, i) => (
+            <button key={i} className="relative rounded-xl overflow-hidden aspect-[9/16] transition-all active:scale-95" style={{ background: pw.gradient, border: wallpaper && i === 0 ? '2px solid #e07a5f' : '1px solid rgba(255,255,255,0.06)' }} onClick={() => selectPresetWallpaper(pw.gradient)}>
+              <div className="absolute inset-0 flex items-end justify-center pb-1">
+                <span className="text-[9px] font-medium text-white drop-shadow-lg">{pw.name}</span>
+              </div>
+            </button>
+          ))}
+        </div>
+
+        {/* Remove Wallpaper */}
+        {wallpaper && (
+          <button className="w-full flex items-center gap-3 p-4 rounded-2xl transition-all active:scale-[0.98]" style={{ background: 'rgba(239,68,68,0.08)', border: '1.5px solid rgba(239,68,68,0.15)' }} onClick={removeWallpaper}>
+            <div className="w-10 h-10 rounded-xl flex items-center justify-center" style={{ background: 'rgba(239,68,68,0.15)' }}><Trash2 size={20} style={{ color: '#ef4444' }} /></div>
+            <span className="text-[15px] font-medium" style={{ color: '#ef4444' }}>{t('wallpaper_remove')}</span>
+          </button>
+        )}
+      </BottomSheet>
+
+      {/* Image Crop Dialog for Wallpaper */}
+      <ImageCropDialog
+        open={cropOpen}
+        imageSrc={wallpaperImageSrc}
+        onCropComplete={handleCropComplete}
+        onCancel={handleCropCancel}
+        cropShape="rect"
+        aspectRatio={9 / 16}
+      />
 
       <BottomSheet open={lockOpen} onClose={() => { setLockOpen(false); setPin(''); setFirstPin(''); setPinStep('set'); }} title={t('lock_title')}>
         <div className="text-center mb-4">

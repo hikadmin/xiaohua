@@ -19,6 +19,7 @@ import SymptomSheet from '@/components/luna/SymptomSheet';
 import ProfileEditSheet from '@/components/luna/ProfileEditSheet';
 import DeleteConfirmDialog from '@/components/luna/DeleteConfirmDialog';
 import FeedbackSheet from '@/components/luna/FeedbackSheet';
+import NotificationPanel, { type LunaNotification } from '@/components/luna/NotificationPanel';
 import {
   periodsApi, recordsApi, profileApi, settingsApi, feedbackApi, seedApi, exportApi,
   ApiError,
@@ -79,6 +80,10 @@ export default function LunaApp() {
   const [editAvatar, setEditAvatar] = useState('');
   const fileInputRef = React.useRef<HTMLInputElement>(null);
 
+  // Notification state
+  const [notifications, setNotifications] = useState<LunaNotification[]>([]);
+  const [notificationPanelOpen, setNotificationPanelOpen] = useState(false);
+
   // Daily tip state
   const [dailyTipIndex, setDailyTipIndex] = useState(() => {
     const t = new Date();
@@ -88,10 +93,29 @@ export default function LunaApp() {
   // Theme color state
   const [themeColor, setThemeColorState] = useState('#e07a5f');
 
+  // Wallpaper state
+  const [wallpaper, setWallpaperState] = useState('');
+
+  // Theme scope state
+  const [themeScope, setThemeScopeState] = useState<'local' | 'global'>('global');
+
+  // App lock state
+  const [lockScreenPin, setLockScreenPin] = useState('');
+  const [lockScreenShake, setLockScreenShake] = useState(false);
+  const [isUnlocked, setIsUnlocked] = useState(false);
+
   useEffect(() => {
     try {
       const saved = localStorage.getItem('luna_theme_color');
       if (saved) setThemeColorState(saved);
+    } catch {}
+    try {
+      const savedWp = localStorage.getItem('luna_wallpaper');
+      if (savedWp) setWallpaperState(savedWp);
+    } catch {}
+    try {
+      const savedScope = localStorage.getItem('luna_theme_scope');
+      if (savedScope === 'local' || savedScope === 'global') setThemeScopeState(savedScope);
     } catch {}
   }, []);
 
@@ -99,6 +123,61 @@ export default function LunaApp() {
     setThemeColorState(color);
     try { localStorage.setItem('luna_theme_color', color); } catch {}
   }, []);
+
+  const setWallpaper = useCallback((wp: string) => {
+    setWallpaperState(wp);
+    try { if (wp) localStorage.setItem('luna_wallpaper', wp); else localStorage.removeItem('luna_wallpaper'); } catch {}
+  }, []);
+
+  const setThemeScope = useCallback((scope: 'local' | 'global') => {
+    setThemeScopeState(scope);
+    try { localStorage.setItem('luna_theme_scope', scope); } catch {}
+  }, []);
+
+  // Apply theme color as CSS custom property when scope is global
+  useEffect(() => {
+    if (themeScope === 'global') {
+      document.documentElement.style.setProperty('--theme-color', themeColor);
+    } else {
+      document.documentElement.style.removeProperty('--theme-color');
+    }
+  }, [themeScope, themeColor]);
+
+  // Check if app lock should be shown
+  const shouldShowLockScreen = (() => {
+    if (isUnlocked) return false;
+    try {
+      const appLock = localStorage.getItem('luna_app_lock');
+      const pin = localStorage.getItem('luna_pin');
+      // Check settings as well
+      const hasLockSetting = settings.find(s => s.key === 'app_lock')?.value === 'true';
+      return (hasLockSetting || appLock === 'true') && pin;
+    } catch {
+      return false;
+    }
+  })();
+
+  const handleLockScreenPin = (d: string) => {
+    if (lockScreenPin.length < 4) {
+      const np = lockScreenPin + d;
+      setLockScreenPin(np);
+      if (np.length === 4) {
+        try {
+          const savedPin = localStorage.getItem('luna_pin');
+          if (savedPin && np === savedPin) {
+            setIsUnlocked(true);
+          } else {
+            // Wrong PIN
+            setLockScreenShake(true);
+            setTimeout(() => { setLockScreenShake(false); setLockScreenPin(''); }, 600);
+            toast({ description: t('lock_wrong_pin') });
+          }
+        } catch {
+          setLockScreenPin('');
+        }
+      }
+    }
+  };
 
   const { toast } = useToast();
 
@@ -120,7 +199,21 @@ export default function LunaApp() {
   }, [toast]);
 
   const seedData = useCallback(async () => {
-    try { await seedApi.create(); } catch {}
+    // 仅首次安装时初始化，版本更新时迁移
+    try {
+      const initialized = localStorage.getItem('luna_initialized');
+      if (!initialized) {
+        await seedApi.create();
+        localStorage.setItem('luna_initialized', '2'); // APP_VERSION
+      } else {
+        const savedVersion = parseInt(initialized);
+        if (savedVersion < 2) {
+          // 版本迁移：补充新增设置项
+          await seedApi.create();
+          localStorage.setItem('luna_initialized', '2');
+        }
+      }
+    } catch {}
   }, []);
 
   useEffect(() => {
@@ -132,6 +225,93 @@ export default function LunaApp() {
     };
     init();
   }, [seedData, fetchPeriods, fetchRecords, fetchProfile, fetchSettings]);
+
+  // ============ Notification Logic ============
+  // Load notifications from localStorage on mount
+  useEffect(() => {
+    try {
+      const saved = localStorage.getItem('luna_notifications');
+      if (saved) {
+        setNotifications(JSON.parse(saved));
+      }
+    } catch {}
+  }, []);
+
+  // Save notifications to localStorage when they change
+  useEffect(() => {
+    try {
+      localStorage.setItem('luna_notifications', JSON.stringify(notifications));
+    } catch {}
+  }, [notifications]);
+
+  // Generate notifications from app data when data loads or changes
+  useEffect(() => {
+    if (!isLoaded) return;
+    const newNotifs: LunaNotification[] = [];
+    const ci = getCycleInfo();
+    const todayStr = formatDateStr(new Date());
+
+    // 1. Period reminder: if period is predicted within 1-3 days
+    if (ci.daysUntilNext >= 1 && ci.daysUntilNext <= 3) {
+      const existing = notifications.find(n => n.type === 'period' && n.message.includes(String(ci.daysUntilNext)));
+      if (!existing) {
+        newNotifs.push({
+          id: `period-${todayStr}`,
+          type: 'period',
+          title: t('notif_period_coming'),
+          message: `${ci.daysUntilNext}${t('notif_period_days')}`,
+          timestamp: Date.now(),
+        });
+      }
+    }
+
+    // 2. Record reminder: if no record for today
+    const todayRecord = records.find(r => r.date === todayStr);
+    if (!todayRecord) {
+      const existing = notifications.find(n => n.type === 'record' && n.id.startsWith('record-'));
+      if (!existing) {
+        newNotifs.push({
+          id: `record-${todayStr}`,
+          type: 'record',
+          title: t('notif_record_today'),
+          message: t('notif_record_today'),
+          timestamp: Date.now() - 3600000, // 1 hour ago
+        });
+      }
+    }
+
+    // 3. Ovulation reminder: if in fertile window
+    const fertileDays = getFertileDays();
+    if (fertileDays.includes(todayStr)) {
+      const existing = notifications.find(n => n.type === 'ovulation');
+      if (!existing) {
+        newNotifs.push({
+          id: `ovulation-${todayStr}`,
+          type: 'ovulation',
+          title: t('notif_fertile'),
+          message: t('notif_fertile'),
+          timestamp: Date.now() - 7200000, // 2 hours ago
+        });
+      }
+    }
+
+    if (newNotifs.length > 0) {
+      setNotifications(prev => {
+        // Avoid duplicates: remove old notifications of the same type before adding new ones
+        const newIds = newNotifs.map(n => n.id);
+        const filtered = prev.filter(n => !newIds.includes(n.id));
+        return [...newNotifs, ...filtered];
+      });
+    }
+  }, [isLoaded, periods, records, profile]);
+
+  const deleteNotification = useCallback((id: string) => {
+    setNotifications(prev => prev.filter(n => n.id !== id));
+  }, []);
+
+  const deleteAllNotifications = useCallback(() => {
+    setNotifications([]);
+  }, []);
 
   // ============ Period Logic ============
   function getPeriodInfo(dateStr: string): PeriodInfoResult {
@@ -245,13 +425,7 @@ export default function LunaApp() {
     try { await feedbackApi.create({ category: feedbackCategory, content: feedbackContent.trim(), contact: feedbackContact.trim() }); setFeedbackOpen(false); setFeedbackContent(''); setFeedbackContact(''); setFeedbackCategory('功能建议'); toast({ description: t('feedback_success') }); } catch (error) { if (error instanceof ApiError) toast({ description: error.message }); else toast({ description: '提交失败，请稍后重试' }); } finally { setFeedbackSubmitting(false); }
   }
 
-  function handleAvatarUpload(e: React.ChangeEvent<HTMLInputElement>) {
-    const file = e.target.files?.[0]; if (!file) return;
-    if (file.size > 2 * 1024 * 1024) { toast({ description: '图片大小不能超过2MB' }); return; }
-    const reader = new FileReader();
-    reader.onload = (ev) => { setEditAvatar(ev.target?.result as string); };
-    reader.readAsDataURL(file);
-  }
+
 
   async function deleteRecord(id: string) {
     try { await recordsApi.deleteByDate(deleteConfirm.date); setDeleteConfirm({ open: false, recordId: '', date: '' }); await fetchRecords(); toast({ description: t('log_record_deleted') }); } catch (error) { if (error instanceof ApiError) toast({ description: error.message }); }
@@ -295,7 +469,10 @@ export default function LunaApp() {
     const sp = [...periods].sort((a, b) => a.startDate.localeCompare(b.startDate));
     const cl: number[] = [], pl: number[] = [];
     for (let i = 1; i < sp.length; i++) {
-      if (sp[i].endDate) { const c = daysBetween(parseDate(sp[i - 1].startDate), parseDate(sp[i].startDate)); if (c > 15 && c < 50) cl.push(c); }
+      // 周期长度只需两个相邻经期开始日期，不需要endDate
+      const c = daysBetween(parseDate(sp[i - 1].startDate), parseDate(sp[i].startDate));
+      if (c > 15 && c < 50) cl.push(c);
+      // 经期长度需要endDate
       if (sp[i].endDate) { const p = daysBetween(parseDate(sp[i].startDate), parseDate(sp[i].endDate!)) + 1; if (p > 0 && p < 15) pl.push(p); }
     }
     return { avgCycle: cl.length > 0 ? Math.round(cl.reduce((a, b) => a + b, 0) / cl.length) : (profile?.cycleLength || 28), avgPeriod: pl.length > 0 ? Math.round(pl.reduce((a, b) => a + b, 0) / pl.length) : (profile?.periodLength || 5), totalCycles: sp.length, cycleLengths: cl, periodLengths: pl };
@@ -308,6 +485,14 @@ export default function LunaApp() {
 
   return (
     <div className="min-h-screen bg-[#0f1419] text-[#f0ece4] flex flex-col overflow-hidden relative">
+      {/* Wallpaper Background */}
+      {wallpaper && (
+        <div className="fixed inset-0 z-0">
+          <img src={wallpaper} alt="" className="w-full h-full object-cover" />
+          <div className="absolute inset-0" style={{ background: 'rgba(15,20,25,0.75)' }} />
+        </div>
+      )}
+
       {/* Background */}
       <div className="fixed inset-0 overflow-hidden pointer-events-none z-0">
         <div className="absolute rounded-full opacity-30 blur-[80px]" style={{ width: 300, height: 300, background: `linear-gradient(135deg, ${themeColor}40, transparent)`, top: -80, right: -80, animation: 'blob-float 20s ease-in-out infinite', transition: 'background 1s ease' }} />
@@ -318,10 +503,10 @@ export default function LunaApp() {
       {/* Main Content */}
       <main className="flex-1 relative z-10 overflow-y-auto overflow-x-hidden safe-top" style={{ paddingBottom: 90 }}>
         <AnimatePresence mode="wait">
-          {activeTab === 'home' && <HomeTab today={today} cycleInfo={cycleInfo} cycleStats={cycleStats} records={records} dailyTipIndex={dailyTipIndex} setDailyTipIndex={setDailyTipIndex} setActiveTab={setActiveTab} setLogTab={setLogTab} ringAnimated={ringAnimated} />}
+          {activeTab === 'home' && <HomeTab today={today} cycleInfo={cycleInfo} cycleStats={cycleStats} records={records} dailyTipIndex={dailyTipIndex} setDailyTipIndex={setDailyTipIndex} setActiveTab={setActiveTab} setLogTab={setLogTab} ringAnimated={ringAnimated} notificationCount={notifications.length} onOpenNotification={() => setNotificationPanelOpen(true)} />}
           {activeTab === 'calendar' && <CalendarTab calYear={calYear} calMonth={calMonth} setCalYear={setCalYear} setCalMonth={setCalMonth} isCurrentMonth={isCurrentMonth} today={today} calendarDays={calendarDays} periods={periods} setActionSheet={setActionSheet} />}
           {activeTab === 'log' && <LogTab today={today} logTab={logTab} setLogTab={setLogTab} currentFlow={currentFlow} setCurrentFlow={setCurrentFlow} currentMood={currentMood} setCurrentMood={setCurrentMood} selectedSymptoms={selectedSymptoms} setSelectedSymptoms={setSelectedSymptoms} customSymptoms={customSymptoms} noteText={noteText} setNoteText={setNoteText} records={records} saveRecord={saveRecord} saveRecordForDate={saveRecordForDate} updateRecord={updateRecord} setSymptomSheetOpen={setSymptomSheetOpen} setDeleteConfirm={setDeleteConfirm} cycleInfo={cycleInfo} editingDate={editingDate} setEditingDate={setEditingDate} selectedDate={selectedDate} setSelectedDate={setSelectedDate} />}
-          {activeTab === 'profile' && <ProfileTab profile={profile} records={records} periods={periods} cycleStats={cycleStats} settings={settings} cycleInfo={cycleInfo} setProfileEditOpen={setProfileEditOpen} setEditName={setEditName} setEditAvatar={setEditAvatar} setEditCycleLength={setEditCycleLength} setEditPeriodLength={setEditPeriodLength} toggleSetting={toggleSetting} exportCSV={exportCSV} setFeedbackOpen={setFeedbackOpen} toast={toast} resetData={resetData} themeColor={themeColor} setThemeColor={setThemeColor} />}
+          {activeTab === 'profile' && <ProfileTab profile={profile} records={records} periods={periods} cycleStats={cycleStats} settings={settings} cycleInfo={cycleInfo} setProfileEditOpen={setProfileEditOpen} setEditName={setEditName} setEditAvatar={setEditAvatar} setEditCycleLength={setEditCycleLength} setEditPeriodLength={setEditPeriodLength} toggleSetting={toggleSetting} exportCSV={exportCSV} setFeedbackOpen={setFeedbackOpen} toast={toast} resetData={resetData} themeColor={themeColor} setThemeColor={setThemeColor} wallpaper={wallpaper} setWallpaper={setWallpaper} themeScope={themeScope} setThemeScope={setThemeScope} />}
         </AnimatePresence>
       </main>
 
@@ -375,13 +560,63 @@ export default function LunaApp() {
       </AnimatePresence>
 
       {/* Profile Edit Sheet */}
-      <ProfileEditSheet open={profileEditOpen} editName={editName} setEditName={setEditName} editAvatar={editAvatar} setEditAvatar={setEditAvatar} editCycleLength={editCycleLength} setEditCycleLength={setEditCycleLength} editPeriodLength={editPeriodLength} setEditPeriodLength={setEditPeriodLength} setProfileEditOpen={setProfileEditOpen} saveProfile={saveProfile} handleAvatarUpload={handleAvatarUpload} fileInputRef={fileInputRef} />
+      <ProfileEditSheet open={profileEditOpen} editName={editName} setEditName={setEditName} editAvatar={editAvatar} setEditAvatar={setEditAvatar} editCycleLength={editCycleLength} setEditCycleLength={setEditCycleLength} editPeriodLength={editPeriodLength} setEditPeriodLength={setEditPeriodLength} setProfileEditOpen={setProfileEditOpen} saveProfile={saveProfile} fileInputRef={fileInputRef} />
 
       {/* Delete Confirmation */}
       <DeleteConfirmDialog open={deleteConfirm.open} recordId={deleteConfirm.recordId} date={deleteConfirm.date} setDeleteConfirm={setDeleteConfirm} deleteRecord={deleteRecord} />
 
       {/* Feedback Sheet */}
       <FeedbackSheet open={feedbackOpen} feedbackCategory={feedbackCategory} setFeedbackCategory={setFeedbackCategory} feedbackContent={feedbackContent} setFeedbackContent={setFeedbackContent} feedbackContact={feedbackContact} setFeedbackContact={setFeedbackContact} feedbackSubmitting={feedbackSubmitting} setFeedbackOpen={setFeedbackOpen} submitFeedback={submitFeedback} />
+
+      {/* Notification Panel */}
+      <NotificationPanel open={notificationPanelOpen} onClose={() => setNotificationPanelOpen(false)} notifications={notifications} onDeleteNotification={deleteNotification} onDeleteAll={deleteAllNotifications} />
+
+      {/* App Lock Screen */}
+      <AnimatePresence>
+        {shouldShowLockScreen && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.3 }}
+            className="fixed inset-0 z-[400] flex flex-col items-center justify-center"
+            style={{ background: '#0f1419' }}
+          >
+            <motion.div
+              className="text-center mb-8"
+              initial={{ scale: 0.8, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1, x: lockScreenShake ? [0, -10, 10, -10, 10, 0] : 0 }}
+              transition={{ duration: lockScreenShake ? 0.5 : 0.5 }}
+            >
+              {/* Luna Logo */}
+              <div className="w-20 h-20 rounded-full mx-auto mb-4 flex items-center justify-center" style={{ background: `linear-gradient(135deg, ${themeColor}, #81b29a)` }}>
+                <span className="text-3xl font-light" style={{ fontFamily: 'Georgia, serif', color: '#0f1419' }}>L</span>
+              </div>
+              <p className="text-xl font-light mb-1" style={{ fontFamily: 'Georgia, serif' }}>Luna</p>
+              <p className="text-sm" style={{ color: '#6b7280' }}>{t('lock_enter_pin')}</p>
+            </motion.div>
+
+            {/* PIN dots */}
+            <div className="flex justify-center gap-4 mb-8">
+              {[0,1,2,3].map(i => (
+                <div key={i} className="w-4 h-4 rounded-full transition-all duration-200" style={{ background: i < lockScreenPin.length ? '#e07a5f' : 'rgba(255,255,255,0.1)' }} />
+              ))}
+            </div>
+
+            {/* Number pad */}
+            <div className="grid grid-cols-3 gap-3 w-64 mx-auto">
+              {[1,2,3,4,5,6,7,8,9].map(d => (
+                <button key={d} className="py-3.5 rounded-xl text-lg font-medium active:scale-95 transition-transform" style={{ background: '#232b35', color: '#f0ece4' }} onClick={() => handleLockScreenPin(String(d))}>{d}</button>
+              ))}
+              <div />
+              <button className="py-3.5 rounded-xl text-lg font-medium active:scale-95 transition-transform" style={{ background: '#232b35', color: '#f0ece4' }} onClick={() => handleLockScreenPin('0')}>0</button>
+              <button className="py-3.5 rounded-xl text-sm font-medium active:scale-95 transition-transform" style={{ background: '#232b35', color: '#6b7280' }} onClick={() => setLockScreenPin(lockScreenPin.slice(0, -1))}>←</button>
+            </div>
+
+            <p className="text-xs mt-8" style={{ color: '#6b7280' }}>{t('lock_unlock')}</p>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }

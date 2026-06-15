@@ -3,9 +3,11 @@
 import React from 'react';
 import { motion } from 'framer-motion';
 import { Bell, Activity, Droplets, ArrowRight } from 'lucide-react';
+import { useI18n } from '@/lib/i18n';
+import type { TKey } from '@/lib/i18n';
 import {
-  StaggerIn, formatDateChinese, PHASE_INFO, RING_TICK_MARKS,
-  DAILY_TIPS, MOOD_EMOJIS, FLOW_LABELS, parseDate,
+  StaggerIn, PHASE_INFO, RING_TICK_MARKS,
+  MOOD_EMOJIS, parseDate,
   type DailyRecord, type CycleInfo, type CycleStats, type TabPage,
 } from './shared';
 
@@ -19,13 +21,56 @@ interface HomeTabProps {
   setActiveTab: (tab: TabPage) => void;
   setLogTab: (tab: 'record' | 'history') => void;
   ringAnimated: boolean;
+  notificationCount?: number;
+  onOpenNotification?: () => void;
 }
+
+const FLOW_KEYS: TKey[] = ['', 'log_flow_spotting', 'log_flow_light', 'log_flow_medium', 'log_flow_heavy'];
+const WEEKDAY_FULL_KEYS: TKey[] = ['week_sunday', 'week_monday', 'week_tuesday', 'week_wednesday', 'week_thursday', 'week_friday', 'week_saturday'];
+const PHASE_NAME_KEYS: Record<string, TKey> = {
+  period: 'phase_period',
+  follicular: 'phase_follicular',
+  ovulation: 'phase_ovulation',
+  luteal: 'phase_luteal',
+};
+const PHASE_DESC_KEYS: Record<string, TKey> = {
+  period: 'phase_period_desc',
+  follicular: 'phase_follicular_desc',
+  ovulation: 'phase_ovulation_desc',
+  luteal: 'phase_luteal_desc',
+};
+const PHASE_TIP_KEYS: Record<string, TKey> = {
+  period: 'phase_period_tip',
+  follicular: 'phase_follicular_tip',
+  ovulation: 'phase_ovulation_tip',
+  luteal: 'phase_luteal_tip',
+};
 
 export default function HomeTab({
   today, cycleInfo, cycleStats, records, dailyTipIndex,
   setDailyTipIndex, setActiveTab, setLogTab, ringAnimated,
+  notificationCount = 0, onOpenNotification,
 }: HomeTabProps) {
+  const { t } = useI18n();
   const phaseData = PHASE_INFO[cycleInfo.phase] || PHASE_INFO.follicular;
+
+  const formatLocalDateFull = (date: Date) => {
+    return t('home_date_full', String(date.getMonth() + 1), String(date.getDate()), t(WEEKDAY_FULL_KEYS[date.getDay()]));
+  };
+
+  const formatLocalDateShort = (date: Date) => {
+    return t('home_date_short', String(date.getMonth() + 1), String(date.getDate()));
+  };
+
+  const getTipText = () => {
+    const tipKey = `tip_${cycleInfo.phase}_${dailyTipIndex}` as TKey;
+    const text = t(tipKey);
+    // Fallback: if the key is returned as-is (not found), use follicular tip
+    if (text === tipKey) {
+      return t('tip_follicular_0');
+    }
+    return text;
+  };
 
   return (
     <motion.div
@@ -40,14 +85,20 @@ export default function HomeTab({
       <StaggerIn delay={0.05}>
         <div className="flex justify-between items-center mb-4">
           <div>
-            <p className="text-sm" style={{ color: '#a8a29e' }}>今天</p>
+            <p className="text-sm" style={{ color: '#a8a29e' }}>{t('home_today')}</p>
             <p className="text-2xl font-light" style={{ fontFamily: 'Georgia, serif' }}>
-              {formatDateChinese(today)}
+              {formatLocalDateFull(today)}
             </p>
           </div>
-          <button className="w-10 h-10 rounded-full flex items-center justify-center transition-all hover:scale-105 active:scale-95"
-            style={{ background: '#232b35', border: '1px solid rgba(255,255,255,0.08)' }}>
+          <button className="w-10 h-10 rounded-full flex items-center justify-center transition-all hover:scale-105 active:scale-95 relative"
+            style={{ background: '#232b35', border: '1px solid rgba(255,255,255,0.08)' }}
+            onClick={onOpenNotification}>
             <Bell size={18} style={{ color: '#a8a29e' }} />
+            {notificationCount > 0 && (
+              <span className="absolute -top-1 -right-1 min-w-[18px] h-[18px] rounded-full flex items-center justify-center text-[10px] font-bold px-1" style={{ background: '#ef4444', color: '#fff' }}>
+                {notificationCount > 9 ? '9+' : notificationCount}
+              </span>
+            )}
           </button>
         </div>
       </StaggerIn>
@@ -64,11 +115,11 @@ export default function HomeTab({
             <div className="w-2.5 h-2.5 rounded-full"
               style={{ background: phaseData.color, boxShadow: `0 0 10px ${phaseData.color}80` }} />
             <span className="text-sm font-medium" style={{ color: phaseData.color }}>
-              {phaseData.name} 第{cycleInfo.phaseDay}天
+              {t(PHASE_NAME_KEYS[cycleInfo.phase] || 'phase_follicular')} {t('home_phase_day', cycleInfo.phaseDay)}
             </span>
           </div>
-          <p className="text-lg font-light mb-2">{phaseData.desc}</p>
-          <p className="text-sm" style={{ color: '#a8a29e' }}>{phaseData.tip}</p>
+          <p className="text-lg font-light mb-2">{t(PHASE_DESC_KEYS[cycleInfo.phase] || 'phase_follicular_desc')}</p>
+          <p className="text-sm" style={{ color: '#a8a29e' }}>{t(PHASE_TIP_KEYS[cycleInfo.phase] || 'phase_follicular_tip')}</p>
         </div>
       </StaggerIn>
 
@@ -111,7 +162,7 @@ export default function HomeTab({
             </svg>
             {/* Center Content */}
             <div className="absolute inset-[25px] rounded-full flex flex-col items-center justify-center">
-              <p className="text-xs mb-0.5" style={{ color: '#6b7280' }}>下次经期预计</p>
+              <p className="text-xs mb-0.5" style={{ color: '#6b7280' }}>{t('home_next_period_label')}</p>
               <motion.p
                 className="text-4xl font-light"
                 style={{ fontFamily: 'Georgia, serif' }}
@@ -122,7 +173,7 @@ export default function HomeTab({
               >
                 {cycleInfo.daysUntilNext}
               </motion.p>
-              <p className="text-sm" style={{ color: '#a8a29e' }}>天后</p>
+              <p className="text-sm" style={{ color: '#a8a29e' }}>{t('home_days_after')}</p>
             </div>
           </div>
         </div>
@@ -134,21 +185,21 @@ export default function HomeTab({
           <div className="rounded-[20px] p-4" style={{ background: '#232b35', border: '1px solid rgba(255,255,255,0.08)' }}>
             <div className="flex items-center gap-2 mb-2">
               <Activity size={14} style={{ color: '#81b29a' }} />
-              <p className="text-xs" style={{ color: '#6b7280' }}>周期长度</p>
+              <p className="text-xs" style={{ color: '#6b7280' }}>{t('home_cycle_length')}</p>
             </div>
             <p className="text-2xl font-light" style={{ fontFamily: 'Georgia, serif' }}>
               {cycleStats.avgCycle}
-              <span className="text-sm ml-1" style={{ color: '#a8a29e' }}>天</span>
+              <span className="text-sm ml-1" style={{ color: '#a8a29e' }}>{t('common_days')}</span>
             </p>
           </div>
           <div className="rounded-[20px] p-4" style={{ background: '#232b35', border: '1px solid rgba(255,255,255,0.08)' }}>
             <div className="flex items-center gap-2 mb-2">
               <Droplets size={14} style={{ color: '#e07a5f' }} />
-              <p className="text-xs" style={{ color: '#6b7280' }}>经期长度</p>
+              <p className="text-xs" style={{ color: '#6b7280' }}>{t('home_period_length')}</p>
             </div>
             <p className="text-2xl font-light" style={{ fontFamily: 'Georgia, serif' }}>
               {cycleStats.avgPeriod}
-              <span className="text-sm ml-1" style={{ color: '#a8a29e' }}>天</span>
+              <span className="text-sm ml-1" style={{ color: '#a8a29e' }}>{t('common_days')}</span>
             </p>
           </div>
         </div>
@@ -157,7 +208,7 @@ export default function HomeTab({
       {/* Cycle Phase Timeline */}
       <StaggerIn delay={0.35}>
         <div className="rounded-[20px] p-5 mt-4" style={{ background: '#232b35', border: '1px solid rgba(255,255,255,0.08)' }}>
-          <p className="text-sm font-medium mb-4">周期阶段</p>
+          <p className="text-sm font-medium mb-4">{t('home_phase_timeline')}</p>
           <div className="flex gap-1 h-3 rounded-full overflow-hidden mb-3">
             {/* Period phase */}
             <div
@@ -193,10 +244,10 @@ export default function HomeTab({
               }} />
           </div>
           <div className="flex justify-between text-xs" style={{ color: '#6b7280' }}>
-            <span style={{ color: cycleInfo.phase === 'period' ? '#e07a5f' : '#6b7280' }}>经期</span>
-            <span style={{ color: cycleInfo.phase === 'follicular' ? '#81b29a' : '#6b7280' }}>卵泡期</span>
-            <span style={{ color: cycleInfo.phase === 'ovulation' ? '#d4a574' : '#6b7280' }}>排卵</span>
-            <span style={{ color: cycleInfo.phase === 'luteal' ? '#f2cc8f' : '#6b7280' }}>黄体期</span>
+            <span style={{ color: cycleInfo.phase === 'period' ? '#e07a5f' : '#6b7280' }}>{t('phase_period')}</span>
+            <span style={{ color: cycleInfo.phase === 'follicular' ? '#81b29a' : '#6b7280' }}>{t('phase_follicular')}</span>
+            <span style={{ color: cycleInfo.phase === 'ovulation' ? '#d4a574' : '#6b7280' }}>{t('phase_ovulation')}</span>
+            <span style={{ color: cycleInfo.phase === 'luteal' ? '#f2cc8f' : '#6b7280' }}>{t('phase_luteal')}</span>
           </div>
         </div>
       </StaggerIn>
@@ -206,16 +257,17 @@ export default function HomeTab({
         <StaggerIn delay={0.4}>
           <div className="mt-4 rounded-[20px] p-5" style={{ background: '#232b35', border: '1px solid rgba(255,255,255,0.08)' }}>
             <div className="flex justify-between items-center mb-3">
-              <p className="text-sm font-medium">最近记录</p>
+              <p className="text-sm font-medium">{t('home_recent_records')}</p>
               <button className="text-xs px-3 py-1 rounded-full transition-all hover:scale-105"
                 style={{ background: 'rgba(255,255,255,0.05)', color: '#a8a29e' }}
                 onClick={() => { setActiveTab('log'); setLogTab('history'); }}>
-                查看全部
+                {t('home_view_all')}
               </button>
             </div>
             {records.slice(0, 3).map(record => {
               const d = parseDate(record.date);
               const symptoms = JSON.parse(record.symptoms || '[]');
+              const flowLabel = record.flow >= 1 && record.flow <= 4 ? t(FLOW_KEYS[record.flow]) : '';
               return (
                 <div key={record.id} className="flex items-center gap-3 py-2.5 border-b last:border-0"
                   style={{ borderColor: 'rgba(255,255,255,0.04)' }}>
@@ -224,7 +276,7 @@ export default function HomeTab({
                     {MOOD_EMOJIS[record.mood] || '📝'}
                   </div>
                   <div className="flex-1 min-w-0">
-                    <p className="text-sm font-medium">{d.getMonth() + 1}月{d.getDate()}日</p>
+                    <p className="text-sm font-medium">{formatLocalDateShort(d)}</p>
                     <div className="flex gap-1 mt-0.5 flex-wrap">
                       {symptoms.slice(0, 2).map((s: string, i: number) => (
                         <span key={i} className="text-[11px] px-1.5 py-0.5 rounded-md"
@@ -240,7 +292,7 @@ export default function HomeTab({
                     </div>
                   </div>
                   <span className="text-xs flex-shrink-0" style={{ color: '#6b7280' }}>
-                    {FLOW_LABELS[record.flow]}
+                    {flowLabel}
                   </span>
                 </div>
               );
@@ -265,7 +317,7 @@ export default function HomeTab({
               <span className="text-lg">💡</span>
             </div>
             <div className="flex-1">
-              <p className="text-sm font-medium mb-1">今日小贴士</p>
+              <p className="text-sm font-medium mb-1">{t('home_daily_tip')}</p>
               <motion.p
                 className="text-sm leading-relaxed"
                 style={{ color: '#a8a29e' }}
@@ -274,7 +326,7 @@ export default function HomeTab({
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ duration: 0.3 }}
               >
-                {DAILY_TIPS[cycleInfo.phase]?.[dailyTipIndex] || DAILY_TIPS.follicular[0]}
+                {getTipText()}
               </motion.p>
             </div>
             <button className="flex-shrink-0 w-8 h-8 rounded-lg flex items-center justify-center transition-all hover:scale-110 active:scale-95"
@@ -291,8 +343,8 @@ export default function HomeTab({
         <StaggerIn delay={0.5}>
           <div className="mt-4 rounded-[20px] p-5" style={{ background: '#232b35', border: '1px solid rgba(255,255,255,0.08)' }}>
             <div className="flex justify-between items-center mb-4">
-              <p className="text-sm font-medium">周期趋势</p>
-              <span className="text-xs" style={{ color: '#6b7280' }}>最近{Math.min(cycleStats.cycleLengths.length, 6)}个周期</span>
+              <p className="text-sm font-medium">{t('home_trend')}</p>
+              <span className="text-xs" style={{ color: '#6b7280' }}>{t('home_recent_n_cycles', Math.min(cycleStats.cycleLengths.length, 6))}</span>
             </div>
             <div className="flex items-end gap-2 h-20">
               {cycleStats.cycleLengths.slice(-6).map((len, i) => {
@@ -325,10 +377,10 @@ export default function HomeTab({
               })}
             </div>
             <div className="flex items-center justify-between mt-2 pt-2" style={{ borderTop: '1px solid rgba(255,255,255,0.04)' }}>
-              <span className="text-[11px]" style={{ color: '#6b7280' }}>平均 {cycleStats.avgCycle} 天</span>
+              <span className="text-[11px]" style={{ color: '#6b7280' }}>{t('home_avg_format', cycleStats.avgCycle)}</span>
               <div className="flex items-center gap-1">
                 <div className="w-2 h-2 rounded-full" style={{ background: '#e07a5f' }} />
-                <span className="text-[11px]" style={{ color: '#6b7280' }}>最近</span>
+                <span className="text-[11px]" style={{ color: '#6b7280' }}>{t('home_recent_label')}</span>
               </div>
             </div>
           </div>
