@@ -6,7 +6,7 @@ import {
   Calendar, TrendingUp, Droplets, Check, Bell, Clock, Crosshair,
   Shield, Eye, Lock, Moon, Sun, Download, Cloud, RotateCcw,
   Globe, Info, MessageSquare, ChevronRight, Target,
-  Trash2, Palette, Share2, AlertTriangle, Image as ImageIcon,
+  Trash2, Palette, AlertTriangle, Image as ImageIcon,
 } from 'lucide-react';
 import { useI18n, LOCALE_NAMES, type Locale } from '@/lib/i18n';
 import {
@@ -164,83 +164,6 @@ export default function ProfileTab({
     const v = cycleStats.cycleLengths.reduce((s, l) => s + Math.pow(l - avg, 2), 0) / cycleStats.cycleLengths.length;
     return Math.sqrt(v) <= 4 ? t('profile_regular') : t('profile_irregular');
   })();
-
-  // Task 6: Enhanced WeChat share
-  const shareWeChat = async () => {
-    // Try native share first (works well on mobile, includes WeChat option)
-    if (navigator.share) {
-      try {
-        await navigator.share({
-          title: 'Luna',
-          text: '我在使用 Luna 经期追踪应用，推荐给你！',
-          url: window.location.href,
-        });
-        return;
-      } catch {
-        // User cancelled or share failed, fallback
-      }
-    }
-
-    // Fallback: generate share image via canvas and copy link
-    try {
-      const canvas = document.createElement('canvas');
-      canvas.width = 600;
-      canvas.height = 400;
-      const ctx = canvas.getContext('2d');
-      if (!ctx) throw new Error('No canvas');
-
-      // Background
-      const bgGrad = ctx.createLinearGradient(0, 0, 600, 400);
-      bgGrad.addColorStop(0, '#1a2027');
-      bgGrad.addColorStop(1, '#0f1419');
-      ctx.fillStyle = bgGrad;
-      ctx.fillRect(0, 0, 600, 400);
-
-      // Accent circle
-      const accentGrad = ctx.createRadialGradient(300, 140, 10, 300, 140, 80);
-      accentGrad.addColorStop(0, themeColor);
-      accentGrad.addColorStop(1, 'transparent');
-      ctx.fillStyle = accentGrad;
-      ctx.fillRect(0, 0, 600, 400);
-
-      // Logo circle
-      ctx.beginPath();
-      ctx.arc(300, 130, 40, 0, Math.PI * 2);
-      const logoGrad = ctx.createLinearGradient(260, 90, 340, 170);
-      logoGrad.addColorStop(0, themeColor);
-      logoGrad.addColorStop(1, '#81b29a');
-      ctx.fillStyle = logoGrad;
-      ctx.fill();
-
-      // Logo text
-      ctx.fillStyle = '#0f1419';
-      ctx.font = 'bold 32px Georgia, serif';
-      ctx.textAlign = 'center';
-      ctx.textBaseline = 'middle';
-      ctx.fillText('L', 300, 132);
-
-      // App name
-      ctx.fillStyle = '#f0ece4';
-      ctx.font = '28px Georgia, serif';
-      ctx.fillText('Luna', 300, 200);
-
-      // Description
-      ctx.fillStyle = '#a8a29e';
-      ctx.font = '16px sans-serif';
-      ctx.fillText('经期追踪 · 周期管理 · 健康记录', 300, 240);
-
-      // URL
-      ctx.fillStyle = themeColor;
-      ctx.font = '14px sans-serif';
-      ctx.fillText(window.location.host, 300, 300);
-
-      // Copy link to clipboard
-      await navigator.clipboard.writeText(`${window.location.href} - Luna 经期追踪`);
-      toast({ description: '链接已复制，可分享给好友 📋' });
-    } catch {
-      toast({ description: '分享功能暂不可用' });
-    }
-  };
 
   // Wallpaper: handle file selection
   const handleWallpaperFile = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -401,7 +324,7 @@ export default function ProfileTab({
       <StaggerIn delay={0.3}>
         <div className="rounded-[20px] p-5 mb-4" style={{ background: 'var(--luna-card)', border: '1px solid var(--luna-card-border)' }}>
           <p className="text-sm font-medium mb-3">{t('profile_data_management')}</p>
-          {[{ icon: Download, l: t('profile_export_data'), d: t('profile_export_csv'), fn: exportCSV }, { icon: Share2, l: t('profile_export_wechat'), d: t('profile_export_wechat'), fn: shareWeChat }, { icon: Cloud, l: t('profile_cloud_sync'), d: t('profile_cloud_sync_desc'), fn: () => toast({ description: '云同步功能开发中' }) }, { icon: RotateCcw, l: t('profile_restore_data'), d: t('profile_restore_data_desc'), fn: () => toast({ description: '恢复数据功能开发中' }) }, { icon: Trash2, l: t('profile_reset_data'), d: t('profile_reset_data_desc'), fn: () => setResetOpen(true), danger: true }].map((item, i) => (
+          {[{ icon: Download, l: t('profile_export_data'), d: t('profile_export_csv'), fn: exportCSV }, { icon: Cloud, l: t('profile_cloud_sync'), d: t('profile_cloud_sync_desc'), fn: () => toast({ description: '云同步功能开发中' }) }, { icon: RotateCcw, l: t('profile_restore_data'), d: t('profile_restore_data_desc'), fn: () => toast({ description: '恢复数据功能开发中' }) }, { icon: Trash2, l: t('profile_reset_data'), d: t('profile_reset_data_desc'), fn: () => setResetOpen(true), danger: true }].map((item, i) => (
             <div key={i} className="flex items-center gap-3.5 py-3.5 cursor-pointer active:scale-[0.98]" onClick={item.fn}>
               <div className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0" style={{ background: 'var(--luna-surface)' }}><item.icon size={20} style={{ color: item.danger ? '#ef4444' : 'var(--luna-text-secondary)' }} /></div>
               <div className="flex-1"><p className="text-[15px] font-medium" style={{ color: item.danger ? '#ef4444' : 'var(--luna-text)' }}>{item.l}</p><p className="text-xs" style={{ color: 'var(--luna-text-muted)' }}>{item.d}</p></div>

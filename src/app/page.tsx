@@ -458,18 +458,25 @@ export default function LunaApp() {
   async function exportCSV() {
     try {
       const data = await exportApi.getData();
-      const BOM = '\uFEFF';
-      const csvContent = data.csvContent || generateCSVFromRecords(data.records);
-      const blob = new Blob([BOM + csvContent], { type: 'text/csv;charset=utf-8;' });
+      const fileName = `luna_data_${formatDateStr(new Date())}.json`;
+      const exportPayload = {
+        app: 'Luna',
+        version: 2,
+        exportedAt: new Date().toISOString(),
+        profile: data.profile,
+        periods: data.periods,
+        records: data.records,
+      };
+      const jsonStr = JSON.stringify(exportPayload, null, 2);
+      const blob = new Blob([jsonStr], { type: 'application/json' });
 
-      // Try Web Share API first (can share to WeChat, etc.)
+      // Try Web Share API first (can share file to WeChat, etc.)
       if (navigator.share && navigator.canShare) {
-        const file = new File([blob], `luna_records_${formatDateStr(new Date())}.csv`, { type: 'text/csv' });
-        const shareData = { files: [file], title: 'Luna 经期数据' };
+        const file = new File([blob], fileName, { type: 'application/json' });
+        const shareData = { files: [file] };
         if (navigator.canShare(shareData)) {
           try {
             await navigator.share(shareData);
-            toast({ description: t('export_share_success') });
             return;
           } catch {
             // User cancelled, fall through to download
@@ -481,10 +488,9 @@ export default function LunaApp() {
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
-      a.download = `luna_records_${formatDateStr(new Date())}.csv`;
+      a.download = fileName;
       a.click();
       URL.revokeObjectURL(url);
-      toast({ description: t('export_download_success') });
     } catch (error) {
       if (error instanceof ApiError) toast({ description: error.message });
     }
