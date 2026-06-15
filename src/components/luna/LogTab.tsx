@@ -138,7 +138,7 @@ export default function LogTab({
     setLogTab('record');
   };
 
-  const fl = ['', t('log_flow_spotting'), t('log_flow_light'), t('log_flow_medium'), t('log_flow_heavy')];
+  const fl = [t('log_flow_none'), t('log_flow_spotting'), t('log_flow_light'), t('log_flow_medium'), t('log_flow_heavy')];
   const ml = ['', t('log_mood_happy'), t('log_mood_calm'), t('log_mood_shy'), t('log_mood_sad'), t('log_mood_irritable'), t('log_mood_anxious')];
   const sl: Record<string, string> = { '痛经': t('log_symptom_cramps'), '腰酸': t('log_symptom_backache'), '头痛': t('log_symptom_headache'), '疲劳': t('log_symptom_fatigue'), '腹胀': t('log_symptom_bloating'), '乳房胀痛': t('log_symptom_breast') };
   const sd = parseDate(selectedDate);
@@ -173,11 +173,17 @@ export default function LogTab({
           {/* Flow */}
           <div className="mb-6">
             <div className="flex items-center gap-2 mb-3"><Droplets size={14} style={{ color: '#e07a5f' }} /><p className="text-sm font-medium">{t('log_flow')}</p></div>
-            <div className="flex gap-3 justify-between">
-              {[1, 2, 3, 4].map(level => (
-                <button key={level} className="flex flex-col items-center gap-2 p-3 rounded-2xl transition-all flex-1" style={{ background: currentFlow === level ? 'rgba(224,122,95,0.15)' : '#1a2027', border: currentFlow === level ? '1.5px solid #e07a5f' : '1.5px solid rgba(255,255,255,0.06)' }} onClick={() => setCurrentFlow(level)}>
-                  <div className="rounded-full transition-all" style={{ width: 14 + level * 4, height: 14 + level * 4, background: currentFlow === level ? '#e07a5f' : '#4b5563', boxShadow: currentFlow === level ? '0 0 12px #e07a5f60' : 'none' }} />
-                  <span className="text-xs" style={{ color: currentFlow === level ? '#e07a5f' : '#a8a29e' }}>{fl[level]}</span>
+            <div className="flex gap-2 justify-between">
+              {[0, 1, 2, 3, 4].map(level => (
+                <button key={level} className="flex flex-col items-center gap-2 p-2.5 rounded-2xl transition-all flex-1" style={{ background: currentFlow === level ? 'rgba(224,122,95,0.15)' : '#1a2027', border: currentFlow === level ? '1.5px solid #e07a5f' : '1.5px solid rgba(255,255,255,0.06)' }} onClick={() => setCurrentFlow(level)}>
+                  {level === 0 ? (
+                    <div className="rounded-full transition-all flex items-center justify-center" style={{ width: 20, height: 20, background: 'transparent', border: currentFlow === 0 ? '2px solid #e07a5f' : '2px solid #4b5563', boxShadow: currentFlow === 0 ? '0 0 12px #e07a5f60' : 'none' }}>
+                      <div className="rounded-full" style={{ width: 6, height: 6, background: currentFlow === 0 ? '#e07a5f' : 'transparent' }} />
+                    </div>
+                  ) : (
+                    <div className="rounded-full transition-all" style={{ width: 14 + level * 4, height: 14 + level * 4, background: currentFlow === level ? '#e07a5f' : '#4b5563', boxShadow: currentFlow === level ? '0 0 12px #e07a5f60' : 'none' }} />
+                  )}
+                  <span className="text-[11px]" style={{ color: currentFlow === level ? '#e07a5f' : '#a8a29e' }}>{fl[level]}</span>
                 </button>
               ))}
             </div>
@@ -258,7 +264,7 @@ export default function LogTab({
                   </div>
                   <div className="flex items-center gap-3 mb-2">
                     <span className="text-xs" style={{ color: '#6b7280' }}>{t('log_flow')}:</span>
-                    <div className="flex gap-1">{[1,2,3,4].map(l => <div key={l} className="w-2 rounded-full" style={{ height: 6+l*2, background: l <= rec.flow ? '#e07a5f' : 'rgba(255,255,255,0.06)' }} />)}</div>
+                    <div className="flex gap-1">{rec.flow === 0 ? <div className="w-2 rounded-full" style={{ height: 8, background: 'rgba(224,122,95,0.3)', border: '1px dashed #e07a5f' }} /> : [1,2,3,4].map(l => <div key={l} className="w-2 rounded-full" style={{ height: 6+l*2, background: l <= rec.flow ? '#e07a5f' : 'rgba(255,255,255,0.06)' }} />)}</div>
                     <span className="text-xs" style={{ color: '#e07a5f' }}>{fl[rec.flow]}</span>
                   </div>
                   {syms.length > 0 && <div className="flex flex-wrap gap-1.5 mb-1">{syms.map((s: string, i: number) => <span key={i} className="text-xs px-2.5 py-1 rounded-lg" style={{ background: 'rgba(224,122,95,0.1)', color: '#e07a5f' }}>{sl[s] || s}</span>)}</div>}

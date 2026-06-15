@@ -294,3 +294,32 @@ Stage Summary:
 - 头像/壁纸裁剪：react-easy-crop 实现
 - 主题颜色：局部/全局切换
 - 应用锁：PIN设置+启动验证
+
+---
+Task ID: 6
+Agent: Main
+Task: 记录页添加无量选择 - 流量选择增加"无量"选项
+
+Work Log:
+- 更新 `shared.tsx`: FLOW_LABELS 从 `['', '点滴', '少量', '中等', '大量']` 改为 `['无量', '点滴', '少量', '中等', '大量']`，索引0从空字符串变为'无量'
+- 添加 i18n 翻译键 `log_flow_none`: zh='无量', en='None', ko='없음'
+- 更新 `LogTab.tsx`:
+  - 流量选择器从4个按钮(1-4)扩展为5个按钮(0-4)，增加"无量"选项
+  - "无量"按钮使用空心圆+中心点视觉设计，区别于其他实心圆按钮
+  - 历史记录中 flow=0 的显示：使用虚线边框圆点 + "无量"文字标签
+  - fl 数组更新：从 `['', t('log_flow_spotting'), ...]` 改为 `[t('log_flow_none'), t('log_flow_spotting'), ...]`
+- 更新 `HomeTab.tsx`:
+  - FLOW_KEYS 数组索引0从空字符串改为 `'log_flow_none'`
+  - flowLabel 判断条件从 `flow >= 1` 改为 `flow >= 0`，支持显示无量
+- API 已支持 flow=0（validateIntRange 0-4），无需修改
+- 导出功能已正确使用 FLOW_LABELS[r.flow]，自动适配新索引
+- 使用 agent-browser 验证：流量选择器5个选项（无量/点滴/少量/中等/大量）全部正常显示和选择
+- 保存 flow=0 记录后，历史记录正确显示"None"（无量）
+
+Stage Summary:
+- 流量选择新增"无量"选项（flow=0），用户可以选择"没有流量"
+- 视觉设计：无量用空心圆+中心点表示，其他流量用逐渐增大的实心圆
+- 历史记录中无量用虚线圆点表示
+- i18n 三语支持：无量/None/없음
+- 所有相关文件已更新：shared.tsx, LogTab.tsx, HomeTab.tsx, translations.ts
+- lint 通过，dev server 无报错

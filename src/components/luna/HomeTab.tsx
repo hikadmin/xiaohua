@@ -25,7 +25,7 @@ interface HomeTabProps {
   onOpenNotification?: () => void;
 }
 
-const FLOW_KEYS: TKey[] = ['', 'log_flow_spotting', 'log_flow_light', 'log_flow_medium', 'log_flow_heavy'];
+const FLOW_KEYS: TKey[] = ['log_flow_none', 'log_flow_spotting', 'log_flow_light', 'log_flow_medium', 'log_flow_heavy'];
 const WEEKDAY_FULL_KEYS: TKey[] = ['week_sunday', 'week_monday', 'week_tuesday', 'week_wednesday', 'week_thursday', 'week_friday', 'week_saturday'];
 const PHASE_NAME_KEYS: Record<string, TKey> = {
   period: 'phase_period',
@@ -267,7 +267,7 @@ export default function HomeTab({
             {records.slice(0, 3).map(record => {
               const d = parseDate(record.date);
               const symptoms = JSON.parse(record.symptoms || '[]');
-              const flowLabel = record.flow >= 1 && record.flow <= 4 ? t(FLOW_KEYS[record.flow]) : '';
+              const flowLabel = record.flow >= 0 && record.flow <= 4 ? t(FLOW_KEYS[record.flow]) : '';
               return (
                 <div key={record.id} className="flex items-center gap-3 py-2.5 border-b last:border-0"
                   style={{ borderColor: 'rgba(255,255,255,0.04)' }}>
