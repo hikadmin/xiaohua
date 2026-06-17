@@ -12,18 +12,40 @@ export async function GET() {
       db.userProfile.findFirst(),
     ])
 
-    // CSV 格式化记录
-    const csvHeaders = ['日期', '流量', '情绪', '症状', '备注']
-    const csvRows = records.map(r => {
+    // CSV 格式化记录 — 包含经期区间和每日记录
+    const csvHeaders = ['类型', '开始日期', '结束日期', '流量', '情绪', '症状', '备注']
+    const csvRows: string[][] = []
+
+    // 经期区间
+    for (const p of periods) {
+      csvRows.push([
+        '经期',
+        p.startDate,
+        p.endDate || '进行中',
+        '',
+        '',
+        '',
+        '',
+      ])
+    }
+
+    // 每日记录
+    for (const r of records) {
       const symptoms = JSON.parse(r.symptoms || '[]')
-      return [
+      csvRows.push([
+        '记录',
         r.date,
+        '',
         FLOW_LABELS[r.flow] || '',
         MOOD_LABELS[r.mood] || '',
         symptoms.join(';'),
         `"${(r.note || '').replace(/"/g, '""')}"`,
-      ]
-    })
+      ])
+    }
+
+    // 按开始日期排序
+    csvRows.sort((a, b) => b[1].localeCompare(a[1]))
+
     const csvContent = [csvHeaders.join(','), ...csvRows.map(r => r.join(','))].join('\n')
 
     return success({
